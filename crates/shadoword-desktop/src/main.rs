@@ -10,9 +10,9 @@ use global_hotkey::{GlobalHotKeyEvent, GlobalHotKeyManager, HotKeyState};
 #[cfg(target_os = "linux")]
 use handy_keys::{Hotkey as HandyHotkey, HotkeyId as HandyHotkeyId, HotkeyManager as HandyHotkeyManager, HotkeyState as HandyHotkeyState};
 use shadoword_core::{
-    AudioInput, DeviceListResponse, EngineKind, InputDeviceInfo, LocalService, MicrophoneRecorder,
-    OnnxQuantization, OrtxAccelerator, PasteMethod, RecordingSession, ServiceMode, ServiceStatus,
-    ShadowwordConfig, TranscriptResponse, TranscriptionService, TypingTool, WhisperAccelerator,
+    AudioInput, DeviceListResponse, InputDeviceInfo, LocalService, MicrophoneRecorder, PasteMethod,
+    RecordingSession, ServiceMode, ServiceStatus, ShadowwordConfig, TranscriptResponse,
+    TranscriptionService, TypingTool, WhisperAccelerator,
 };
 use std::collections::HashMap;
 use std::process::{Command, Stdio};
@@ -142,7 +142,7 @@ struct ConnectionTestResult {
 
 struct HistoryEntry {
     text: String,
-    engine: EngineKind,
+    engine: String,
     elapsed_ms: u128,
     timestamp: String,
 }
@@ -304,43 +304,13 @@ struct CatalogModel {
     filename: &'static str,
     url: &'static str,
     size_mb: u32,
-    engine: EngineKind,
     accuracy: f32,
     speed: f32,
     recommended: bool,
     languages: &'static str,
-    is_directory: bool,
 }
 
 const MODEL_CATALOG: &[CatalogModel] = &[
-    CatalogModel {
-        id: "parakeet-tdt-0.6b-v3",
-        name: "Parakeet V3",
-        description: "Fast and accurate, 25 European languages",
-        filename: "parakeet-tdt-0.6b-v3-int8",
-        url: "https://blob.handy.computer/parakeet-v3-int8.tar.gz",
-        size_mb: 456,
-        engine: EngineKind::Parakeet,
-        accuracy: 0.80,
-        speed: 0.85,
-        recommended: true,
-        languages: "25 EU languages",
-        is_directory: true,
-    },
-    CatalogModel {
-        id: "parakeet-tdt-0.6b-v2",
-        name: "Parakeet V2",
-        description: "Best for English speakers",
-        filename: "parakeet-tdt-0.6b-v2-int8",
-        url: "https://blob.handy.computer/parakeet-v2-int8.tar.gz",
-        size_mb: 451,
-        engine: EngineKind::Parakeet,
-        accuracy: 0.85,
-        speed: 0.85,
-        recommended: false,
-        languages: "English",
-        is_directory: true,
-    },
     CatalogModel {
         id: "whisper-small",
         name: "Whisper Small",
@@ -348,12 +318,10 @@ const MODEL_CATALOG: &[CatalogModel] = &[
         filename: "ggml-small.bin",
         url: "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-small.bin",
         size_mb: 465,
-        engine: EngineKind::Whisper,
         accuracy: 0.60,
         speed: 0.85,
         recommended: false,
         languages: "99 languages",
-        is_directory: false,
     },
     CatalogModel {
         id: "whisper-medium",
@@ -362,12 +330,10 @@ const MODEL_CATALOG: &[CatalogModel] = &[
         filename: "whisper-medium-q4_1.bin",
         url: "https://blob.handy.computer/whisper-medium-q4_1.bin",
         size_mb: 469,
-        engine: EngineKind::Whisper,
         accuracy: 0.75,
         speed: 0.60,
         recommended: false,
         languages: "99 languages",
-        is_directory: false,
     },
     CatalogModel {
         id: "whisper-turbo",
@@ -376,12 +342,10 @@ const MODEL_CATALOG: &[CatalogModel] = &[
         filename: "ggml-large-v3-turbo.bin",
         url: "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-large-v3-turbo.bin",
         size_mb: 1549,
-        engine: EngineKind::Whisper,
         accuracy: 0.80,
         speed: 0.40,
-        recommended: false,
+        recommended: true,
         languages: "99 languages",
-        is_directory: false,
     },
     CatalogModel {
         id: "whisper-large",
@@ -390,12 +354,10 @@ const MODEL_CATALOG: &[CatalogModel] = &[
         filename: "ggml-large-v3-q5_0.bin",
         url: "https://blob.handy.computer/ggml-large-v3-q5_0.bin",
         size_mb: 1031,
-        engine: EngineKind::Whisper,
         accuracy: 0.85,
         speed: 0.30,
         recommended: false,
         languages: "99 languages",
-        is_directory: false,
     },
 ];
 
@@ -712,7 +674,7 @@ impl ShadowwordApp {
                 self.connection_test = Some(ConnectionTestResult {
                     success: true,
                     message: format!(
-                        "Connected — engine: {:?}, model loaded: {}, sample rate: {}Hz",
+                        "Connected - engine: {}, model loaded: {}, sample rate: {}Hz",
                         status.engine, status.model_loaded, status.sample_rate
                     ),
                 });
@@ -760,7 +722,6 @@ impl ShadowwordApp {
     fn select_model(&mut self, model: &CatalogModel) {
         if let Some(path) = self.model_path_for(model) {
             self.config.model_path = path;
-            self.config.engine = model.engine;
             self.status_line = format!("Selected {}", model.name);
         }
     }
@@ -779,7 +740,6 @@ impl ShadowwordApp {
 
         let url = model.url.to_string();
         let dest = dir.join(model.filename);
-        let is_directory = model.is_directory;
         let (tx, rx) = mpsc::channel();
 
         self.active_downloads.insert(
@@ -806,40 +766,17 @@ impl ShadowwordApp {
                 let total = resp.content_length().unwrap_or(0);
                 let _ = tx.send(DownloadProgress { downloaded: 0, total, error: None, done: false });
 
-                if is_directory {
-                    let tmp_path = dest.with_extension("tar.gz");
-                    let mut file = std::fs::File::create(&tmp_path)
-                        .context("failed to create temp file")?;
-                    let mut downloaded: u64 = 0;
-                    let mut buf = vec![0u8; 64 * 1024];
-                    loop {
-                        let n = std::io::Read::read(&mut resp, &mut buf)
-                            .context("download read error")?;
-                        if n == 0 { break; }
-                        std::io::Write::write_all(&mut file, &buf[..n])?;
-                        downloaded += n as u64;
-                        let _ = tx.send(DownloadProgress { downloaded, total, error: None, done: false });
-                    }
-                    drop(file);
-                    let tar_file = std::fs::File::open(&tmp_path)?;
-                    let decoder = flate2::read::GzDecoder::new(tar_file);
-                    let mut archive = tar::Archive::new(decoder);
-                    let parent = dest.parent().context("no parent dir")?;
-                    archive.unpack(parent).context("failed to extract tar.gz")?;
-                    let _ = std::fs::remove_file(&tmp_path);
-                } else {
-                    let mut file = std::fs::File::create(&dest)
-                        .context("failed to create model file")?;
-                    let mut downloaded: u64 = 0;
-                    let mut buf = vec![0u8; 64 * 1024];
-                    loop {
-                        let n = std::io::Read::read(&mut resp, &mut buf)
-                            .context("download read error")?;
-                        if n == 0 { break; }
-                        std::io::Write::write_all(&mut file, &buf[..n])?;
-                        downloaded += n as u64;
-                        let _ = tx.send(DownloadProgress { downloaded, total, error: None, done: false });
-                    }
+                let mut file = std::fs::File::create(&dest)
+                    .context("failed to create model file")?;
+                let mut downloaded: u64 = 0;
+                let mut buf = vec![0u8; 64 * 1024];
+                loop {
+                    let n = std::io::Read::read(&mut resp, &mut buf)
+                        .context("download read error")?;
+                    if n == 0 { break; }
+                    std::io::Write::write_all(&mut file, &buf[..n])?;
+                    downloaded += n as u64;
+                    let _ = tx.send(DownloadProgress { downloaded, total, error: None, done: false });
                 }
                 let _ = tx.send(DownloadProgress { downloaded: 0, total, error: None, done: true });
                 Ok(())
@@ -1023,7 +960,7 @@ impl ShadowwordApp {
             Ok(Ok(response)) => {
                 self.transcript = response.text.clone();
                 self.status_line =
-                    format!("Transcribed in {}ms with {:?}", response.elapsed_ms, response.engine);
+                    format!("Transcribed in {}ms with {}", response.elapsed_ms, response.engine);
                 let _ = apply_output(&self.config, &response.text);
 
                 let timestamp = SystemTime::now()
@@ -1553,23 +1490,6 @@ impl ShadowwordApp {
         // ── Acceleration ────────────────────────────────────────────────
         section_heading(ui, "ACCELERATION");
 
-        setting_row_lr(ui, BG_ROW, "ORT Accelerator", |ui| {
-            ui.horizontal(|ui| {
-                ui.selectable_value(&mut self.config.ort_accelerator, OrtxAccelerator::Auto, "Auto");
-                ui.selectable_value(&mut self.config.ort_accelerator, OrtxAccelerator::Cpu, "CPU");
-                ui.selectable_value(&mut self.config.ort_accelerator, OrtxAccelerator::Cuda, "CUDA");
-            });
-        });
-
-        setting_row_lr(ui, BG_ROW_ALT, "ONNX Quantization", |ui| {
-            ui.horizontal(|ui| {
-                ui.selectable_value(&mut self.config.onnx_quantization, OnnxQuantization::Fp32, "FP32");
-                ui.selectable_value(&mut self.config.onnx_quantization, OnnxQuantization::Fp16, "FP16");
-                ui.selectable_value(&mut self.config.onnx_quantization, OnnxQuantization::Int8, "INT8");
-                ui.selectable_value(&mut self.config.onnx_quantization, OnnxQuantization::Int4, "INT4");
-            });
-        });
-
         setting_row_lr(ui, BG_ROW, "Whisper Accelerator", |ui| {
             ui.horizontal(|ui| {
                 ui.selectable_value(&mut self.config.whisper_accelerator, WhisperAccelerator::Auto, "Auto");
@@ -1759,11 +1679,7 @@ impl ShadowwordApp {
                 "delete" => {
                     if let Some(model) = MODEL_CATALOG.iter().find(|m| m.id == id) {
                         if let Some(path) = self.model_path_for(model) {
-                            if model.is_directory {
-                                let _ = std::fs::remove_dir_all(&path);
-                            } else {
-                                let _ = std::fs::remove_file(&path);
-                            }
+                            let _ = std::fs::remove_file(&path);
                             self.status_line = format!("Deleted {}", model.name);
                         }
                     }
@@ -1829,7 +1745,7 @@ impl ShadowwordApp {
                                 }
                                 ui.label(
                                     RichText::new(format!(
-                                        "{:?} - {}ms",
+                                        "{} - {}ms",
                                         entry.engine, entry.elapsed_ms
                                     ))
                                     .size(11.0)
@@ -1872,14 +1788,6 @@ impl ShadowwordApp {
 
         setting_row_lr(ui, BG_ROW, "Version", |ui| {
             ui.label(RichText::new("0.8.0").size(14.0).color(TEXT_DIM));
-        });
-
-        setting_row_lr(ui, BG_ROW_ALT, "Engine", |ui| {
-            ui.label(
-                RichText::new(format!("{:?}", self.config.engine))
-                    .size(14.0)
-                    .color(TEXT_DIM),
-            );
         });
 
         setting_row(ui, BG_ROW, |ui| {

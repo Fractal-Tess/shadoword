@@ -8,9 +8,7 @@ repository.workspace = true
 
 [features]
 default = []
-cuda = ["shadoword-core/cuda"]
 whisper-vulkan = ["shadoword-core/whisper-vulkan"]
-whisper-cuda = ["shadoword-core/whisper-cuda"]
 
 [dependencies]
 anyhow.workspace = true
@@ -19,10 +17,8 @@ base64.workspace = true
 eframe = { version = "0.33.3", default-features = false, features = ["default_fonts", "wayland", "x11", "wgpu"] }
 egui.workspace = true
 enigo.workspace = true
-flate2.workspace = true
 global-hotkey.workspace = true
 handy-keys.workspace = true
-tar.workspace = true
 reqwest.workspace = true
 serde_json.workspace = true
 shadoword-core = { path = "../shadoword-core" }
