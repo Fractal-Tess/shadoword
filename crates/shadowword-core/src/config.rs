@@ -43,6 +43,39 @@ pub enum OnnxQuantization {
     Int4,
 }
 
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum PasteMethod {
+    None,
+    Direct,
+    CtrlV,
+    CtrlShiftV,
+    ShiftInsert,
+}
+
+impl Default for PasteMethod {
+    fn default() -> Self {
+        PasteMethod::None
+    }
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum TypingTool {
+    Auto,
+    Wtype,
+    Kwtype,
+    Dotool,
+    Ydotool,
+    Xdotool,
+}
+
+impl Default for TypingTool {
+    fn default() -> Self {
+        TypingTool::Auto
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct RecordingConfig {
     pub input_device: Option<String>,
@@ -50,9 +83,25 @@ pub struct RecordingConfig {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(default)]
 pub struct OutputConfig {
     pub copy_to_clipboard: bool,
     pub type_into_active_window: bool,
+    pub paste_method: PasteMethod,
+    pub typing_tool: TypingTool,
+    pub paste_delay_ms: u64,
+}
+
+impl Default for OutputConfig {
+    fn default() -> Self {
+        Self {
+            copy_to_clipboard: true,
+            type_into_active_window: false,
+            paste_method: PasteMethod::None,
+            typing_tool: TypingTool::Auto,
+            paste_delay_ms: 120,
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -110,10 +159,7 @@ impl Default for ShadowwordConfig {
                 input_device: None,
                 sample_rate: 16_000,
             },
-            output: OutputConfig {
-                copy_to_clipboard: true,
-                type_into_active_window: false,
-            },
+            output: OutputConfig::default(),
             remote: RemoteConfig {
                 endpoint: "http://127.0.0.1:47813".to_string(),
             },

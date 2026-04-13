@@ -26,6 +26,7 @@ flate2 = "1"
 tar = "0.4"
 enigo = "0.6.1"
 global-hotkey = "0.6"
+handy-keys = "0.2.4"
 hound = "3.5.1"
 log = "0.4.28"
 reqwest = { version = "0.12.24", features = ["blocking", "json", "rustls-tls"] }

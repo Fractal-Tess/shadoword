@@ -2,18 +2,23 @@ use anyhow::{anyhow, Context, Result};
 use arboard::Clipboard;
 use eframe::egui;
 use egui::{Color32, CornerRadius, Frame, Margin, RichText, Stroke, Vec2};
-use enigo::{Enigo, Keyboard, Settings};
+use enigo::{Direction, Enigo, Key, Keyboard, Settings};
+#[cfg(not(target_os = "linux"))]
 use global_hotkey::hotkey::HotKey;
+#[cfg(not(target_os = "linux"))]
 use global_hotkey::{GlobalHotKeyEvent, GlobalHotKeyManager, HotKeyState};
+#[cfg(target_os = "linux")]
+use handy_keys::{Hotkey as HandyHotkey, HotkeyId as HandyHotkeyId, HotkeyManager as HandyHotkeyManager, HotkeyState as HandyHotkeyState};
 use shadowword_core::{
     AudioInput, DeviceListResponse, EngineKind, InputDeviceInfo, LocalService, MicrophoneRecorder,
-    OnnxQuantization, OrtxAccelerator, RecordingSession, ServiceMode, ServiceStatus,
-    ShadowwordConfig, TranscriptResponse, TranscriptionService, WhisperAccelerator,
+    OnnxQuantization, OrtxAccelerator, PasteMethod, RecordingSession, ServiceMode, ServiceStatus,
+    ShadowwordConfig, TranscriptResponse, TranscriptionService, TypingTool, WhisperAccelerator,
 };
 use std::collections::HashMap;
+use std::process::{Command, Stdio};
 use std::sync::mpsc::{self, Receiver};
 use std::sync::Arc;
-use std::thread;
+use std::thread::{self, JoinHandle};
 use std::time::{Duration, SystemTime};
 use tracing_subscriber::EnvFilter;
 
@@ -140,6 +145,153 @@ struct HistoryEntry {
     engine: EngineKind,
     elapsed_ms: u128,
     timestamp: String,
+}
+
+#[cfg(target_os = "linux")]
+#[derive(Debug, Clone, Copy)]
+enum HotkeyEventState {
+    Pressed,
+    Released,
+}
+
+#[cfg(target_os = "linux")]
+enum LinuxHotkeyCommand {
+    Register {
+        shortcut: String,
+        response: mpsc::Sender<Result<(), String>>,
+    },
+    Unregister {
+        response: mpsc::Sender<Result<(), String>>,
+    },
+    Shutdown,
+}
+
+#[cfg(target_os = "linux")]
+struct LinuxHotkeyBackend {
+    command_tx: mpsc::Sender<LinuxHotkeyCommand>,
+    event_rx: Receiver<HotkeyEventState>,
+    thread_handle: Option<JoinHandle<()>>,
+}
+
+#[cfg(target_os = "linux")]
+impl LinuxHotkeyBackend {
+    fn new() -> Result<Self, String> {
+        let (command_tx, command_rx) = mpsc::channel::<LinuxHotkeyCommand>();
+        let (event_tx, event_rx) = mpsc::channel::<HotkeyEventState>();
+
+        let thread_handle = thread::spawn(move || {
+            let manager = HandyHotkeyManager::new_with_blocking().or_else(|blocking_error| {
+                tracing::warn!(
+                    "Failed to initialize handy-keys in blocking mode: {blocking_error}. Falling back to non-blocking mode."
+                );
+                HandyHotkeyManager::new()
+            });
+
+            let manager = match manager {
+                Ok(manager) => manager,
+                Err(error) => {
+                    tracing::error!("Failed to initialize handy-keys hotkey manager: {error}");
+                    return;
+                }
+            };
+
+            let mut registered_id: Option<HandyHotkeyId> = None;
+
+            loop {
+                while let Some(event) = manager.try_recv() {
+                    if Some(event.id) != registered_id {
+                        continue;
+                    }
+
+                    let mapped = match event.state {
+                        HandyHotkeyState::Pressed => HotkeyEventState::Pressed,
+                        HandyHotkeyState::Released => HotkeyEventState::Released,
+                    };
+
+                    if event_tx.send(mapped).is_err() {
+                        return;
+                    }
+                }
+
+                match command_rx.recv_timeout(Duration::from_millis(10)) {
+                    Ok(LinuxHotkeyCommand::Register { shortcut, response }) => {
+                        let result = (|| {
+                            if let Some(id) = registered_id.take() {
+                                manager
+                                    .unregister(id)
+                                    .map_err(|error| format!("Failed to unregister shortcut: {error}"))?;
+                            }
+
+                            let hotkey = shortcut
+                                .parse::<HandyHotkey>()
+                                .map_err(|error| format!("Invalid shortcut: {error}"))?;
+                            let id = manager
+                                .register(hotkey)
+                                .map_err(|error| format!("Failed to register: {error}"))?;
+                            registered_id = Some(id);
+                            Ok(())
+                        })();
+
+                        let _ = response.send(result);
+                    }
+                    Ok(LinuxHotkeyCommand::Unregister { response }) => {
+                        let result = if let Some(id) = registered_id.take() {
+                            manager
+                                .unregister(id)
+                                .map_err(|error| format!("Failed to unregister shortcut: {error}"))
+                        } else {
+                            Ok(())
+                        };
+                        let _ = response.send(result);
+                    }
+                    Ok(LinuxHotkeyCommand::Shutdown) => break,
+                    Err(mpsc::RecvTimeoutError::Timeout) => {}
+                    Err(mpsc::RecvTimeoutError::Disconnected) => break,
+                }
+            }
+        });
+
+        Ok(Self {
+            command_tx,
+            event_rx,
+            thread_handle: Some(thread_handle),
+        })
+    }
+
+    fn register(&self, shortcut: &str) -> Result<(), String> {
+        let (tx, rx) = mpsc::channel();
+        self.command_tx
+            .send(LinuxHotkeyCommand::Register {
+                shortcut: shortcut.trim().to_string(),
+                response: tx,
+            })
+            .map_err(|_| "Failed to send register command".to_string())?;
+        rx.recv()
+            .map_err(|_| "Failed to receive register response".to_string())?
+    }
+
+    fn unregister(&self) -> Result<(), String> {
+        let (tx, rx) = mpsc::channel();
+        self.command_tx
+            .send(LinuxHotkeyCommand::Unregister { response: tx })
+            .map_err(|_| "Failed to send unregister command".to_string())?;
+        rx.recv()
+            .map_err(|_| "Failed to receive unregister response".to_string())?
+    }
+
+    fn try_recv(&self) -> Option<HotkeyEventState> {
+        self.event_rx.try_recv().ok()
+    }
+}
+
+#[cfg(target_os = "linux")]
+impl Drop for LinuxHotkeyBackend {
+    fn drop(&mut self) {
+        let _ = self.command_tx.send(LinuxHotkeyCommand::Shutdown);
+        if let Some(handle) = self.thread_handle.take() {
+            let _ = handle.join();
+        }
+    }
 }
 
 // ── Model catalog ───────────────────────────────────────────────────────────
@@ -341,8 +493,12 @@ struct ShadowwordApp {
     history: Vec<HistoryEntry>,
     status_line: String,
     page: Page,
+    #[cfg(not(target_os = "linux"))]
     hotkey_manager: Option<GlobalHotKeyManager>,
+    #[cfg(not(target_os = "linux"))]
     registered_hotkey: Option<HotKey>,
+    #[cfg(target_os = "linux")]
+    hotkey_manager: Option<LinuxHotkeyBackend>,
     editing_shortcut: bool,
     shortcut_error: Option<String>,
     active_downloads: HashMap<String, ActiveDownload>,
@@ -352,21 +508,73 @@ struct ShadowwordApp {
 }
 
 impl ShadowwordApp {
+    #[cfg(not(target_os = "linux"))]
+    fn register_hotkey(
+        manager: &GlobalHotKeyManager,
+        shortcut: &str,
+    ) -> Result<HotKey, String> {
+        let shortcut = shortcut.trim();
+        let hotkey = shortcut
+            .parse::<HotKey>()
+            .map_err(|error| format!("Invalid shortcut: {error}"))?;
+        manager
+            .register(hotkey)
+            .map_err(|error| format!("Failed to register: {error}"))?;
+        Ok(hotkey)
+    }
+
     fn new(config: ShadowwordConfig) -> Self {
         let local_service = Arc::new(LocalService::new(config.clone()));
         let available_inputs = MicrophoneRecorder::list_input_devices().unwrap_or_default();
 
-        let (hotkey_manager, registered_hotkey) = match GlobalHotKeyManager::new() {
+        #[cfg(not(target_os = "linux"))]
+        let (hotkey_manager, registered_hotkey, shortcut_error) = match GlobalHotKeyManager::new() {
             Ok(manager) => {
-                let hk = config.hotkey.shortcut.parse::<HotKey>().ok();
-                if let Some(hk) = hk {
-                    let _ = manager.register(hk);
+                let registered_hotkey = match Self::register_hotkey(&manager, &config.hotkey.shortcut) {
+                    Ok(hotkey) => Some(hotkey),
+                    Err(error) => {
+                        tracing::warn!("Failed to register startup hotkey '{}': {error}", config.hotkey.shortcut);
+                        None
+                    }
+                };
+                let shortcut_error = match &registered_hotkey {
+                    Some(_) => None,
+                    None => Some(format!("Failed to register shortcut: {}", config.hotkey.shortcut)),
+                };
+                if config.hotkey.shortcut.trim().is_empty() {
+                    (Some(manager), None, Some("Shortcut cannot be empty".to_string()))
+                } else {
+                    (Some(manager), registered_hotkey, shortcut_error)
                 }
-                (Some(manager), hk)
             }
             Err(e) => {
                 tracing::warn!("Failed to init global hotkey manager: {e}");
-                (None, None)
+                (None, None, Some(format!("Failed to initialize global hotkey support: {e}")))
+            }
+        };
+
+        #[cfg(target_os = "linux")]
+        let (hotkey_manager, shortcut_error) = match LinuxHotkeyBackend::new() {
+            Ok(manager) => {
+                let shortcut_error = if config.hotkey.shortcut.trim().is_empty() {
+                    Some("Shortcut cannot be empty".to_string())
+                } else {
+                    match manager.register(&config.hotkey.shortcut) {
+                        Ok(()) => None,
+                        Err(error) => {
+                            tracing::warn!(
+                                "Failed to register startup handy-keys hotkey '{}': {error}",
+                                config.hotkey.shortcut
+                            );
+                            Some(error)
+                        }
+                    }
+                };
+                (Some(manager), shortcut_error)
+            }
+            Err(error) => {
+                tracing::warn!("Failed to init handy-keys hotkey manager: {error}");
+                (None, Some(format!("Failed to initialize global hotkey support: {error}")))
             }
         };
 
@@ -384,9 +592,10 @@ impl ShadowwordApp {
             status_line: "Ready".to_string(),
             page: Page::General,
             hotkey_manager,
+            #[cfg(not(target_os = "linux"))]
             registered_hotkey,
             editing_shortcut: false,
-            shortcut_error: None,
+            shortcut_error,
             active_downloads: HashMap::new(),
             preloading: false,
             preload_rx: None,
@@ -709,6 +918,8 @@ impl ShadowwordApp {
             return;
         }
 
+        #[cfg(not(target_os = "linux"))]
+        {
         let receiver = GlobalHotKeyEvent::receiver();
         while let Ok(event) = receiver.try_recv() {
             if Some(event.id) != self.registered_hotkey.map(|h| h.id()) {
@@ -740,6 +951,31 @@ impl ShadowwordApp {
                 }
             }
         }
+        }
+
+        #[cfg(target_os = "linux")]
+        while let Some(event) = self.hotkey_manager.as_ref().and_then(|manager| manager.try_recv()) {
+            let transcribing = self.response_rx.is_some();
+            if transcribing {
+                continue;
+            }
+
+            let recording = self.active_recording.is_some();
+
+            if self.config.hotkey.push_to_talk {
+                match event {
+                    HotkeyEventState::Pressed if !recording => self.start_recording(),
+                    HotkeyEventState::Released if recording => self.stop_recording(),
+                    _ => {}
+                }
+            } else if matches!(event, HotkeyEventState::Pressed) {
+                if recording {
+                    self.stop_recording();
+                } else {
+                    self.start_recording();
+                }
+            }
+        }
     }
 
     fn re_register_hotkey(&mut self) {
@@ -747,26 +983,33 @@ impl ShadowwordApp {
             return;
         };
 
+        let shortcut = self.config.hotkey.shortcut.trim().to_string();
+        if shortcut.is_empty() {
+            self.shortcut_error = Some("Shortcut cannot be empty".to_string());
+            return;
+        }
+
+        #[cfg(not(target_os = "linux"))]
+        {
         // Unregister old
         if let Some(old) = self.registered_hotkey.take() {
             let _ = manager.unregister(old);
         }
 
-        // Parse and register new
-        match self.config.hotkey.shortcut.parse::<HotKey>() {
+        match Self::register_hotkey(manager, &shortcut) {
             Ok(hk) => {
-                match manager.register(hk) {
-                    Ok(()) => {
-                        self.registered_hotkey = Some(hk);
-                        self.shortcut_error = None;
-                    }
-                    Err(e) => {
-                        self.shortcut_error = Some(format!("Failed to register: {e}"));
-                    }
-                }
+                self.registered_hotkey = Some(hk);
+                self.shortcut_error = None;
             }
-            Err(e) => {
-                self.shortcut_error = Some(format!("Invalid shortcut: {e}"));
+            Err(error) => self.shortcut_error = Some(error),
+        }
+        }
+
+        #[cfg(target_os = "linux")]
+        {
+            match manager.unregister().and_then(|_| manager.register(&shortcut)) {
+                Ok(()) => self.shortcut_error = None,
+                Err(error) => self.shortcut_error = Some(error),
             }
         }
     }
@@ -1123,10 +1366,10 @@ impl ShadowwordApp {
                             resp.request_focus();
                         }
                     } else {
-                        let label_text = if self.registered_hotkey.is_some() {
-                            &self.config.hotkey.shortcut
-                        } else {
+                        let label_text = if self.config.hotkey.shortcut.trim().is_empty() {
                             "Not set"
+                        } else {
+                            &self.config.hotkey.shortcut
                         };
                         if ui
                             .button(RichText::new(label_text).size(13.0).monospace())
@@ -1198,8 +1441,54 @@ impl ShadowwordApp {
             ui.checkbox(&mut self.config.output.copy_to_clipboard, "");
         });
 
-        setting_row_lr(ui, BG_ROW_ALT, "Type into Active Window", |ui| {
-            ui.checkbox(&mut self.config.output.type_into_active_window, "");
+        setting_row_lr(ui, BG_ROW_ALT, "Active Window Output", |ui| {
+            egui::ComboBox::new("paste_method", "")
+                .selected_text(match self.config.output.paste_method {
+                    PasteMethod::None => "None",
+                    PasteMethod::Direct => "Direct",
+                    PasteMethod::CtrlV => "Ctrl+V",
+                    PasteMethod::CtrlShiftV => "Ctrl+Shift+V",
+                    PasteMethod::ShiftInsert => "Shift+Insert",
+                })
+                .width(180.0)
+                .show_ui(ui, |ui| {
+                    ui.selectable_value(&mut self.config.output.paste_method, PasteMethod::None, "None");
+                    ui.selectable_value(&mut self.config.output.paste_method, PasteMethod::Direct, "Direct");
+                    ui.selectable_value(&mut self.config.output.paste_method, PasteMethod::CtrlV, "Ctrl+V");
+                    ui.selectable_value(&mut self.config.output.paste_method, PasteMethod::CtrlShiftV, "Ctrl+Shift+V");
+                    ui.selectable_value(&mut self.config.output.paste_method, PasteMethod::ShiftInsert, "Shift+Insert");
+                });
+        });
+
+        #[cfg(target_os = "linux")]
+        setting_row_lr(ui, BG_ROW, "Typing Tool", |ui| {
+            egui::ComboBox::new("typing_tool", "")
+                .selected_text(match self.config.output.typing_tool {
+                    TypingTool::Auto => "Auto",
+                    TypingTool::Wtype => "wtype",
+                    TypingTool::Kwtype => "kwtype",
+                    TypingTool::Dotool => "dotool",
+                    TypingTool::Ydotool => "ydotool",
+                    TypingTool::Xdotool => "xdotool",
+                })
+                .width(180.0)
+                .show_ui(ui, |ui| {
+                    ui.selectable_value(&mut self.config.output.typing_tool, TypingTool::Auto, "Auto");
+                    ui.selectable_value(&mut self.config.output.typing_tool, TypingTool::Wtype, "wtype");
+                    ui.selectable_value(&mut self.config.output.typing_tool, TypingTool::Kwtype, "kwtype");
+                    ui.selectable_value(&mut self.config.output.typing_tool, TypingTool::Dotool, "dotool");
+                    ui.selectable_value(&mut self.config.output.typing_tool, TypingTool::Ydotool, "ydotool");
+                    ui.selectable_value(&mut self.config.output.typing_tool, TypingTool::Xdotool, "xdotool");
+                });
+        });
+
+        setting_row_lr(ui, BG_ROW_ALT, "Paste Delay", |ui| {
+            ui.add(
+                egui::DragValue::new(&mut self.config.output.paste_delay_ms)
+                    .range(0..=1000)
+                    .speed(5.0)
+                    .suffix(" ms"),
+            );
         });
 
         // ── REMOTE (conditional) ────────────────────────────────────────
@@ -1633,6 +1922,10 @@ impl ShadowwordApp {
 
 impl eframe::App for ShadowwordApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+        if self.hotkey_manager.is_some() {
+            ctx.request_repaint_after(Duration::from_millis(33));
+        }
+
         if self.has_background_work() {
             ctx.request_repaint_after(Duration::from_millis(16));
         }
@@ -1724,6 +2017,401 @@ fn remote_devices(config: &ShadowwordConfig) -> Result<DeviceListResponse> {
         .context("failed to decode daemon device list")
 }
 
+#[cfg(target_os = "linux")]
+fn is_wayland() -> bool {
+    std::env::var_os("WAYLAND_DISPLAY").is_some()
+        || matches!(std::env::var("XDG_SESSION_TYPE").ok().as_deref(), Some("wayland"))
+}
+
+#[cfg(target_os = "linux")]
+fn is_kde_wayland() -> bool {
+    is_wayland()
+        && std::env::var("XDG_CURRENT_DESKTOP")
+            .map(|value| value.to_lowercase().contains("kde"))
+            .unwrap_or(false)
+}
+
+#[cfg(target_os = "linux")]
+fn command_exists(command: &str) -> bool {
+    Command::new("which")
+        .arg(command)
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .status()
+        .map(|status| status.success())
+        .unwrap_or(false)
+}
+
+#[cfg(target_os = "linux")]
+fn write_clipboard_via_wl_copy(text: &str) -> Result<()> {
+    let status = Command::new("wl-copy")
+        .arg("--")
+        .arg(text)
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .status()
+        .context("failed to execute wl-copy")?;
+    if status.success() {
+        Ok(())
+    } else {
+        Err(anyhow!("wl-copy failed"))
+    }
+}
+
+#[cfg(target_os = "linux")]
+fn type_text_via_wtype(text: &str) -> Result<()> {
+    let output = Command::new("wtype")
+        .arg("--")
+        .arg(text)
+        .output()
+        .context("failed to execute wtype")?;
+    if output.status.success() {
+        Ok(())
+    } else {
+        Err(anyhow!("wtype failed: {}", String::from_utf8_lossy(&output.stderr).trim()))
+    }
+}
+
+#[cfg(target_os = "linux")]
+fn type_text_via_kwtype(text: &str) -> Result<()> {
+    let output = Command::new("kwtype")
+        .arg("--")
+        .arg(text)
+        .output()
+        .context("failed to execute kwtype")?;
+    if output.status.success() {
+        Ok(())
+    } else {
+        Err(anyhow!("kwtype failed: {}", String::from_utf8_lossy(&output.stderr).trim()))
+    }
+}
+
+#[cfg(target_os = "linux")]
+fn type_text_via_xdotool(text: &str) -> Result<()> {
+    let output = Command::new("xdotool")
+        .arg("type")
+        .arg("--clearmodifiers")
+        .arg("--")
+        .arg(text)
+        .output()
+        .context("failed to execute xdotool")?;
+    if output.status.success() {
+        Ok(())
+    } else {
+        Err(anyhow!("xdotool failed: {}", String::from_utf8_lossy(&output.stderr).trim()))
+    }
+}
+
+#[cfg(target_os = "linux")]
+fn type_text_via_ydotool(text: &str) -> Result<()> {
+    let output = Command::new("ydotool")
+        .arg("type")
+        .arg("--")
+        .arg(text)
+        .output()
+        .context("failed to execute ydotool")?;
+    if output.status.success() {
+        Ok(())
+    } else {
+        Err(anyhow!("ydotool failed: {}", String::from_utf8_lossy(&output.stderr).trim()))
+    }
+}
+
+#[cfg(target_os = "linux")]
+fn type_text_via_dotool(text: &str) -> Result<()> {
+    use std::io::Write;
+
+    let mut child = Command::new("dotool")
+        .stdin(Stdio::piped())
+        .stdout(Stdio::null())
+        .stderr(Stdio::piped())
+        .spawn()
+        .context("failed to spawn dotool")?;
+    if let Some(mut stdin) = child.stdin.take() {
+        writeln!(stdin, "type {}", text).context("failed to write to dotool stdin")?;
+    }
+    let output = child.wait_with_output().context("failed to wait for dotool")?;
+    if output.status.success() {
+        Ok(())
+    } else {
+        Err(anyhow!("dotool failed: {}", String::from_utf8_lossy(&output.stderr).trim()))
+    }
+}
+
+#[cfg(target_os = "linux")]
+fn try_direct_typing_linux(text: &str, preferred_tool: TypingTool) -> Result<bool> {
+    let try_tool = |tool: TypingTool| -> Result<bool> {
+        match tool {
+            TypingTool::Wtype if command_exists("wtype") => {
+                type_text_via_wtype(text)?;
+                Ok(true)
+            }
+            TypingTool::Kwtype if command_exists("kwtype") => {
+                type_text_via_kwtype(text)?;
+                Ok(true)
+            }
+            TypingTool::Dotool if command_exists("dotool") => {
+                type_text_via_dotool(text)?;
+                Ok(true)
+            }
+            TypingTool::Ydotool if command_exists("ydotool") => {
+                type_text_via_ydotool(text)?;
+                Ok(true)
+            }
+            TypingTool::Xdotool if command_exists("xdotool") => {
+                type_text_via_xdotool(text)?;
+                Ok(true)
+            }
+            TypingTool::Auto => Ok(false),
+            _ => Err(anyhow!("Requested typing tool is not available")),
+        }
+    };
+
+    if preferred_tool != TypingTool::Auto {
+        return try_tool(preferred_tool);
+    }
+
+    if is_wayland() {
+        if is_kde_wayland() && command_exists("kwtype") {
+            type_text_via_kwtype(text)?;
+            return Ok(true);
+        }
+        if !is_kde_wayland() && command_exists("wtype") {
+            type_text_via_wtype(text)?;
+            return Ok(true);
+        }
+        if command_exists("dotool") {
+            type_text_via_dotool(text)?;
+            return Ok(true);
+        }
+        if command_exists("ydotool") {
+            type_text_via_ydotool(text)?;
+            return Ok(true);
+        }
+    } else {
+        if command_exists("xdotool") {
+            type_text_via_xdotool(text)?;
+            return Ok(true);
+        }
+        if command_exists("ydotool") {
+            type_text_via_ydotool(text)?;
+            return Ok(true);
+        }
+    }
+
+    Ok(false)
+}
+
+fn send_paste_ctrl_v(enigo: &mut Enigo) -> Result<()> {
+    #[cfg(target_os = "macos")]
+    let (modifier_key, v_key_code) = (Key::Meta, Key::Other(9));
+    #[cfg(target_os = "windows")]
+    let (modifier_key, v_key_code) = (Key::Control, Key::Other(0x56));
+    #[cfg(target_os = "linux")]
+    let (modifier_key, v_key_code) = (Key::Control, Key::Unicode('v'));
+
+    enigo.key(modifier_key, Direction::Press).context("failed to press modifier")?;
+    enigo.key(v_key_code, Direction::Click).context("failed to click V")?;
+    std::thread::sleep(Duration::from_millis(100));
+    enigo.key(modifier_key, Direction::Release).context("failed to release modifier")?;
+    Ok(())
+}
+
+fn send_paste_ctrl_shift_v(enigo: &mut Enigo) -> Result<()> {
+    #[cfg(target_os = "macos")]
+    let (modifier_key, v_key_code) = (Key::Meta, Key::Other(9));
+    #[cfg(target_os = "windows")]
+    let (modifier_key, v_key_code) = (Key::Control, Key::Other(0x56));
+    #[cfg(target_os = "linux")]
+    let (modifier_key, v_key_code) = (Key::Control, Key::Unicode('v'));
+
+    enigo.key(modifier_key, Direction::Press).context("failed to press modifier")?;
+    enigo.key(Key::Shift, Direction::Press).context("failed to press shift")?;
+    enigo.key(v_key_code, Direction::Click).context("failed to click V")?;
+    std::thread::sleep(Duration::from_millis(100));
+    enigo.key(Key::Shift, Direction::Release).context("failed to release shift")?;
+    enigo.key(modifier_key, Direction::Release).context("failed to release modifier")?;
+    Ok(())
+}
+
+fn send_paste_shift_insert(enigo: &mut Enigo) -> Result<()> {
+    #[cfg(target_os = "windows")]
+    let insert_key_code = Key::Other(0x2D);
+    #[cfg(not(target_os = "windows"))]
+    let insert_key_code = Key::Other(0x76);
+
+    enigo.key(Key::Shift, Direction::Press).context("failed to press shift")?;
+    enigo.key(insert_key_code, Direction::Click).context("failed to click insert")?;
+    std::thread::sleep(Duration::from_millis(100));
+    enigo.key(Key::Shift, Direction::Release).context("failed to release shift")?;
+    Ok(())
+}
+
+#[cfg(target_os = "linux")]
+fn send_key_combo_via_wtype(paste_method: PasteMethod) -> Result<()> {
+    let args: Vec<&str> = match paste_method {
+        PasteMethod::CtrlV => vec!["-M", "ctrl", "-k", "v"],
+        PasteMethod::CtrlShiftV => vec!["-M", "ctrl", "-M", "shift", "-k", "v"],
+        PasteMethod::ShiftInsert => vec!["-M", "shift", "-k", "Insert"],
+        _ => return Err(anyhow!("Unsupported paste method")),
+    };
+    let output = Command::new("wtype").args(&args).output().context("failed to execute wtype")?;
+    if output.status.success() {
+        Ok(())
+    } else {
+        Err(anyhow!("wtype failed: {}", String::from_utf8_lossy(&output.stderr).trim()))
+    }
+}
+
+#[cfg(target_os = "linux")]
+fn send_key_combo_via_dotool(paste_method: PasteMethod) -> Result<()> {
+    let command = match paste_method {
+        PasteMethod::CtrlV => "echo key ctrl+v | dotool",
+        PasteMethod::CtrlShiftV => "echo key ctrl+shift+v | dotool",
+        PasteMethod::ShiftInsert => "echo key shift+insert | dotool",
+        _ => return Err(anyhow!("Unsupported paste method")),
+    };
+    let status = Command::new("sh")
+        .arg("-c")
+        .arg(command)
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .status()
+        .context("failed to execute dotool")?;
+    if status.success() {
+        Ok(())
+    } else {
+        Err(anyhow!("dotool failed"))
+    }
+}
+
+#[cfg(target_os = "linux")]
+fn send_key_combo_via_ydotool(paste_method: PasteMethod) -> Result<()> {
+    let args: Vec<&str> = match paste_method {
+        PasteMethod::CtrlV => vec!["key", "29:1", "47:1", "47:0", "29:0"],
+        PasteMethod::CtrlShiftV => vec!["key", "29:1", "42:1", "47:1", "47:0", "42:0", "29:0"],
+        PasteMethod::ShiftInsert => vec!["key", "42:1", "110:1", "110:0", "42:0"],
+        _ => return Err(anyhow!("Unsupported paste method")),
+    };
+    let output = Command::new("ydotool").args(&args).output().context("failed to execute ydotool")?;
+    if output.status.success() {
+        Ok(())
+    } else {
+        Err(anyhow!("ydotool failed: {}", String::from_utf8_lossy(&output.stderr).trim()))
+    }
+}
+
+#[cfg(target_os = "linux")]
+fn send_key_combo_via_xdotool(paste_method: PasteMethod) -> Result<()> {
+    let combo = match paste_method {
+        PasteMethod::CtrlV => "ctrl+v",
+        PasteMethod::CtrlShiftV => "ctrl+shift+v",
+        PasteMethod::ShiftInsert => "shift+Insert",
+        _ => return Err(anyhow!("Unsupported paste method")),
+    };
+    let output = Command::new("xdotool")
+        .arg("key")
+        .arg("--clearmodifiers")
+        .arg(combo)
+        .output()
+        .context("failed to execute xdotool")?;
+    if output.status.success() {
+        Ok(())
+    } else {
+        Err(anyhow!("xdotool failed: {}", String::from_utf8_lossy(&output.stderr).trim()))
+    }
+}
+
+#[cfg(target_os = "linux")]
+fn try_send_key_combo_linux(paste_method: PasteMethod) -> Result<bool> {
+    if is_wayland() {
+        if !is_kde_wayland() && command_exists("wtype") {
+            send_key_combo_via_wtype(paste_method)?;
+            return Ok(true);
+        }
+        if command_exists("dotool") {
+            send_key_combo_via_dotool(paste_method)?;
+            return Ok(true);
+        }
+        if command_exists("ydotool") {
+            send_key_combo_via_ydotool(paste_method)?;
+            return Ok(true);
+        }
+    } else {
+        if command_exists("xdotool") {
+            send_key_combo_via_xdotool(paste_method)?;
+            return Ok(true);
+        }
+        if command_exists("ydotool") {
+            send_key_combo_via_ydotool(paste_method)?;
+            return Ok(true);
+        }
+    }
+    Ok(false)
+}
+
+fn paste_via_clipboard(
+    enigo: &mut Enigo,
+    text: &str,
+    paste_method: PasteMethod,
+    paste_delay_ms: u64,
+) -> Result<()> {
+    let original_clipboard = Clipboard::new()
+        .ok()
+        .and_then(|mut clipboard| clipboard.get_text().ok())
+        .unwrap_or_default();
+
+    #[cfg(target_os = "linux")]
+    {
+        if is_wayland() && command_exists("wl-copy") {
+            write_clipboard_via_wl_copy(text)?;
+        } else {
+            let mut clipboard = Clipboard::new().context("failed to access clipboard")?;
+            clipboard.set_text(text.to_string()).context("failed to write clipboard")?;
+        }
+    }
+
+    #[cfg(not(target_os = "linux"))]
+    {
+        let mut clipboard = Clipboard::new().context("failed to access clipboard")?;
+        clipboard.set_text(text.to_string()).context("failed to write clipboard")?;
+    }
+
+    std::thread::sleep(Duration::from_millis(paste_delay_ms));
+
+    #[cfg(target_os = "linux")]
+    let handled = try_send_key_combo_linux(paste_method)?;
+    #[cfg(not(target_os = "linux"))]
+    let handled = false;
+
+    if !handled {
+        match paste_method {
+            PasteMethod::CtrlV => send_paste_ctrl_v(enigo)?,
+            PasteMethod::CtrlShiftV => send_paste_ctrl_shift_v(enigo)?,
+            PasteMethod::ShiftInsert => send_paste_shift_insert(enigo)?,
+            _ => return Err(anyhow!("Invalid paste method for clipboard paste")),
+        }
+    }
+
+    std::thread::sleep(Duration::from_millis(50));
+
+    #[cfg(target_os = "linux")]
+    {
+        if is_wayland() && command_exists("wl-copy") {
+            let _ = write_clipboard_via_wl_copy(&original_clipboard);
+        } else if let Ok(mut clipboard) = Clipboard::new() {
+            let _ = clipboard.set_text(original_clipboard);
+        }
+    }
+
+    #[cfg(not(target_os = "linux"))]
+    if let Ok(mut clipboard) = Clipboard::new() {
+        let _ = clipboard.set_text(original_clipboard);
+    }
+
+    Ok(())
+}
+
 fn apply_output(config: &ShadowwordConfig, text: &str) -> Result<()> {
     if config.output.copy_to_clipboard {
         let mut clipboard = Clipboard::new().context("failed to access clipboard")?;
@@ -1732,9 +2420,29 @@ fn apply_output(config: &ShadowwordConfig, text: &str) -> Result<()> {
             .context("failed to write clipboard")?;
     }
 
-    if config.output.type_into_active_window {
+    let legacy_direct = config.output.type_into_active_window && config.output.paste_method == PasteMethod::None;
+    let paste_method = if legacy_direct {
+        PasteMethod::Direct
+    } else {
+        config.output.paste_method
+    };
+
+    if paste_method != PasteMethod::None {
         let mut enigo = Enigo::new(&Settings::default()).context("failed to init enigo")?;
-        enigo.text(text).context("failed to type transcript")?;
+        match paste_method {
+            PasteMethod::None => {}
+            PasteMethod::Direct => {
+                #[cfg(target_os = "linux")]
+                if !try_direct_typing_linux(text, config.output.typing_tool)? {
+                    enigo.text(text).context("failed to type transcript")?;
+                }
+                #[cfg(not(target_os = "linux"))]
+                enigo.text(text).context("failed to type transcript")?;
+            }
+            PasteMethod::CtrlV | PasteMethod::CtrlShiftV | PasteMethod::ShiftInsert => {
+                paste_via_clipboard(&mut enigo, text, paste_method, config.output.paste_delay_ms)?;
+            }
+        }
     }
 
     Ok(())
