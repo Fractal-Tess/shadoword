@@ -1,0 +1,30 @@
+{
+  "mode": "local",
+  "engine": "whisper",
+  "model_path": "/data/shadoword/models/ggml-large-v3-turbo.bin",
+  "preload_on_startup": true,
+  "recording": {
+    "input_device": null,
+    "sample_rate": 16000
+  },
+  "output": {
+    "copy_to_clipboard": false,
+    "type_into_active_window": false,
+    "paste_method": "none",
+    "typing_tool": "auto",
+    "paste_delay_ms": 120
+  },
+  "remote": {
+    "endpoint": "http://127.0.0.1:47813"
+  },
+  "daemon": {
+    "listen_addr": "0.0.0.0:47813"
+  },
+  "hotkey": {
+    "shortcut": "ctrl+space",
+    "push_to_talk": true
+  },
+  "onnx_quantization": "fp32",
+  "ort_accelerator": "cpu",
+  "whisper_accelerator": "gpu"
+}

@@ -9,7 +9,7 @@ use global_hotkey::hotkey::HotKey;
 use global_hotkey::{GlobalHotKeyEvent, GlobalHotKeyManager, HotKeyState};
 #[cfg(target_os = "linux")]
 use handy_keys::{Hotkey as HandyHotkey, HotkeyId as HandyHotkeyId, HotkeyManager as HandyHotkeyManager, HotkeyState as HandyHotkeyState};
-use shadowword_core::{
+use shadoword_core::{
     AudioInput, DeviceListResponse, EngineKind, InputDeviceInfo, LocalService, MicrophoneRecorder,
     OnnxQuantization, OrtxAccelerator, PasteMethod, RecordingSession, ServiceMode, ServiceStatus,
     ShadowwordConfig, TranscriptResponse, TranscriptionService, TypingTool, WhisperAccelerator,
@@ -1959,7 +1959,7 @@ impl eframe::App for ShadowwordApp {
 
 fn remote_transcribe(config: &ShadowwordConfig, audio: AudioInput) -> Result<TranscriptResponse> {
     let client = reqwest::blocking::Client::new();
-    let wav = shadowword_core::wav::encode_wav(&audio)?;
+    let wav = shadoword_core::wav::encode_wav(&audio)?;
     let response = client
         .post(format!("{}/v1/transcribe-wav", config.remote.endpoint))
         .header("content-type", "audio/wav")

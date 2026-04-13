@@ -1,5 +1,5 @@
 [package]
-name = "shadowword-desktop"
+name = "shadoword-desktop"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
@@ -8,9 +8,9 @@ repository.workspace = true
 
 [features]
 default = []
-cuda = ["shadowword-core/cuda"]
-whisper-vulkan = ["shadowword-core/whisper-vulkan"]
-whisper-cuda = ["shadowword-core/whisper-cuda"]
+cuda = ["shadoword-core/cuda"]
+whisper-vulkan = ["shadoword-core/whisper-vulkan"]
+whisper-cuda = ["shadoword-core/whisper-cuda"]
 
 [dependencies]
 anyhow.workspace = true
@@ -25,7 +25,7 @@ handy-keys.workspace = true
 tar.workspace = true
 reqwest.workspace = true
 serde_json.workspace = true
-shadowword-core = { path = "../shadowword-core" }
+shadoword-core = { path = "../shadoword-core" }
 tracing.workspace = true
 tracing-subscriber.workspace = true
 wgpu = { version = "27.0.1", default-features = false, features = ["std", "wgsl", "vulkan", "gles"] }

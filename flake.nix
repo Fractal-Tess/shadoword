@@ -1,5 +1,5 @@
 {
-  description = "Shadow Word - Rust workspace for the egui desktop client and remote daemon";
+  description = "Shadoword - Rust workspace for the egui desktop client and remote daemon";
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
@@ -82,9 +82,14 @@
       commonBuildDeps = pkgs:
         with pkgs; [
           cmake
+          glslang
           llvmPackages.libclang
           makeWrapper
           pkg-config
+          shaderc
+          vulkan-headers
+          vulkan-loader
+          vulkan-tools
         ];
 
       commonEnv = pkgs: onnxruntimePkg: {
@@ -160,38 +165,55 @@
         {
           default = mkRustPackage {
             inherit pkgs;
-            pname = "shadowword-desktop";
-            cargoPackage = "shadowword-desktop";
-          };
-
-          shadowword-desktop = mkRustPackage {
-            inherit pkgs;
-            pname = "shadowword-desktop";
-            cargoPackage = "shadowword-desktop";
+            pname = "shadoword";
+            cargoPackage = "shadoword-desktop";
             cargoFeatures = pkgs.lib.optionals (system == "x86_64-linux") [ "whisper-vulkan" ];
           };
 
-          shadowword-daemon = mkRustPackage {
+          shadoword = mkRustPackage {
             inherit pkgs;
-            pname = "shadowword-daemon";
-            cargoPackage = "shadowword-daemon";
+            pname = "shadoword";
+            cargoPackage = "shadoword-desktop";
+            cargoFeatures = pkgs.lib.optionals (system == "x86_64-linux") [ "whisper-vulkan" ];
+          };
+
+          shadoword-desktop = mkRustPackage {
+            inherit pkgs;
+            pname = "shadoword-desktop";
+            cargoPackage = "shadoword-desktop";
+            cargoFeatures = pkgs.lib.optionals (system == "x86_64-linux") [ "whisper-vulkan" ];
+          };
+
+          shadoword-daemon = mkRustPackage {
+            inherit pkgs;
+            pname = "shadoword-daemon";
+            cargoPackage = "shadoword-daemon";
             cargoFeatures = pkgs.lib.optionals (system == "x86_64-linux") [ "whisper-vulkan" ];
           };
         }
         // pkgs.lib.optionalAttrs (system == "x86_64-linux") {
-          shadowword-desktop-cuda = mkRustPackage {
+          shadoword-cuda = mkRustPackage {
             pkgs = cudaPkgs;
-            pname = "shadowword-desktop-cuda";
-            cargoPackage = "shadowword-desktop";
+            pname = "shadoword-cuda";
+            cargoPackage = "shadoword-desktop";
             onnxruntimePkg = prebuiltOnnxruntimeGpu;
             cargoFeatures = [ "cuda" "whisper-vulkan" ];
             extraRuntimeLibs = cudaRuntimeDeps cudaPkgs;
           };
 
-          shadowword-daemon-cuda = mkRustPackage {
+          shadoword-desktop-cuda = mkRustPackage {
             pkgs = cudaPkgs;
-            pname = "shadowword-daemon-cuda";
-            cargoPackage = "shadowword-daemon";
+            pname = "shadoword-desktop-cuda";
+            cargoPackage = "shadoword-desktop";
+            onnxruntimePkg = prebuiltOnnxruntimeGpu;
+            cargoFeatures = [ "cuda" "whisper-vulkan" ];
+            extraRuntimeLibs = cudaRuntimeDeps cudaPkgs;
+          };
+
+          shadoword-daemon-cuda = mkRustPackage {
+            pkgs = cudaPkgs;
+            pname = "shadoword-daemon-cuda";
+            cargoPackage = "shadoword-daemon";
             onnxruntimePkg = prebuiltOnnxruntimeGpu;
             cargoFeatures = [ "cuda" "whisper-vulkan" ];
             extraRuntimeLibs = cudaRuntimeDeps cudaPkgs;
@@ -233,9 +255,9 @@
               else
                 export XDG_DATA_DIRS=/run/opengl-driver/share
               fi
-              echo "Shadow Word Rust development environment"
-              echo "Run 'cargo run -p shadowword-desktop --features whisper-vulkan' for the egui app"
-              echo "Run 'cargo run -p shadowword-daemon --features whisper-vulkan' for the remote daemon"
+              echo "Shadoword Rust development environment"
+              echo "Run 'cargo run -p shadoword-desktop --features whisper-vulkan' for the egui app"
+              echo "Run 'cargo run -p shadoword-daemon --features whisper-vulkan' for the remote daemon"
             '';
           };
 
@@ -268,9 +290,9 @@
               else
                 export XDG_DATA_DIRS=/run/opengl-driver/share
               fi
-              echo "Shadow Word CUDA development environment"
-              echo "Run 'cargo run -p shadowword-desktop --features cuda,whisper-vulkan' for the egui app"
-              echo "Run 'cargo run -p shadowword-daemon --features cuda,whisper-vulkan' for the remote daemon"
+              echo "Shadoword CUDA development environment"
+              echo "Run 'cargo run -p shadoword-desktop --features cuda,whisper-vulkan' for the egui app"
+              echo "Run 'cargo run -p shadoword-daemon --features cuda,whisper-vulkan' for the remote daemon"
             '';
           };
         });

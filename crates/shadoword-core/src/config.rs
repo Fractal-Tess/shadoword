@@ -1,6 +1,7 @@
 use anyhow::{Context, Result};
 use directories::ProjectDirs;
 use serde::{Deserialize, Serialize};
+use std::env;
 use std::fs;
 use std::path::PathBuf;
 
@@ -13,34 +14,16 @@ pub enum ServiceMode {
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
-pub enum EngineKind {
-    Parakeet,
-    Whisper,
-}
-
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
-#[serde(rename_all = "snake_case")]
-pub enum OrtxAccelerator {
-    Auto,
-    Cpu,
-    Cuda,
-}
-
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
-#[serde(rename_all = "snake_case")]
 pub enum WhisperAccelerator {
     Auto,
     Cpu,
     Gpu,
 }
 
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
-#[serde(rename_all = "snake_case")]
-pub enum OnnxQuantization {
-    Fp32,
-    Fp16,
-    Int8,
-    Int4,
+impl Default for WhisperAccelerator {
+    fn default() -> Self {
+        Self::Auto
+    }
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
@@ -55,7 +38,7 @@ pub enum PasteMethod {
 
 impl Default for PasteMethod {
     fn default() -> Self {
-        PasteMethod::None
+        Self::None
     }
 }
 
@@ -72,7 +55,7 @@ pub enum TypingTool {
 
 impl Default for TypingTool {
     fn default() -> Self {
-        TypingTool::Auto
+        Self::Auto
     }
 }
 
@@ -133,7 +116,6 @@ impl Default for HotkeyConfig {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ShadowwordConfig {
     pub mode: ServiceMode,
-    pub engine: EngineKind,
     pub model_path: PathBuf,
     #[serde(default)]
     pub preload_on_startup: bool,
@@ -143,8 +125,7 @@ pub struct ShadowwordConfig {
     pub daemon: DaemonConfig,
     #[serde(default)]
     pub hotkey: HotkeyConfig,
-    pub onnx_quantization: OnnxQuantization,
-    pub ort_accelerator: OrtxAccelerator,
+    #[serde(default)]
     pub whisper_accelerator: WhisperAccelerator,
 }
 
@@ -152,7 +133,6 @@ impl Default for ShadowwordConfig {
     fn default() -> Self {
         Self {
             mode: ServiceMode::Local,
-            engine: EngineKind::Parakeet,
             model_path: PathBuf::new(),
             preload_on_startup: false,
             recording: RecordingConfig {
@@ -166,43 +146,67 @@ impl Default for ShadowwordConfig {
             daemon: DaemonConfig {
                 listen_addr: "127.0.0.1:47813".to_string(),
             },
-            hotkey: HotkeyConfig {
-                shortcut: "ctrl+space".to_string(),
-                push_to_talk: true,
-            },
-            onnx_quantization: OnnxQuantization::Fp32,
-            ort_accelerator: OrtxAccelerator::Auto,
+            hotkey: HotkeyConfig::default(),
             whisper_accelerator: WhisperAccelerator::Auto,
         }
     }
 }
 
 impl ShadowwordConfig {
-    pub fn config_path() -> Result<PathBuf> {
-        let dirs = ProjectDirs::from("io", "fractaltess", "shadowword")
-            .context("failed to resolve project directories")?;
+    fn project_dirs(app_name: &str) -> Result<ProjectDirs> {
+        ProjectDirs::from("io", "fractaltess", app_name)
+            .context("failed to resolve project directories")
+    }
+
+    fn shadoword_config_path() -> Result<PathBuf> {
+        let dirs = Self::project_dirs("shadoword")?;
         let config_dir = dirs.config_dir();
         fs::create_dir_all(config_dir).context("failed to create config directory")?;
         Ok(config_dir.join("config.json"))
     }
 
+    fn legacy_config_path() -> Result<PathBuf> {
+        let dirs = Self::project_dirs("shadowword")?;
+        Ok(dirs.config_dir().join("config.json"))
+    }
+
+    pub fn config_path() -> Result<PathBuf> {
+        Self::shadoword_config_path()
+    }
+
     pub fn models_dir() -> Result<PathBuf> {
-        let dirs = ProjectDirs::from("io", "fractaltess", "shadowword")
-            .context("failed to resolve project directories")?;
-        let models_dir = dirs.data_dir().join("models");
-        fs::create_dir_all(&models_dir).context("failed to create models directory")?;
-        Ok(models_dir)
+        let shadoword_dirs = Self::project_dirs("shadoword")?;
+        let shadoword_models_dir = shadoword_dirs.data_dir().join("models");
+        let legacy_dirs = Self::project_dirs("shadowword")?;
+        let legacy_models_dir = legacy_dirs.data_dir().join("models");
+
+        if legacy_models_dir.exists() && !shadoword_models_dir.exists() {
+            return Ok(legacy_models_dir);
+        }
+
+        fs::create_dir_all(&shadoword_models_dir).context("failed to create models directory")?;
+        Ok(shadoword_models_dir)
     }
 
     pub fn load() -> Result<Self> {
         let path = Self::config_path()?;
-        if !path.exists() {
-            return Ok(Self::default());
-        }
+        let legacy_path = Self::legacy_config_path()?;
 
-        let raw = fs::read_to_string(&path)
-            .with_context(|| format!("failed to read config at {}", path.display()))?;
-        let config = serde_json::from_str(&raw).context("failed to parse config json")?;
+        let load_path = if path.exists() {
+            path
+        } else if legacy_path.exists() {
+            legacy_path
+        } else {
+            let mut config = Self::default();
+            config.apply_env_overrides();
+            return Ok(config);
+        };
+
+        let raw = fs::read_to_string(&load_path)
+            .with_context(|| format!("failed to read config at {}", load_path.display()))?;
+        let mut config: Self =
+            serde_json::from_str(&raw).context("failed to parse config json")?;
+        config.apply_env_overrides();
         Ok(config)
     }
 
@@ -211,5 +215,14 @@ impl ShadowwordConfig {
         let raw = serde_json::to_string_pretty(self).context("failed to serialize config")?;
         fs::write(&path, raw).with_context(|| format!("failed to write {}", path.display()))?;
         Ok(())
+    }
+
+    fn apply_env_overrides(&mut self) {
+        if let Ok(listen_addr) = env::var("SHADOWORD_LISTEN_ADDR") {
+            let listen_addr = listen_addr.trim();
+            if !listen_addr.is_empty() {
+                self.daemon.listen_addr = listen_addr.to_string();
+            }
+        }
     }
 }

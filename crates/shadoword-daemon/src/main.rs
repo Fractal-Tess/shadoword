@@ -3,7 +3,7 @@ use axum::extract::State;
 use axum::extract::DefaultBodyLimit;
 use axum::routing::{get, post};
 use axum::{Json, Router};
-use shadowword_core::{
+use shadoword_core::{
     DeviceListResponse, LocalService, ServiceHealth, ServiceStatus, ShadowwordConfig,
     TranscriptRequest, TranscriptResponse, TranscriptionService,
 };
@@ -46,7 +46,7 @@ async fn main() -> anyhow::Result<()> {
         .layer(DefaultBodyLimit::max(256 * 1024 * 1024))
         .with_state(state);
 
-    tracing::info!("shadowword-daemon listening on http://{}", addr);
+    tracing::info!("shadoword-daemon listening on http://{}", addr);
     let listener = tokio::net::TcpListener::bind(addr).await?;
     axum::serve(listener, app).await?;
     Ok(())

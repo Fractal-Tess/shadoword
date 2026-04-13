@@ -1,8 +1,8 @@
-# Home-manager module for Shadow Word speech-to-text
+# Home-manager module for Shadoword speech-to-text
 #
 # Provides a systemd user service for autostart.
-# Usage: imports = [ shadowword.homeManagerModules.default ];
-#        services.shadowword.enable = true;
+# Usage: imports = [ shadoword.homeManagerModules.default ];
+#        services.shadoword.enable = true;
 {
   config,
   lib,
@@ -10,28 +10,28 @@
   ...
 }:
 let
-  cfg = config.services.shadowword;
+  cfg = config.services.shadoword;
 in
 {
-  options.services.shadowword = {
-    enable = lib.mkEnableOption "Shadow Word speech-to-text user service";
+  options.services.shadoword = {
+    enable = lib.mkEnableOption "Shadoword speech-to-text user service";
 
     package = lib.mkOption {
       type = lib.types.package;
-      defaultText = lib.literalExpression "shadowword.packages.\${system}.shadowword";
-      description = "The Shadow Word package to use.";
+      defaultText = lib.literalExpression "shadoword.packages.\${system}.shadoword";
+      description = "The Shadoword package to use.";
     };
   };
 
   config = lib.mkIf cfg.enable {
-    systemd.user.services.shadowword = {
+    systemd.user.services.shadoword = {
       Unit = {
-        Description = "Shadow Word speech-to-text";
+        Description = "Shadoword speech-to-text";
         After = [ "graphical-session.target" ];
         PartOf = [ "graphical-session.target" ];
       };
       Service = {
-        ExecStart = "${cfg.package}/bin/shadowword";
+        ExecStart = "${cfg.package}/bin/shadoword-desktop";
         Restart = "on-failure";
         RestartSec = 5;
       };

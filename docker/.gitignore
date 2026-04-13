@@ -1,0 +1,4 @@
+config/shadoword/config.json
+data/*
+!data/.gitkeep
+

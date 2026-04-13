@@ -1,8 +1,5 @@
 use crate::audio::{AudioInput, InputDeviceInfo, MicrophoneRecorder};
-use crate::config::{
-    EngineKind, OnnxQuantization, OrtxAccelerator, ServiceMode, ShadowwordConfig,
-    WhisperAccelerator,
-};
+use crate::config::{ServiceMode, ShadowwordConfig, WhisperAccelerator};
 use crate::wav;
 use anyhow::{anyhow, Context, Result};
 use base64::Engine;
@@ -13,8 +10,6 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex, RwLock};
 use std::time::Instant;
 use transcribe_rs::accel;
-use transcribe_rs::onnx::parakeet::{ParakeetModel, ParakeetParams, TimestampGranularity};
-use transcribe_rs::onnx::Quantization;
 use transcribe_rs::whisper_cpp::{WhisperEngine, WhisperInferenceParams};
 use transcribe_rs::TranscribeOptions;
 
@@ -27,17 +22,15 @@ pub struct TranscriptRequest {
 pub struct TranscriptResponse {
     pub text: String,
     pub elapsed_ms: u128,
-    pub engine: EngineKind,
+    pub engine: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ServiceStatus {
     pub model_loaded: bool,
     pub mode: ServiceMode,
-    pub engine: EngineKind,
+    pub engine: String,
     pub model_path: String,
-    pub onnx_quantization: Option<OnnxQuantization>,
-    pub ort_accelerator: OrtxAccelerator,
     pub whisper_accelerator: WhisperAccelerator,
     pub input_device: Option<String>,
     pub sample_rate: u32,
@@ -86,32 +79,18 @@ pub trait TranscriptionService: Send + Sync {
     }
 }
 
-enum LoadedEngine {
-    Whisper(WhisperEngine),
-    Parakeet(ParakeetModel),
-}
-
 pub struct LocalService {
     config: Arc<RwLock<ShadowwordConfig>>,
-    engine: Arc<Mutex<Option<LoadedEngine>>>,
+    engine: Arc<Mutex<Option<WhisperEngine>>>,
     model_loaded: Arc<AtomicBool>,
 }
 
 impl LocalService {
     fn compiled_backend_summary() -> &'static str {
-        match (
-            cfg!(feature = "cuda"),
-            cfg!(feature = "whisper-vulkan"),
-            cfg!(feature = "whisper-cuda"),
-        ) {
-            (true, true, true) => "ort-cuda,whisper-vulkan,whisper-cuda",
-            (true, true, false) => "ort-cuda,whisper-vulkan",
-            (true, false, true) => "ort-cuda,whisper-cuda",
-            (true, false, false) => "ort-cuda",
-            (false, true, true) => "whisper-vulkan,whisper-cuda",
-            (false, true, false) => "whisper-vulkan",
-            (false, false, true) => "whisper-cuda",
-            (false, false, false) => "cpu-only",
+        if cfg!(feature = "whisper-vulkan") {
+            "whisper-vulkan"
+        } else {
+            "cpu-only"
         }
     }
 
@@ -119,11 +98,9 @@ impl LocalService {
         tracing::info!(
             target: "shadowword.backend",
             phase,
-            engine = ?config.engine,
+            engine = "whisper",
             model_path = %config.model_path.display(),
-            ort_accelerator = ?config.ort_accelerator,
             whisper_accelerator = ?config.whisper_accelerator,
-            onnx_quantization = ?config.onnx_quantization,
             compiled_backends = Self::compiled_backend_summary(),
             "backend configuration"
         );
@@ -155,23 +132,7 @@ impl LocalService {
         })
     }
 
-    fn onnx_quantization(config: &ShadowwordConfig) -> Quantization {
-        match config.onnx_quantization {
-            OnnxQuantization::Fp32 => Quantization::FP32,
-            OnnxQuantization::Fp16 => Quantization::FP16,
-            OnnxQuantization::Int8 => Quantization::Int8,
-            OnnxQuantization::Int4 => Quantization::Int4,
-        }
-    }
-
-    fn apply_accelerators(config: &ShadowwordConfig) {
-        let ort = match config.ort_accelerator {
-            OrtxAccelerator::Auto => accel::OrtAccelerator::Auto,
-            OrtxAccelerator::Cpu => accel::OrtAccelerator::CpuOnly,
-            OrtxAccelerator::Cuda => accel::OrtAccelerator::Cuda,
-        };
-        accel::set_ort_accelerator(ort);
-
+    fn apply_accelerator(config: &ShadowwordConfig) {
         let whisper = match config.whisper_accelerator {
             WhisperAccelerator::Auto => accel::WhisperAccelerator::Auto,
             WhisperAccelerator::Cpu => accel::WhisperAccelerator::CpuOnly,
@@ -191,10 +152,8 @@ impl LocalService {
 
         tracing::info!(
             target: "shadowword.profile",
-            engine = ?config.engine,
-            ort = ?config.ort_accelerator,
+            engine = "whisper",
             whisper = ?config.whisper_accelerator,
-            onnx_quantization = ?config.onnx_quantization,
             sample_rate = timings.sample_rate,
             request_bytes = timings.request_bytes,
             input_samples = timings.input_samples,
@@ -210,13 +169,11 @@ impl LocalService {
         );
     }
 
-    /// Preload the model into memory so subsequent transcriptions are instant.
     pub fn preload(&self) -> Result<()> {
         self.ensure_loaded()?;
         Ok(())
     }
 
-    /// Returns true if a model is currently loaded in memory.
     pub fn is_loaded(&self) -> bool {
         self.model_loaded.load(Ordering::Relaxed)
     }
@@ -224,13 +181,13 @@ impl LocalService {
     fn ensure_loaded(&self) -> Result<bool> {
         let config = self.config();
         Self::log_backend_request(&config, "ensure_loaded");
-        Self::apply_accelerators(&config);
+        Self::apply_accelerator(&config);
 
         let mut engine_guard = self.engine.lock().expect("engine lock poisoned");
         if engine_guard.is_some() {
             tracing::info!(
                 target: "shadowword.backend",
-                engine = ?config.engine,
+                engine = "whisper",
                 model_path = %config.model_path.display(),
                 compiled_backends = Self::compiled_backend_summary(),
                 "model already loaded"
@@ -245,34 +202,18 @@ impl LocalService {
             ));
         }
 
-        let loaded = match config.engine {
-            EngineKind::Parakeet => LoadedEngine::Parakeet(
-                ParakeetModel::load(
-                    Path::new(&config.model_path),
-                    &Self::onnx_quantization(&config),
-                )
-                .with_context(|| {
-                    format!(
-                        "failed to load parakeet model from {}",
-                        config.model_path.display()
-                    )
-                })?,
-            ),
-            EngineKind::Whisper => LoadedEngine::Whisper(
-                WhisperEngine::load(Path::new(&config.model_path)).with_context(|| {
-                    format!(
-                        "failed to load whisper model from {}",
-                        config.model_path.display()
-                    )
-                })?,
-            ),
-        };
+        let loaded = WhisperEngine::load(Path::new(&config.model_path)).with_context(|| {
+            format!(
+                "failed to load whisper model from {}",
+                config.model_path.display()
+            )
+        })?;
 
         *engine_guard = Some(loaded);
         self.model_loaded.store(true, Ordering::Relaxed);
         tracing::info!(
             target: "shadowword.backend",
-            engine = ?config.engine,
+            engine = "whisper",
             model_path = %config.model_path.display(),
             compiled_backends = Self::compiled_backend_summary(),
             "model load complete"
@@ -309,6 +250,66 @@ impl LocalService {
         }
         Ok(output)
     }
+
+    fn transcribe_audio_internal(
+        &self,
+        input: AudioInput,
+        timings: &mut ProfileTimings,
+    ) -> Result<TranscriptResponse> {
+        timings.sample_rate = input.sample_rate;
+        timings.input_samples = input.samples.len();
+        let total_start = Instant::now();
+
+        let ensure_loaded_start = Instant::now();
+        timings.cold_load = self.ensure_loaded()?;
+        timings.ensure_loaded_ms = ensure_loaded_start.elapsed().as_millis();
+
+        let resample_start = Instant::now();
+        let audio = self.resample_if_needed(input)?;
+        timings.resample_ms = resample_start.elapsed().as_millis();
+        timings.output_samples = audio.len();
+
+        let config = self.config();
+        Self::log_backend_request(&config, "transcribe");
+        let inference_start = Instant::now();
+
+        let text = {
+            let mut engine_guard = self.engine.lock().expect("engine lock poisoned");
+            let engine = engine_guard
+                .as_mut()
+                .context("transcription engine not loaded")?;
+
+            engine
+                .transcribe_with(
+                    &audio,
+                    &WhisperInferenceParams {
+                        language: None,
+                        translate: false,
+                        ..Default::default()
+                    },
+                )
+                .context("whisper transcription failed")?
+                .text
+        };
+
+        timings.inference_ms = inference_start.elapsed().as_millis();
+        timings.total_ms = total_start.elapsed().as_millis();
+        tracing::info!(
+            target: "shadowword.backend",
+            engine = "whisper",
+            elapsed_ms = timings.total_ms,
+            inference_ms = timings.inference_ms,
+            cold_load = timings.cold_load,
+            compiled_backends = Self::compiled_backend_summary(),
+            "transcription complete"
+        );
+
+        Ok(TranscriptResponse {
+            text,
+            elapsed_ms: timings.total_ms,
+            engine: "whisper".to_string(),
+        })
+    }
 }
 
 impl TranscriptionService for LocalService {
@@ -318,11 +319,8 @@ impl TranscriptionService for LocalService {
         Ok(ServiceStatus {
             model_loaded: loaded,
             mode: config.mode,
-            engine: config.engine,
+            engine: "whisper".to_string(),
             model_path: config.model_path.display().to_string(),
-            onnx_quantization: (config.engine == EngineKind::Parakeet)
-                .then_some(config.onnx_quantization),
-            ort_accelerator: config.ort_accelerator,
             whisper_accelerator: config.whisper_accelerator,
             input_device: config.recording.input_device.clone(),
             sample_rate: config.recording.sample_rate,
@@ -373,80 +371,6 @@ impl TranscriptionService for LocalService {
         let config = self.config();
         self.log_profile(&config, &timings);
         Ok(response)
-    }
-}
-
-impl LocalService {
-    fn transcribe_audio_internal(
-        &self,
-        input: AudioInput,
-        timings: &mut ProfileTimings,
-    ) -> Result<TranscriptResponse> {
-        timings.sample_rate = input.sample_rate;
-        timings.input_samples = input.samples.len();
-        let total_start = Instant::now();
-
-        let ensure_loaded_start = Instant::now();
-        timings.cold_load = self.ensure_loaded()?;
-        timings.ensure_loaded_ms = ensure_loaded_start.elapsed().as_millis();
-
-        let resample_start = Instant::now();
-        let audio = self.resample_if_needed(input)?;
-        timings.resample_ms = resample_start.elapsed().as_millis();
-        timings.output_samples = audio.len();
-
-        let config = self.config();
-        Self::log_backend_request(&config, "transcribe");
-        let inference_start = Instant::now();
-
-        let text = {
-            let mut engine_guard = self.engine.lock().expect("engine lock poisoned");
-            let engine = engine_guard
-                .as_mut()
-                .context("transcription engine not loaded")?;
-
-            match engine {
-                LoadedEngine::Parakeet(model) => model
-                    .transcribe_with(
-                        &audio,
-                        &ParakeetParams {
-                            timestamp_granularity: Some(TimestampGranularity::Segment),
-                            ..Default::default()
-                        },
-                    )
-                    .context("parakeet transcription failed")?
-                    .text,
-                LoadedEngine::Whisper(model) => model
-                    .transcribe_with(
-                        &audio,
-                        &WhisperInferenceParams {
-                            language: None,
-                            translate: false,
-                            ..Default::default()
-                        },
-                    )
-                    .context("whisper transcription failed")?
-                    .text,
-            }
-        };
-
-        timings.inference_ms = inference_start.elapsed().as_millis();
-        timings.total_ms = total_start.elapsed().as_millis();
-        tracing::info!(
-            target: "shadowword.backend",
-            engine = ?config.engine,
-            elapsed_ms = timings.total_ms,
-            inference_ms = timings.inference_ms,
-            cold_load = timings.cold_load,
-            compiled_backends = Self::compiled_backend_summary(),
-            "transcription complete"
-        );
-
-        Ok(TranscriptResponse {
-            text,
-            elapsed_ms: timings.total_ms,
-            engine: config.engine,
-        })
     }
 }
 

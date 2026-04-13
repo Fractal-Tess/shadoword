@@ -5,9 +5,8 @@ pub mod wav;
 
 pub use audio::{AudioInput, InputDeviceInfo, MicrophoneRecorder, RecordingSession};
 pub use config::{
-    DaemonConfig, EngineKind, OnnxQuantization, OrtxAccelerator, OutputConfig, PasteMethod,
-    RecordingConfig, RemoteConfig, ServiceMode, ShadowwordConfig, TypingTool,
-    WhisperAccelerator,
+    DaemonConfig, OutputConfig, PasteMethod, RecordingConfig, RemoteConfig, ServiceMode,
+    ShadowwordConfig, TypingTool, WhisperAccelerator,
 };
 pub use service::{
     DeviceListResponse, LocalService, ServiceHealth, ServiceStatus, TranscriptRequest,

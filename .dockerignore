@@ -1,0 +1,9 @@
+.git
+.github
+.direnv
+.vscode
+target
+audio corpus
+benchmarks
+.codex
+

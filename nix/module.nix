@@ -1,4 +1,4 @@
-# NixOS module for Shadow Word speech-to-text
+# NixOS module for Shadoword speech-to-text
 #
 # Handles system-level configuration that the package wrapper cannot:
 #   - udev rule for /dev/uinput (rdev grab() needs it for virtual input)
@@ -7,12 +7,12 @@
 #
 # Usage in your flake:
 #
-#   inputs.shadowword.url = "github:Fractal-Tess/shadoword";
+#   inputs.shadoword.url = "github:Fractal-Tess/shadoword";
 #
 #   nixosConfigurations.myhost = nixpkgs.lib.nixosSystem {
 #     modules = [
-#       shadowword.nixosModules.default
-#       { programs.shadowword.enable = true; }
+#       shadoword.nixosModules.default
+#       { programs.shadoword.enable = true; }
 #     ];
 #   };
 {
@@ -22,16 +22,16 @@
   ...
 }:
 let
-  cfg = config.programs.shadowword;
+  cfg = config.programs.shadoword;
 in
 {
-  options.programs.shadowword = {
-    enable = lib.mkEnableOption "Shadow Word offline speech-to-text";
+  options.programs.shadoword = {
+    enable = lib.mkEnableOption "Shadoword offline speech-to-text";
 
     package = lib.mkOption {
       type = lib.types.package;
-      defaultText = lib.literalExpression "shadowword.packages.\${system}.shadowword";
-      description = "The Shadow Word package to use.";
+      defaultText = lib.literalExpression "shadoword.packages.\${system}.shadoword";
+      description = "The Shadoword package to use.";
     };
   };
 
