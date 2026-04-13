@@ -30,6 +30,12 @@ async fn main() -> anyhow::Result<()> {
         service: Arc::new(LocalService::new(config)),
     };
 
+    if state.service.config().preload_on_startup {
+        tracing::info!("preload_on_startup enabled, loading model before serving requests");
+        state.service.preload()?;
+        tracing::info!("daemon model preload complete");
+    }
+
     let app = Router::new()
         .route("/health", get(health))
         .route("/v1/status", get(status))
