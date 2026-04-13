@@ -21,7 +21,10 @@ fn main() -> Result<()> {
         .init();
 
     let config = ShadowwordConfig::load()?;
-    let native_options = eframe::NativeOptions::default();
+    let native_options = eframe::NativeOptions {
+        renderer: eframe::Renderer::Wgpu,
+        ..Default::default()
+    };
 
     eframe::run_native(
         "Shadoword",
