@@ -9,6 +9,8 @@ repository.workspace = true
 [features]
 default = []
 cuda = ["shadowword-core/cuda"]
+whisper-vulkan = ["shadowword-core/whisper-vulkan"]
+whisper-cuda = ["shadowword-core/whisper-cuda"]
 
 [dependencies]
 anyhow.workspace = true

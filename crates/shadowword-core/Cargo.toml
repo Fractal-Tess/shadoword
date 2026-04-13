@@ -9,6 +9,8 @@ repository.workspace = true
 [features]
 default = []
 cuda = ["transcribe-rs/ort-cuda"]
+whisper-vulkan = ["transcribe-rs/whisper-vulkan"]
+whisper-cuda = ["transcribe-rs/whisper-cuda"]
 
 [dependencies]
 anyhow.workspace = true

@@ -9,6 +9,7 @@ use base64::Engine;
 use rubato::{FftFixedIn, Resampler};
 use serde::{Deserialize, Serialize};
 use std::path::Path;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex, RwLock};
 use std::time::Instant;
 use transcribe_rs::accel;
@@ -92,14 +93,47 @@ enum LoadedEngine {
 
 pub struct LocalService {
     config: Arc<RwLock<ShadowwordConfig>>,
-    engine: Mutex<Option<LoadedEngine>>,
+    engine: Arc<Mutex<Option<LoadedEngine>>>,
+    model_loaded: Arc<AtomicBool>,
 }
 
 impl LocalService {
+    fn compiled_backend_summary() -> &'static str {
+        match (
+            cfg!(feature = "cuda"),
+            cfg!(feature = "whisper-vulkan"),
+            cfg!(feature = "whisper-cuda"),
+        ) {
+            (true, true, true) => "ort-cuda,whisper-vulkan,whisper-cuda",
+            (true, true, false) => "ort-cuda,whisper-vulkan",
+            (true, false, true) => "ort-cuda,whisper-cuda",
+            (true, false, false) => "ort-cuda",
+            (false, true, true) => "whisper-vulkan,whisper-cuda",
+            (false, true, false) => "whisper-vulkan",
+            (false, false, true) => "whisper-cuda",
+            (false, false, false) => "cpu-only",
+        }
+    }
+
+    fn log_backend_request(config: &ShadowwordConfig, phase: &str) {
+        tracing::info!(
+            target: "shadowword.backend",
+            phase,
+            engine = ?config.engine,
+            model_path = %config.model_path.display(),
+            ort_accelerator = ?config.ort_accelerator,
+            whisper_accelerator = ?config.whisper_accelerator,
+            onnx_quantization = ?config.onnx_quantization,
+            compiled_backends = Self::compiled_backend_summary(),
+            "backend configuration"
+        );
+    }
+
     pub fn new(config: ShadowwordConfig) -> Self {
         Self {
             config: Arc::new(RwLock::new(config)),
-            engine: Mutex::new(None),
+            engine: Arc::new(Mutex::new(None)),
+            model_loaded: Arc::new(AtomicBool::new(false)),
         }
     }
 
@@ -111,6 +145,7 @@ impl LocalService {
         config.save()?;
         *self.config.write().expect("config lock poisoned") = config;
         *self.engine.lock().expect("engine lock poisoned") = None;
+        self.model_loaded.store(false, Ordering::Relaxed);
         Ok(())
     }
 
@@ -175,12 +210,31 @@ impl LocalService {
         );
     }
 
+    /// Preload the model into memory so subsequent transcriptions are instant.
+    pub fn preload(&self) -> Result<()> {
+        self.ensure_loaded()?;
+        Ok(())
+    }
+
+    /// Returns true if a model is currently loaded in memory.
+    pub fn is_loaded(&self) -> bool {
+        self.model_loaded.load(Ordering::Relaxed)
+    }
+
     fn ensure_loaded(&self) -> Result<bool> {
         let config = self.config();
+        Self::log_backend_request(&config, "ensure_loaded");
         Self::apply_accelerators(&config);
 
         let mut engine_guard = self.engine.lock().expect("engine lock poisoned");
         if engine_guard.is_some() {
+            tracing::info!(
+                target: "shadowword.backend",
+                engine = ?config.engine,
+                model_path = %config.model_path.display(),
+                compiled_backends = Self::compiled_backend_summary(),
+                "model already loaded"
+            );
             return Ok(false);
         }
 
@@ -215,6 +269,14 @@ impl LocalService {
         };
 
         *engine_guard = Some(loaded);
+        self.model_loaded.store(true, Ordering::Relaxed);
+        tracing::info!(
+            target: "shadowword.backend",
+            engine = ?config.engine,
+            model_path = %config.model_path.display(),
+            compiled_backends = Self::compiled_backend_summary(),
+            "model load complete"
+        );
         Ok(true)
     }
 
@@ -252,7 +314,7 @@ impl LocalService {
 impl TranscriptionService for LocalService {
     fn status(&self) -> Result<ServiceStatus> {
         let config = self.config();
-        let loaded = self.engine.lock().expect("engine lock poisoned").is_some();
+        let loaded = self.model_loaded.load(Ordering::Relaxed);
         Ok(ServiceStatus {
             model_loaded: loaded,
             mode: config.mode,
@@ -334,6 +396,7 @@ impl LocalService {
         timings.output_samples = audio.len();
 
         let config = self.config();
+        Self::log_backend_request(&config, "transcribe");
         let inference_start = Instant::now();
 
         let text = {
@@ -369,6 +432,15 @@ impl LocalService {
 
         timings.inference_ms = inference_start.elapsed().as_millis();
         timings.total_ms = total_start.elapsed().as_millis();
+        tracing::info!(
+            target: "shadowword.backend",
+            engine = ?config.engine,
+            elapsed_ms = timings.total_ms,
+            inference_ms = timings.inference_ms,
+            cold_load = timings.cold_load,
+            compiled_backends = Self::compiled_backend_summary(),
+            "transcription complete"
+        );
 
         Ok(TranscriptResponse {
             text,
@@ -382,7 +454,8 @@ impl Clone for LocalService {
     fn clone(&self) -> Self {
         Self {
             config: Arc::clone(&self.config),
-            engine: Mutex::new(None),
+            engine: Arc::clone(&self.engine),
+            model_loaded: Arc::clone(&self.model_loaded),
         }
     }
 }

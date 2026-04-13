@@ -43,37 +43,57 @@ pub enum OnnxQuantization {
     Int4,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct RecordingConfig {
     pub input_device: Option<String>,
     pub sample_rate: u32,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct OutputConfig {
     pub copy_to_clipboard: bool,
     pub type_into_active_window: bool,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct RemoteConfig {
     pub endpoint: String,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct DaemonConfig {
     pub listen_addr: String,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct HotkeyConfig {
+    pub shortcut: String,
+    pub push_to_talk: bool,
+}
+
+impl Default for HotkeyConfig {
+    fn default() -> Self {
+        Self {
+            shortcut: "ctrl+space".to_string(),
+            push_to_talk: true,
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ShadowwordConfig {
     pub mode: ServiceMode,
     pub engine: EngineKind,
     pub model_path: PathBuf,
+    #[serde(default)]
+    pub preload_on_startup: bool,
     pub recording: RecordingConfig,
     pub output: OutputConfig,
     pub remote: RemoteConfig,
     pub daemon: DaemonConfig,
+    #[serde(default)]
+    pub hotkey: HotkeyConfig,
     pub onnx_quantization: OnnxQuantization,
     pub ort_accelerator: OrtxAccelerator,
     pub whisper_accelerator: WhisperAccelerator,
@@ -85,6 +105,7 @@ impl Default for ShadowwordConfig {
             mode: ServiceMode::Local,
             engine: EngineKind::Parakeet,
             model_path: PathBuf::new(),
+            preload_on_startup: false,
             recording: RecordingConfig {
                 input_device: None,
                 sample_rate: 16_000,
@@ -98,6 +119,10 @@ impl Default for ShadowwordConfig {
             },
             daemon: DaemonConfig {
                 listen_addr: "127.0.0.1:47813".to_string(),
+            },
+            hotkey: HotkeyConfig {
+                shortcut: "ctrl+space".to_string(),
+                push_to_talk: true,
             },
             onnx_quantization: OnnxQuantization::Fp32,
             ort_accelerator: OrtxAccelerator::Auto,
@@ -113,6 +138,14 @@ impl ShadowwordConfig {
         let config_dir = dirs.config_dir();
         fs::create_dir_all(config_dir).context("failed to create config directory")?;
         Ok(config_dir.join("config.json"))
+    }
+
+    pub fn models_dir() -> Result<PathBuf> {
+        let dirs = ProjectDirs::from("io", "fractaltess", "shadowword")
+            .context("failed to resolve project directories")?;
+        let models_dir = dirs.data_dir().join("models");
+        fs::create_dir_all(&models_dir).context("failed to create models directory")?;
+        Ok(models_dir)
     }
 
     pub fn load() -> Result<Self> {
