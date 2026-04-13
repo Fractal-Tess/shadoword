@@ -49,6 +49,7 @@
           fontconfig
           libevdev
           libx11
+          libxi
           libxcb
           libxkbcommon
           wayland
