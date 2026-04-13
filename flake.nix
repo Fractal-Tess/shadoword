@@ -47,6 +47,7 @@
         daemonRuntimeDeps pkgs
         ++ (with pkgs; [
           fontconfig
+          libevdev
           libx11
           libxcb
           libxkbcommon
