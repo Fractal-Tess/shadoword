@@ -1,5 +1,5 @@
 {
-  description = "Shadoword - Rust workspace for the egui desktop client and remote daemon";
+  description = "Shadoword - Rust workspace for the egui desktop client and Whisper daemon";
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
@@ -17,67 +17,10 @@
       workspaceToml = builtins.fromTOML (builtins.readFile ./Cargo.toml);
       version = workspaceToml.workspace.package.version;
 
-      mkPkgs = { system, cuda ? false }:
-        import nixpkgs {
-          inherit system;
-          config = nixpkgs.lib.optionalAttrs cuda {
-            allowUnfree = true;
-            cudaSupport = true;
-            rocmSupport = false;
-            cudaCapabilities = [ "8.6" ];
-            cudaForwardCompat = false;
-          };
-        };
-
-      cudaRuntimeDeps = pkgs:
-        with pkgs.cudaPackages; [
-          cuda_cudart
-          libcublas
-          libcurand
-          libcusparse
-          libcufft
-          cuda_nvrtc
-          cudnn
-        ];
-
-      mkPrebuiltOnnxruntimeGpu = pkgs:
-        pkgs.stdenvNoCC.mkDerivation rec {
-          pname = "onnxruntime-gpu-prebuilt";
-          version = "1.24.2";
-
-          src = pkgs.fetchurl {
-            url = "https://github.com/microsoft/onnxruntime/releases/download/v${version}/onnxruntime-linux-x64-gpu-${version}.tgz";
-            hash = "sha256-vLQtoEH0IZLlV53hdfdBAxPBFHQKYR4jCv6deb5lzEk=";
-          };
-
-          dontConfigure = true;
-          dontBuild = true;
-
-          installPhase = ''
-            runHook preInstall
-            mkdir -p "$out"
-            tar xzf "$src" --strip-components=1 -C "$out"
-            runHook postInstall
-          '';
-        };
-
-      commonRuntimeDeps = pkgs: onnxruntimePkg:
-        with pkgs; [
-          alsa-lib
-          fontconfig
-          glslang
-          libglvnd
-          libx11
-          libxcb
-          libxkbcommon
-          onnxruntimePkg
-          openssl
-          shaderc
-          vulkan-headers
-          vulkan-loader
-          vulkan-tools
-          wayland
-        ];
+      mkPkgs = system: import nixpkgs {
+        inherit system;
+        config.allowUnfree = true;
+      };
 
       commonBuildDeps = pkgs:
         with pkgs; [
@@ -92,63 +35,70 @@
           vulkan-tools
         ];
 
-      commonEnv = pkgs: onnxruntimePkg: {
+      daemonRuntimeDeps = pkgs:
+        with pkgs; [
+          alsa-lib
+          libglvnd
+          openssl
+          vulkan-loader
+        ];
+
+      desktopRuntimeDeps = pkgs:
+        daemonRuntimeDeps pkgs
+        ++ (with pkgs; [
+          fontconfig
+          libx11
+          libxcb
+          libxkbcommon
+          wayland
+        ]);
+
+      commonEnv = pkgs: {
         LIBCLANG_PATH = "${pkgs.llvmPackages.libclang.lib}/lib";
         BINDGEN_EXTRA_CLANG_ARGS = "-isystem ${pkgs.llvmPackages.libclang.lib}/lib/clang/${pkgs.lib.getVersion pkgs.llvmPackages.libclang}/include -isystem ${pkgs.glibc.dev}/include";
-        ORT_LIB_LOCATION = "${onnxruntimePkg}/lib";
-        ORT_PREFER_DYNAMIC_LINK = "1";
         VULKAN_SDK = "${pkgs.vulkan-headers}";
-        VK_DRIVER_FILES = "/run/opengl-driver/share/vulkan/icd.d/nvidia_icd.x86_64.json";
-        VK_ICD_FILENAMES = "/run/opengl-driver/share/vulkan/icd.d/nvidia_icd.x86_64.json";
-        VK_LAYER_PATH = "/run/opengl-driver/share/vulkan/implicit_layer.d:/run/opengl-driver/share/vulkan/explicit_layer.d";
       };
 
-      runtimeLibraryPath = pkgs: onnxruntimePkg: extraLibs:
-        "/run/opengl-driver/lib:${pkgs.lib.makeLibraryPath (commonRuntimeDeps pkgs onnxruntimePkg ++ extraLibs)}";
+      runtimeLibraryPath = pkgs: runtimeDeps:
+        "/run/opengl-driver/lib:${pkgs.lib.makeLibraryPath runtimeDeps}";
 
       mkRustPackage =
         {
           pkgs,
+          system,
           pname,
           cargoPackage,
-          onnxruntimePkg ? pkgs.onnxruntime,
-          cargoFeatures ? [ ],
-          extraRuntimeLibs ? [ ],
+          runtimeDeps,
         }:
         pkgs.rustPlatform.buildRustPackage {
           inherit pname version;
           src = self;
 
-          cargoLock = {
-            lockFile = ./Cargo.lock;
-          };
+          cargoLock.lockFile = ./Cargo.lock;
 
           cargoBuildFlags =
             [
               "-p"
               cargoPackage
             ]
-            ++ pkgs.lib.optionals (cargoFeatures != [ ]) [
+            ++ pkgs.lib.optionals (system == "x86_64-linux") [
               "--features"
-              (pkgs.lib.concatStringsSep "," cargoFeatures)
+              "whisper-vulkan"
             ];
 
           nativeBuildInputs = commonBuildDeps pkgs;
-          buildInputs = commonRuntimeDeps pkgs onnxruntimePkg ++ extraRuntimeLibs;
+          buildInputs = runtimeDeps;
 
-          env = commonEnv pkgs onnxruntimePkg;
+          env = commonEnv pkgs;
           doCheck = false;
 
           postInstall = ''
             wrapProgram "$out/bin/${cargoPackage}" \
-              --prefix LD_LIBRARY_PATH : "${runtimeLibraryPath pkgs onnxruntimePkg extraRuntimeLibs}" \
-              --set VK_DRIVER_FILES "/run/opengl-driver/share/vulkan/icd.d/nvidia_icd.x86_64.json" \
-              --set VK_ICD_FILENAMES "/run/opengl-driver/share/vulkan/icd.d/nvidia_icd.x86_64.json" \
-              --set VK_LAYER_PATH "/run/opengl-driver/share/vulkan/implicit_layer.d:/run/opengl-driver/share/vulkan/explicit_layer.d"
+              --prefix LD_LIBRARY_PATH : "${runtimeLibraryPath pkgs runtimeDeps}"
           '';
 
           meta = {
-            description = "Offline speech-to-text workspace with egui desktop UI and optional daemon";
+            description = "Offline speech-to-text workspace with egui desktop UI and Whisper daemon";
             homepage = "https://github.com/Fractal-Tess/shadoword";
             license = pkgs.lib.licenses.mit;
             platforms = supportedSystems;
@@ -156,81 +106,57 @@
         };
     in
     {
-      packages = forAllSystems (system:
+      packages = forAllSystems (
+        system:
         let
-          pkgs = mkPkgs { inherit system; };
-          cudaPkgs = mkPkgs { inherit system; cuda = system == "x86_64-linux"; };
-          prebuiltOnnxruntimeGpu = mkPrebuiltOnnxruntimeGpu cudaPkgs;
+          pkgs = mkPkgs system;
         in
         {
           default = mkRustPackage {
             inherit pkgs;
+            inherit system;
             pname = "shadoword";
             cargoPackage = "shadoword-desktop";
-            cargoFeatures = pkgs.lib.optionals (system == "x86_64-linux") [ "whisper-vulkan" ];
+            runtimeDeps = desktopRuntimeDeps pkgs;
           };
 
           shadoword = mkRustPackage {
             inherit pkgs;
+            inherit system;
             pname = "shadoword";
             cargoPackage = "shadoword-desktop";
-            cargoFeatures = pkgs.lib.optionals (system == "x86_64-linux") [ "whisper-vulkan" ];
+            runtimeDeps = desktopRuntimeDeps pkgs;
           };
 
           shadoword-desktop = mkRustPackage {
             inherit pkgs;
+            inherit system;
             pname = "shadoword-desktop";
             cargoPackage = "shadoword-desktop";
-            cargoFeatures = pkgs.lib.optionals (system == "x86_64-linux") [ "whisper-vulkan" ];
+            runtimeDeps = desktopRuntimeDeps pkgs;
           };
 
           shadoword-daemon = mkRustPackage {
             inherit pkgs;
+            inherit system;
             pname = "shadoword-daemon";
             cargoPackage = "shadoword-daemon";
-            cargoFeatures = pkgs.lib.optionals (system == "x86_64-linux") [ "whisper-vulkan" ];
+            runtimeDeps = daemonRuntimeDeps pkgs;
           };
         }
-        // pkgs.lib.optionalAttrs (system == "x86_64-linux") {
-          shadoword-cuda = mkRustPackage {
-            pkgs = cudaPkgs;
-            pname = "shadoword-cuda";
-            cargoPackage = "shadoword-desktop";
-            onnxruntimePkg = prebuiltOnnxruntimeGpu;
-            cargoFeatures = [ "cuda" "whisper-vulkan" ];
-            extraRuntimeLibs = cudaRuntimeDeps cudaPkgs;
-          };
+      );
 
-          shadoword-desktop-cuda = mkRustPackage {
-            pkgs = cudaPkgs;
-            pname = "shadoword-desktop-cuda";
-            cargoPackage = "shadoword-desktop";
-            onnxruntimePkg = prebuiltOnnxruntimeGpu;
-            cargoFeatures = [ "cuda" "whisper-vulkan" ];
-            extraRuntimeLibs = cudaRuntimeDeps cudaPkgs;
-          };
-
-          shadoword-daemon-cuda = mkRustPackage {
-            pkgs = cudaPkgs;
-            pname = "shadoword-daemon-cuda";
-            cargoPackage = "shadoword-daemon";
-            onnxruntimePkg = prebuiltOnnxruntimeGpu;
-            cargoFeatures = [ "cuda" "whisper-vulkan" ];
-            extraRuntimeLibs = cudaRuntimeDeps cudaPkgs;
-          };
-        });
-
-      devShells = forAllSystems (system:
+      devShells = forAllSystems (
+        system:
         let
-          pkgs = mkPkgs { inherit system; };
-          cudaPkgs = mkPkgs { inherit system; cuda = system == "x86_64-linux"; };
-          prebuiltOnnxruntimeGpu = mkPrebuiltOnnxruntimeGpu cudaPkgs;
+          pkgs = mkPkgs system;
+          runtimeDeps = desktopRuntimeDeps pkgs;
         in
         {
           default = pkgs.mkShell {
             buildInputs =
               commonBuildDeps pkgs
-              ++ commonRuntimeDeps pkgs pkgs.onnxruntime
+              ++ runtimeDeps
               ++ (with pkgs; [
                 cargo
                 clippy
@@ -238,13 +164,12 @@
                 rustc
               ]);
 
-            inherit (commonEnv pkgs pkgs.onnxruntime)
+            inherit (commonEnv pkgs)
               LIBCLANG_PATH
               BINDGEN_EXTRA_CLANG_ARGS
-              ORT_LIB_LOCATION
-              ORT_PREFER_DYNAMIC_LINK;
+              VULKAN_SDK;
 
-            LD_LIBRARY_PATH = runtimeLibraryPath pkgs pkgs.onnxruntime [ ];
+            LD_LIBRARY_PATH = runtimeLibraryPath pkgs runtimeDeps;
 
             shellHook = ''
               export VK_DRIVER_FILES=/run/opengl-driver/share/vulkan/icd.d/nvidia_icd.x86_64.json
@@ -255,46 +180,12 @@
               else
                 export XDG_DATA_DIRS=/run/opengl-driver/share
               fi
-              echo "Shadoword Rust development environment"
+              echo "Shadoword Whisper development environment"
               echo "Run 'cargo run -p shadoword-desktop --features whisper-vulkan' for the egui app"
-              echo "Run 'cargo run -p shadoword-daemon --features whisper-vulkan' for the remote daemon"
+              echo "Run 'cargo run -p shadoword-daemon --features whisper-vulkan' for the daemon"
             '';
           };
-
-          cuda = cudaPkgs.mkShell {
-            buildInputs =
-              commonBuildDeps cudaPkgs
-              ++ commonRuntimeDeps cudaPkgs prebuiltOnnxruntimeGpu
-              ++ cudaRuntimeDeps cudaPkgs
-              ++ (with cudaPkgs; [
-                cargo
-                clippy
-                rust-analyzer
-                rustc
-              ]);
-
-            inherit (commonEnv cudaPkgs prebuiltOnnxruntimeGpu)
-              LIBCLANG_PATH
-              BINDGEN_EXTRA_CLANG_ARGS
-              ORT_LIB_LOCATION
-              ORT_PREFER_DYNAMIC_LINK;
-
-            LD_LIBRARY_PATH = runtimeLibraryPath cudaPkgs prebuiltOnnxruntimeGpu (cudaRuntimeDeps cudaPkgs);
-
-            shellHook = ''
-              export VK_DRIVER_FILES=/run/opengl-driver/share/vulkan/icd.d/nvidia_icd.x86_64.json
-              export VK_ICD_FILENAMES=/run/opengl-driver/share/vulkan/icd.d/nvidia_icd.x86_64.json
-              export VK_LAYER_PATH=/run/opengl-driver/share/vulkan/implicit_layer.d:/run/opengl-driver/share/vulkan/explicit_layer.d
-              if [ -n "''${XDG_DATA_DIRS:-}" ]; then
-                export XDG_DATA_DIRS=/run/opengl-driver/share:$XDG_DATA_DIRS
-              else
-                export XDG_DATA_DIRS=/run/opengl-driver/share
-              fi
-              echo "Shadoword CUDA development environment"
-              echo "Run 'cargo run -p shadoword-desktop --features cuda,whisper-vulkan' for the egui app"
-              echo "Run 'cargo run -p shadoword-daemon --features cuda,whisper-vulkan' for the remote daemon"
-            '';
-          };
-        });
+        }
+      );
     };
 }

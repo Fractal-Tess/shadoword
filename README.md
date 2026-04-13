@@ -1,6 +1,7 @@
 # Shadoword
 
 Rust workspace for an offline speech-to-text desktop app built with `egui`, plus an optional remote daemon.
+The active codebase is Whisper-only.
 
 ## Workspace
 
@@ -13,51 +14,58 @@ Rust workspace for an offline speech-to-text desktop app built with `egui`, plus
 ### Nix
 
 ```bash
-direnv reload
-cargo run -p shadoword-desktop
-```
-
-CUDA shell:
-
-```bash
-nix develop .#cuda
-cargo run -p shadoword-desktop --features cuda
+nix develop
+cargo run -p shadoword-desktop --features whisper-vulkan
 ```
 
 ### Plain Cargo
 
 ```bash
 cargo build
-cargo run -p shadoword-desktop
-cargo run -p shadoword-daemon
+cargo run -p shadoword-desktop --features whisper-vulkan
+cargo run -p shadoword-daemon --features whisper-vulkan
 ```
 
 ## Docker
 
 First container target is the working Whisper GPU daemon path: Vulkan.
 
-Build:
+This image is intentionally split into:
+- a stable Debian runtime layer with only a few runtime packages
+- a generated `docker/rootfs` layer exported from the local Nix build
+
+That keeps the OS package layer cached when application code changes. Rebuild flow is:
+
+1. rebuild the Nix daemon closure
+2. export it into `docker/rootfs`
+3. rebuild the container image
 
 ```bash
-docker build -t shadoword-backend --target runtime-vulkan .
+./docker/export-rootfs.sh
+docker build -t shadoword-backend .
 ```
 
-Run on NixOS with NVIDIA Vulkan passthrough:
+Run with NVIDIA GPU access:
 
 ```bash
 docker run --rm -p 47813:47813 \
-  --device /dev/dri \
-  -v /run/opengl-driver:/run/opengl-driver:ro \
-  -e VK_ICD_FILENAMES=/run/opengl-driver/share/vulkan/icd.d/nvidia_icd.x86_64.json \
-  -e VK_DRIVER_FILES=/run/opengl-driver/share/vulkan/icd.d/nvidia_icd.x86_64.json \
-  -e VK_LAYER_PATH=/run/opengl-driver/share/vulkan/implicit_layer.d:/run/opengl-driver/share/vulkan/explicit_layer.d \
+  --device nvidia.com/gpu=all \
   -v $PWD/docker/config:/config \
-  -v $PWD/docker/data:/data \
+  -v $HOME/.local/share/shadowword/models:/data/shadoword/models:ro \
   shadoword-backend
 ```
 
 The daemon will read config from `/config/shadoword/config.json` and models from `/data/shadoword/models`.
 Start by copying `docker/config/config.json.example` to `docker/config/shadoword/config.json`.
+
+This runtime contract is now self-contained from the application side:
+- no host `/nix/store` mount
+- no host `/run/opengl-driver` mount
+- no manual `/dev/nvidia*` or `/dev/dri` mounts
+
+The only host requirement is NVIDIA CDI / container-toolkit support so Docker can inject the GPU
+devices and matching driver userspace into the container. On this NixOS machine, the working form
+is `--device nvidia.com/gpu=all`.
 
 ## Current Direction
 

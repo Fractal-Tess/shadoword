@@ -1,6 +1,5 @@
 {
   "mode": "local",
-  "engine": "whisper",
   "model_path": "/data/shadoword/models/ggml-large-v3-turbo.bin",
   "preload_on_startup": true,
   "recording": {
@@ -24,7 +23,5 @@
     "shortcut": "ctrl+space",
     "push_to_talk": true
   },
-  "onnx_quantization": "fp32",
-  "ort_accelerator": "cpu",
   "whisper_accelerator": "gpu"
 }
