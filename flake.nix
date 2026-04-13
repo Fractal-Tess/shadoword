@@ -252,7 +252,7 @@
 
           meta = {
             description = "A free, open source, and extensible speech-to-text application that works completely offline";
-            homepage = "https://github.com/Fractal-Tess/shadow-word";
+            homepage = "https://github.com/Fractal-Tess/shadoword";
             license = lib.licenses.mit;
             mainProgram = "shadowword";
             platforms = supportedSystems;

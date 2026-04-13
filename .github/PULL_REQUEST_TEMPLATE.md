@@ -8,8 +8,8 @@ BUG FIXES ARE THE TOP PRIORITY. THERE ARE 60+ ISSUES TO FIX.
 
 **Please confirm you have done the following:**
 
-- [ ] I have searched [existing issues](https://github.com/Fractal-Tess/shadow-word/issues) and [pull requests](https://github.com/Fractal-Tess/shadow-word/pulls) (including closed ones) to ensure this isn't a duplicate
-- [ ] I have read [CONTRIBUTING.md](https://github.com/Fractal-Tess/shadow-word/blob/main/CONTRIBUTING.md)
+- [ ] I have searched [existing issues](https://github.com/Fractal-Tess/shadoword/issues) and [pull requests](https://github.com/Fractal-Tess/shadoword/pulls) (including closed ones) to ensure this isn't a duplicate
+- [ ] I have read [CONTRIBUTING.md](https://github.com/Fractal-Tess/shadoword/blob/main/CONTRIBUTING.md)
 
 **If this is a feature or change that was previously closed/rejected:**
 
@@ -45,7 +45,7 @@ For features: Link to a discussion where community members have expressed intere
 For bug fixes: Link to the issue where others have confirmed the bug.
 
 If you haven't gathered feedback yet, consider starting a discussion first:
-https://github.com/Fractal-Tess/shadow-word/discussions
+https://github.com/Fractal-Tess/shadoword/discussions
 
 It is not explicitly required to gather feedback, but it certainly helps your PR get merged.
 -->

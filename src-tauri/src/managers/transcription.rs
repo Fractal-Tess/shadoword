@@ -8,6 +8,7 @@ use anyhow::Result;
 use log::{debug, error, info, warn};
 use serde::Serialize;
 use specta::Type;
+use std::env;
 use std::panic::{catch_unwind, AssertUnwindSafe};
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, Condvar, Mutex, MutexGuard, OnceLock};
@@ -45,6 +46,144 @@ enum LoadedEngine {
     GigaAM(GigaAMModel),
     Canary(CanaryModel),
     Cohere(CohereModel),
+}
+
+fn engine_runtime_label(engine_type: &EngineType) -> &'static str {
+    match engine_type {
+        EngineType::Whisper => "whisper.cpp",
+        EngineType::Parakeet
+        | EngineType::Moonshine
+        | EngineType::MoonshineStreaming
+        | EngineType::SenseVoice
+        | EngineType::GigaAM
+        | EngineType::Canary
+        | EngineType::Cohere => "onnxruntime",
+    }
+}
+
+fn summarize_path_var(key: &str) -> String {
+    match env::var_os(key) {
+        Some(value) => {
+            let parts: Vec<String> = env::split_paths(&value)
+                .map(|path| path.display().to_string())
+                .collect();
+            if parts.is_empty() {
+                "<empty>".to_string()
+            } else {
+                let preview = parts.iter().take(4).cloned().collect::<Vec<_>>().join(":");
+                if parts.len() > 4 {
+                    format!("{preview}:... (+{} more)", parts.len() - 4)
+                } else {
+                    preview
+                }
+            }
+        }
+        None => "<unset>".to_string(),
+    }
+}
+
+fn summarize_scalar_env(key: &str) -> String {
+    match env::var(key) {
+        Ok(value) if value.is_empty() => "<empty>".to_string(),
+        Ok(value) => value,
+        Err(_) => "<unset>".to_string(),
+    }
+}
+
+fn log_model_backend_context(
+    engine_type: &EngineType,
+    model_id: &str,
+    model_name: &str,
+    model_path: &std::path::Path,
+) {
+    use transcribe_rs::accel;
+
+    info!(
+        "Loading model '{}' ({}) with runtime {} from {}",
+        model_name,
+        model_id,
+        engine_runtime_label(engine_type),
+        model_path.display()
+    );
+
+    match engine_type {
+        EngineType::Whisper => {
+            let whisper_pref = accel::get_whisper_accelerator();
+            let whisper_available: Vec<String> = accel::WhisperAccelerator::available()
+                .into_iter()
+                .map(|a| a.to_string())
+                .collect();
+            let whisper_gpu_device = accel::get_whisper_gpu_device();
+            info!(
+                "Whisper backend request: accelerator={}, compiled_options={:?}, gpu_device={}",
+                whisper_pref,
+                whisper_available,
+                if whisper_gpu_device == accel::GPU_DEVICE_AUTO {
+                    "auto".to_string()
+                } else {
+                    whisper_gpu_device.to_string()
+                }
+            );
+        }
+        EngineType::Parakeet
+        | EngineType::Moonshine
+        | EngineType::MoonshineStreaming
+        | EngineType::SenseVoice
+        | EngineType::GigaAM
+        | EngineType::Canary
+        | EngineType::Cohere => {
+            let ort_pref = accel::get_ort_accelerator();
+            let ort_available: Vec<String> = accel::OrtAccelerator::available()
+                .into_iter()
+                .map(|a| a.to_string())
+                .collect();
+            info!(
+                "ONNX backend request: accelerator={}, compiled_options={:?}, ORT_LOG={}, ORT_LIB_LOCATION={}, LD_LIBRARY_PATH={}",
+                ort_pref,
+                ort_available,
+                summarize_scalar_env("ORT_LOG"),
+                summarize_path_var("ORT_LIB_LOCATION"),
+                summarize_path_var("LD_LIBRARY_PATH")
+            );
+        }
+    }
+}
+
+fn log_transcription_backend(engine: &LoadedEngine) {
+    use transcribe_rs::accel;
+
+    match engine {
+        LoadedEngine::Whisper(_) => {
+            let whisper_pref = accel::get_whisper_accelerator();
+            let whisper_gpu_device = accel::get_whisper_gpu_device();
+            info!(
+                "Transcription engine in use: whisper.cpp, requested_accelerator={}, gpu_device={}",
+                whisper_pref,
+                if whisper_gpu_device == accel::GPU_DEVICE_AUTO {
+                    "auto".to_string()
+                } else {
+                    whisper_gpu_device.to_string()
+                }
+            );
+        }
+        LoadedEngine::Parakeet(_)
+        | LoadedEngine::Moonshine(_)
+        | LoadedEngine::MoonshineStreaming(_)
+        | LoadedEngine::SenseVoice(_)
+        | LoadedEngine::GigaAM(_)
+        | LoadedEngine::Canary(_)
+        | LoadedEngine::Cohere(_) => {
+            let ort_pref = accel::get_ort_accelerator();
+            let ort_available: Vec<String> = accel::OrtAccelerator::available()
+                .into_iter()
+                .map(|a| a.to_string())
+                .collect();
+            info!(
+                "Transcription engine in use: onnxruntime, requested_accelerator={}, compiled_options={:?}",
+                ort_pref, ort_available
+            );
+        }
+    }
 }
 
 /// RAII guard that clears the `is_loading` flag and notifies waiters on drop.
@@ -285,6 +424,12 @@ impl TranscriptionManager {
         }
 
         let model_path = self.model_manager.get_model_path(model_id)?;
+        log_model_backend_context(
+            &model_info.engine_type,
+            model_id,
+            &model_info.name,
+            &model_path,
+        );
 
         // Create appropriate engine based on model type
         let emit_loading_failed = |error_msg: &str| {
@@ -525,6 +670,7 @@ impl TranscriptionManager {
 
             let transcribe_result = catch_unwind(AssertUnwindSafe(
                 || -> Result<transcribe_rs::TranscriptionResult> {
+                    log_transcription_backend(&engine);
                     match &mut engine {
                         LoadedEngine::Whisper(whisper_engine) => {
                             let whisper_language = if validated_language == "auto" {

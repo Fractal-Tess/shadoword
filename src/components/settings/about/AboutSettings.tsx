@@ -66,7 +66,7 @@ export const AboutSettings: React.FC = () => {
           <Button
             variant="secondary"
             size="md"
-            onClick={() => openUrl("https://github.com/Fractal-Tess/shadow-word")}
+            onClick={() => openUrl("https://github.com/Fractal-Tess/shadoword")}
           >
             {t("settings.about.sourceCode.button")}
           </Button>

@@ -7,7 +7,7 @@
 #
 # Usage in your flake:
 #
-#   inputs.shadowword.url = "github:Fractal-Tess/shadow-word";
+#   inputs.shadowword.url = "github:Fractal-Tess/shadoword";
 #
 #   nixosConfigurations.myhost = nixpkgs.lib.nixosSystem {
 #     modules = [

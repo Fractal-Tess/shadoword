@@ -36,7 +36,7 @@ The process is entirely local:
 
 ### Installation
 
-1. Download the latest release from the [releases page](https://github.com/Fractal-Tess/shadow-word/releases) or the [website](https://handy.computer)
+1. Download the latest release from the [releases page](https://github.com/Fractal-Tess/shadoword/releases) or the [website](https://handy.computer)
    - **macOS**: Also available via [Homebrew cask](https://formulae.brew.sh/cask/handy): Not currently published via Homebrew cask.
    - **Windows**: Also available via [winget](https://github.com/microsoft/winget-pkgs): Not currently published via winget. \
      **Note:** The Homebrew cask and winget package are not maintained by the Shadow Word developers.
@@ -113,7 +113,7 @@ shadowword --start-hidden --no-tray
 
 ## Known Issues & Current Limitations
 
-This project is actively being developed and has some [known issues](https://github.com/Fractal-Tess/shadow-word/issues). We believe in transparency about the current state:
+This project is actively being developed and has some [known issues](https://github.com/Fractal-Tess/shadoword/issues). We believe in transparency about the current state:
 
 ### Major Issues (Help Wanted)
 
@@ -451,11 +451,11 @@ Once you've found a flag that helps, export it from your shell profile (`~/.bash
 Exec=env HANDY_NO_GTK_LAYER_SHELL=1 shadowword
 ```
 
-If a workaround helps you, please [open an issue](https://github.com/Fractal-Tess/shadow-word/issues) describing your distro, desktop environment, and session type — that information helps us narrow down the underlying bug.
+If a workaround helps you, please [open an issue](https://github.com/Fractal-Tess/shadoword/issues) describing your distro, desktop environment, and session type — that information helps us narrow down the underlying bug.
 
 ### How to Contribute
 
-1. **Check existing issues** at [github.com/cjpais/Shadow Word/issues](https://github.com/Fractal-Tess/shadow-word/issues)
+1. **Check existing issues** at [github.com/cjpais/Shadow Word/issues](https://github.com/Fractal-Tess/shadoword/issues)
 2. **Fork the repository** and create a feature branch
 3. **Test thoroughly** on your target platform
 4. **Submit a pull request** with clear description of changes
