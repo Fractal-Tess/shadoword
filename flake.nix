@@ -50,6 +50,7 @@
           libevdev
           libx11
           libxi
+          libxtst
           libxcb
           libxkbcommon
           wayland
