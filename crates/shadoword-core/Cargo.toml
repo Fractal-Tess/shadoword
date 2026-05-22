@@ -8,7 +8,7 @@ repository.workspace = true
 
 [features]
 default = []
-whisper-vulkan = ["transcribe-rs/whisper-vulkan"]
+whisper-vulkan = ["shadoword-model-whisper/whisper-vulkan", "transcribe-rs/whisper-vulkan"]
 
 [dependencies]
 anyhow.workspace = true
@@ -17,8 +17,15 @@ cpal.workspace = true
 directories.workspace = true
 hound.workspace = true
 log.workspace = true
+reqwest.workspace = true
 rubato.workspace = true
 serde.workspace = true
 serde_json.workspace = true
+shadoword-shared = { path = "../shadoword-shared" }
+shadoword-model-whisper = { path = "../shadoword-model-whisper" }
 tracing.workspace = true
 transcribe-rs.workspace = true
+
+[dev-dependencies]
+ort = { version = "2.0.0-rc.12", features = ["preload-dylibs"] }
+tracing-subscriber.workspace = true

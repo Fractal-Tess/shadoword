@@ -1,0 +1,32 @@
+[package]
+name = "shadoword-egui"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+
+[features]
+default = []
+whisper-vulkan = ["shadoword-core/whisper-vulkan"]
+
+[target.'cfg(target_os = "linux")'.dependencies]
+gtk = "0.18"
+
+[dependencies]
+anyhow.workspace = true
+arboard.workspace = true
+base64.workspace = true
+eframe = { version = "0.33.3", default-features = false, features = ["default_fonts", "wayland", "x11", "wgpu"] }
+egui.workspace = true
+enigo.workspace = true
+global-hotkey.workspace = true
+handy-keys.workspace = true
+reqwest.workspace = true
+serde_json.workspace = true
+shadoword-core = { path = "../shadoword-core" }
+shadoword-shared = { path = "../shadoword-shared" }
+tracing.workspace = true
+tracing-subscriber.workspace = true
+tray-icon.workspace = true
+wgpu = { version = "27.0.1", default-features = false, features = ["std", "wgsl", "vulkan", "gles"] }

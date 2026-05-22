@@ -1,0 +1,20 @@
+[package]
+name = "shadoword-model-whisper"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+description = "Whisper model implementation for shadoword-shared::Model"
+
+[features]
+default = []
+whisper-vulkan = ["transcribe-rs/whisper-vulkan"]
+whisper-cuda = ["transcribe-rs/whisper-cuda"]
+
+[dependencies]
+shadoword-shared = { path = "../shadoword-shared" }
+transcribe-rs.workspace = true
+
+[dev-dependencies]
+hound.workspace = true

@@ -6,8 +6,8 @@ The active codebase is Whisper-only.
 ## Workspace
 
 - `crates/shadoword-core`: shared audio, config, WAV, and transcription service code
-- `crates/shadoword-desktop`: native `egui` desktop client
-- `crates/shadoword-daemon`: HTTP daemon for remote transcription mode
+- `crates/shadoword-egui`: native `egui` desktop client
+- `crates/shadoword-api`: HTTP daemon for remote transcription mode
 
 ## Development
 
@@ -15,15 +15,30 @@ The active codebase is Whisper-only.
 
 ```bash
 nix develop
-cargo run -p shadoword-desktop --features whisper-vulkan
+cargo run -p shadoword-egui --features whisper-vulkan
+```
+
+Or CUDA:
+
+```bash
+nix develop .#cuda
+cargo run -p shadoword-egui --features whisper-cuda
 ```
 
 ### Plain Cargo
 
 ```bash
 cargo build
-cargo run -p shadoword-desktop --features whisper-vulkan
-cargo run -p shadoword-daemon --features whisper-vulkan
+cargo run -p shadoword-egui --features whisper-vulkan
+cargo run -p shadoword-api --features whisper-vulkan
+```
+
+No backend is enabled by default. Choose one explicitly:
+
+```bash
+cargo run -p shadoword-egui --features whisper-vulkan
+# or
+cargo run -p shadoword-egui --features whisper-cuda
 ```
 
 ## Docker
@@ -57,6 +72,36 @@ docker run --rm -p 47813:47813 \
 
 The daemon will read config from `/config/shadoword/config.json` and models from `/data/shadoword/models`.
 Start by copying `docker/config/config.json.example` to `docker/config/shadoword/config.json`.
+
+Daemon HTTP docs are available at:
+
+```text
+GET /
+GET /docs
+```
+
+The daemon also supports startup model downloads via environment variables:
+
+```bash
+SHADOWORD_DOWNLOAD_MODELS=tiny,base,small,medium,turbo,large-v3
+SHADOWORD_DOWNLOAD_DIR=/data/shadoword/models
+```
+
+Notes:
+- `SHADOWORD_DOWNLOAD_MODELS` is a comma-separated list of Whisper model ids.
+- existing files are skipped
+- `SHADOWORD_DOWNLOAD_DIR` is optional
+- default download directory on a normal host install: `~/.local/share/shadoword/models`
+- default download directory inside the Docker container: `/data/shadoword/models`
+- downloading models does not change `config.model_path`; it only ensures the files exist on disk
+
+Supported download ids:
+- `tiny`
+- `base`
+- `small`
+- `medium`
+- `turbo`
+- `large-v3`
 
 This runtime contract is now self-contained from the application side:
 - no host `/nix/store` mount

@@ -26,6 +26,8 @@
         with pkgs; [
           cmake
           glslang
+          gtk3
+          libappindicator-gtk3
           llvmPackages.libclang
           makeWrapper
           pkg-config
@@ -33,6 +35,7 @@
           vulkan-headers
           vulkan-loader
           vulkan-tools
+          xdotool
         ];
 
       daemonRuntimeDeps = pkgs:
@@ -47,6 +50,8 @@
         daemonRuntimeDeps pkgs
         ++ (with pkgs; [
           fontconfig
+          gtk3
+          libappindicator-gtk3
           libevdev
           libx11
           libxi
@@ -83,10 +88,6 @@
             [
               "-p"
               cargoPackage
-            ]
-            ++ pkgs.lib.optionals (system == "x86_64-linux") [
-              "--features"
-              "whisper-vulkan"
             ];
 
           nativeBuildInputs = commonBuildDeps pkgs;
@@ -119,7 +120,7 @@
             inherit pkgs;
             inherit system;
             pname = "shadoword";
-            cargoPackage = "shadoword-desktop";
+            cargoPackage = "shadoword-egui";
             runtimeDeps = desktopRuntimeDeps pkgs;
           };
 
@@ -127,23 +128,23 @@
             inherit pkgs;
             inherit system;
             pname = "shadoword";
-            cargoPackage = "shadoword-desktop";
+            cargoPackage = "shadoword-egui";
             runtimeDeps = desktopRuntimeDeps pkgs;
           };
 
-          shadoword-desktop = mkRustPackage {
+          shadoword-egui = mkRustPackage {
             inherit pkgs;
             inherit system;
-            pname = "shadoword-desktop";
-            cargoPackage = "shadoword-desktop";
+            pname = "shadoword-egui";
+            cargoPackage = "shadoword-egui";
             runtimeDeps = desktopRuntimeDeps pkgs;
           };
 
-          shadoword-daemon = mkRustPackage {
+          shadoword-api = mkRustPackage {
             inherit pkgs;
             inherit system;
-            pname = "shadoword-daemon";
-            cargoPackage = "shadoword-daemon";
+            pname = "shadoword-api";
+            cargoPackage = "shadoword-api";
             runtimeDeps = daemonRuntimeDeps pkgs;
           };
         }
@@ -154,6 +155,13 @@
         let
           pkgs = mkPkgs system;
           runtimeDeps = desktopRuntimeDeps pkgs;
+          cudaPkgs = with pkgs.cudaPackages; [
+            cudnn  # cuDNN 9.x for CUDA 12.9
+            libcublas
+            libcufft
+            libcurand
+            cuda_nvrtc
+          ];
         in
         {
           default = pkgs.mkShell {
@@ -175,8 +183,8 @@
             LD_LIBRARY_PATH = runtimeLibraryPath pkgs runtimeDeps;
 
             shellHook = ''
-              export VK_DRIVER_FILES=/run/opengl-driver/share/vulkan/icd.d/nvidia_icd.x86_64.json
-              export VK_ICD_FILENAMES=/run/opengl-driver/share/vulkan/icd.d/nvidia_icd.x86_64.json
+              export VK_DRIVER_FILES=/run/opengl-driver/share/vulkan/icd.d/nvidia_icd.json
+              export VK_ICD_FILENAMES=/run/opengl-driver/share/vulkan/icd.d/nvidia_icd.json
               export VK_LAYER_PATH=/run/opengl-driver/share/vulkan/implicit_layer.d:/run/opengl-driver/share/vulkan/explicit_layer.d
               if [ -n "''${XDG_DATA_DIRS:-}" ]; then
                 export XDG_DATA_DIRS=/run/opengl-driver/share:$XDG_DATA_DIRS
@@ -184,8 +192,69 @@
                 export XDG_DATA_DIRS=/run/opengl-driver/share
               fi
               echo "Shadoword Whisper development environment"
-              echo "Run 'cargo run -p shadoword-desktop --features whisper-vulkan' for the egui app"
-              echo "Run 'cargo run -p shadoword-daemon --features whisper-vulkan' for the daemon"
+              echo "Run 'cargo run -p shadoword-egui --features whisper-vulkan' for Vulkan"
+              echo "Run 'cargo run -p shadoword-egui --features whisper-cuda' for CUDA"
+              echo "Run 'cargo run -p shadoword-api --features whisper-vulkan' for daemon Vulkan"
+            '';
+          };
+
+          cuda = pkgs.mkShell {
+            buildInputs =
+              commonBuildDeps pkgs
+              ++ runtimeDeps
+              ++ (with pkgs; [
+                cargo
+                clippy
+                rust-analyzer
+                rustc
+              ])
+              ++ (with pkgs.cudaPackages; [
+                cuda_cudart       # CUDA runtime (libcudart)
+                cudnn             # cuDNN 9.x (runtime libs)
+                libcublas
+                libcufft
+                libcurand
+                cuda_nvrtc
+              ]);
+
+            inherit (commonEnv pkgs)
+              LIBCLANG_PATH
+              BINDGEN_EXTRA_CLANG_ARGS
+              VULKAN_SDK;
+
+            LD_LIBRARY_PATH = runtimeLibraryPath pkgs runtimeDeps;
+
+            CUDA_PATH = "${pkgs.cudaPackages.cuda_nvcc}";
+
+            shellHook = ''
+              export VK_DRIVER_FILES=/run/opengl-driver/share/vulkan/icd.d/nvidia_icd.json
+              export VK_ICD_FILENAMES=/run/opengl-driver/share/vulkan/icd.d/nvidia_icd.json
+              export VK_LAYER_PATH=/run/opengl-driver/share/vulkan/implicit_layer.d:/run/opengl-driver/share/vulkan/explicit_layer.d
+              if [ -n "''${XDG_DATA_DIRS:-}" ]; then
+                export XDG_DATA_DIRS=/run/opengl-driver/share:$XDG_DATA_DIRS
+              else
+                export XDG_DATA_DIRS=/run/opengl-driver/share
+              fi
+
+              # Use a single CUDA toolchain from nixpkgs for compile/link/runtime.
+              # Avoid mixing with ~/.local/cuda-toolkit wrappers, which causes
+              # inconsistent header/lib discovery in CMake + whisper-rs-sys.
+              export CUDA_HOME="${pkgs.cudaPackages.cuda_nvcc}"
+              export CUDA_PATH="$CUDA_HOME"
+              export CUDACXX="${pkgs.cudaPackages.cuda_nvcc}/bin/nvcc"
+              export CMAKE_CUDA_COMPILER="$CUDACXX"
+
+              # Extra hints for CMake projects that use CUDAToolkit_ROOT.
+              export CUDAToolkit_ROOT="$CUDA_HOME"
+
+              # Make CUDA libs available for both linker-time and runtime.
+              export LIBRARY_PATH=/run/opengl-driver/lib:${pkgs.lib.makeLibraryPath (with pkgs.cudaPackages; [ cuda_cudart libcublas libcufft libcurand cuda_nvrtc cudnn ])}:$LIBRARY_PATH
+              export LD_LIBRARY_PATH=/run/opengl-driver/lib:${pkgs.lib.makeLibraryPath (with pkgs.cudaPackages; [ cuda_cudart libcublas libcufft libcurand cuda_nvrtc cudnn ])}:$LD_LIBRARY_PATH
+
+              echo "Shadoword development environment (CUDA)"
+              echo "CUDA toolkit: $CUDA_HOME"
+              echo "CUDA compiler: $CUDACXX"
+              echo "Run with: cargo test --workspace"
             '';
           };
         }
