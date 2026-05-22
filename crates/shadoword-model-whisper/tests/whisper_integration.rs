@@ -1,9 +1,11 @@
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::process::Command;
 use std::time::Instant;
 
 use shadoword_model_whisper::WhisperModel;
 use shadoword_shared::{AudioInput, Model, ModelConfig};
+use transcribe_rs::accel;
 
 struct Clip {
     name: &'static str,
@@ -45,10 +47,17 @@ fn clips() -> [Clip; 4] {
 }
 
 fn corpus_dir() -> PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR"))
+    let root = Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("..")
         .join("..")
-        .join("test_corpus")
+        .to_path_buf();
+
+    let bench_corpus = root.join("bench_corpus");
+    if bench_corpus.exists() {
+        return bench_corpus;
+    }
+
+    root.join("test_corpus")
 }
 
 fn default_model_path() -> PathBuf {
@@ -74,15 +83,68 @@ fn report_path() -> PathBuf {
     }
 
     Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("..")
-        .join("..")
-        .join("test-results")
-        .join("whisper-integration-report.md")
+        .join("bench-results")
+        .join(format!("whisper-integration-report-{}.md", backend_name()))
+}
+
+fn backend_name() -> &'static str {
+    if cfg!(feature = "whisper-cuda") {
+        "cuda"
+    } else if cfg!(feature = "whisper-vulkan") {
+        "vulkan"
+    } else {
+        "cpu"
+    }
+}
+
+fn whisper_gpu_device_index() -> i32 {
+    std::env::var("SHADOWORD_WHISPER_GPU_DEVICE")
+        .ok()
+        .and_then(|s| s.parse::<i32>().ok())
+        .unwrap_or(0)
+}
+
+fn detect_gpu_name(device_index: i32) -> Option<String> {
+    let output = Command::new("nvidia-smi")
+        .args([
+            "--query-gpu=name",
+            "--format=csv,noheader,nounits",
+            "-i",
+            &device_index.to_string(),
+        ])
+        .output()
+        .ok()?;
+
+    if !output.status.success() {
+        return None;
+    }
+
+    let name = String::from_utf8_lossy(&output.stdout).trim().to_string();
+    if name.is_empty() {
+        None
+    } else {
+        Some(name)
+    }
+}
+
+fn backend_hardware_label() -> String {
+    let backend = backend_name();
+    if backend == "cpu" {
+        return "CPU".to_string();
+    }
+
+    let device_index = whisper_gpu_device_index();
+    if let Some(gpu_name) = detect_gpu_name(device_index) {
+        format!("{} (device {}, backend={})", gpu_name, device_index, backend)
+    } else {
+        format!("GPU device {} (backend={})", device_index, backend)
+    }
 }
 
 fn write_markdown_report(
     path: &Path,
     model_path: &Path,
+    hardware: &str,
     runs: &[ClipRun],
     avg_wer: f64,
     total_audio_secs: f64,
@@ -97,6 +159,8 @@ fn write_markdown_report(
 
     let mut markdown = String::new();
     markdown.push_str("# Whisper Integration Test Report\n\n");
+    markdown.push_str(&format!("- Backend: `{}`\n", backend_name()));
+    markdown.push_str(&format!("- Hardware: `{}`\n", hardware));
     markdown.push_str(&format!("- Model: `{}`\n", model_path.display()));
     markdown.push_str(&format!("- Clips processed: `{}`\n", runs.len()));
     markdown.push_str(&format!("- Total audio seconds: `{:.2}`\n", total_audio_secs));
@@ -186,6 +250,9 @@ fn whisper_transcribes_corpus_with_quality_and_speed_metrics() {
         eprintln!("skipping: missing model path {}", model_path.display());
         return;
     }
+
+    let gpu_device = whisper_gpu_device_index();
+    accel::set_whisper_gpu_device(gpu_device);
 
     let mut model = WhisperModel::new();
     model
@@ -287,9 +354,11 @@ fn whisper_transcribes_corpus_with_quality_and_speed_metrics() {
     );
 
     let report = report_path();
+    let hardware = backend_hardware_label();
     write_markdown_report(
         &report,
         &model_path,
+        &hardware,
         &runs,
         avg_wer,
         total_audio_secs,
