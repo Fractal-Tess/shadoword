@@ -1,6 +1,13 @@
-# Tauri Functionality Map
+# Tauri Functionality Map (Archived Reference)
 
-This document captures the feature surface of the removed Tauri/React app so the `egui` desktop client can absorb it deliberately instead of losing behavior by accident.
+This document is an archive of the removed Tauri/React app feature surface.
+It exists only as migration reference material for the Rust-native workspace.
+
+Current runtime crates are:
+
+- `crates/shadoword-egui`
+- `crates/shadoword-api`
+- `crates/shadoword-core`
 
 ## Scope
 
@@ -214,7 +221,7 @@ Persisted `AppSettings` fields found in `src-tauri/src/settings.rs`:
 
 ## Present `egui` Desktop Coverage
 
-The current `crates/shadowword-desktop` app already covers a narrower but useful subset:
+The current `crates/shadoword-egui` app already covers a narrower but useful subset:
 
 - local vs remote mode
 - input device selection

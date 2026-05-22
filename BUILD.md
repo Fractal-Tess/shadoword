@@ -9,25 +9,35 @@
 
 ```bash
 cargo build
-cargo build -p shadowword-desktop
-cargo build -p shadowword-daemon
+cargo build -p shadoword-egui --features whisper-vulkan
+cargo build -p shadoword-api --features whisper-vulkan
 
-cargo run -p shadowword-desktop
-cargo run -p shadowword-daemon
+cargo run -p shadoword-egui --features whisper-vulkan
+cargo run -p shadoword-api --features whisper-vulkan
+```
+
+No whisper backend is enabled by default. Pick one explicitly:
+
+```bash
+# Vulkan
+cargo run -p shadoword-egui --features whisper-vulkan
+
+# CUDA
+cargo run -p shadoword-egui --features whisper-cuda
 ```
 
 ## Nix
 
 ```bash
 nix develop
-cargo run -p shadowword-desktop
+cargo run -p shadoword-egui --features whisper-vulkan
 ```
 
 CUDA:
 
 ```bash
 nix develop .#cuda
-cargo run -p shadowword-desktop --features cuda
+cargo run -p shadoword-egui --features whisper-cuda
 ```
 
 ## Notes

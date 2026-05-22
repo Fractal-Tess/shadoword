@@ -1,13 +1,33 @@
 # Shadoword
 
-Rust workspace for an offline speech-to-text desktop app built with `egui`, plus an optional remote daemon.
-The active codebase is Whisper-only.
+Rust workspace for an offline speech-to-text app with:
+
+- a native `egui` desktop client
+- an optional HTTP daemon
+
+The active codebase is Rust-native and Whisper-focused.
 
 ## Workspace
 
-- `crates/shadoword-core`: shared audio, config, WAV, and transcription service code
-- `crates/shadoword-egui`: native `egui` desktop client
-- `crates/shadoword-api`: HTTP daemon for remote transcription mode
+- `crates/shadoword-core` - shared audio/config/transcription service logic
+- `crates/shadoword-model-whisper` - Whisper model implementation
+- `crates/shadoword-shared` - shared trait/types contracts
+- `crates/shadoword-egui` - native desktop client
+- `crates/shadoword-api` - HTTP daemon
+
+## Backend selection
+
+No whisper backend is enabled by default. Choose one explicitly:
+
+- `whisper-vulkan`
+- `whisper-cuda`
+
+Examples:
+
+```bash
+cargo run -p shadoword-egui --features whisper-vulkan
+cargo run -p shadoword-egui --features whisper-cuda
+```
 
 ## Development
 
@@ -18,7 +38,7 @@ nix develop
 cargo run -p shadoword-egui --features whisper-vulkan
 ```
 
-Or CUDA:
+CUDA shell:
 
 ```bash
 nix develop .#cuda
@@ -33,27 +53,7 @@ cargo run -p shadoword-egui --features whisper-vulkan
 cargo run -p shadoword-api --features whisper-vulkan
 ```
 
-No backend is enabled by default. Choose one explicitly:
-
-```bash
-cargo run -p shadoword-egui --features whisper-vulkan
-# or
-cargo run -p shadoword-egui --features whisper-cuda
-```
-
-## Docker
-
-First container target is the working Whisper GPU daemon path: Vulkan.
-
-This image is intentionally split into:
-- a stable Debian runtime layer with only a few runtime packages
-- a generated `docker/rootfs` layer exported from the local Nix build
-
-That keeps the OS package layer cached when application code changes. Rebuild flow is:
-
-1. rebuild the Nix daemon closure
-2. export it into `docker/rootfs`
-3. rebuild the container image
+## Docker (daemon)
 
 ```bash
 ./docker/export-rootfs.sh
@@ -66,52 +66,13 @@ Run with NVIDIA GPU access:
 docker run --rm -p 47813:47813 \
   --device nvidia.com/gpu=all \
   -v $PWD/docker/config:/config \
-  -v $HOME/.local/share/shadowword/models:/data/shadoword/models:ro \
+  -v $HOME/.local/share/shadoword/models:/data/shadoword/models:ro \
   shadoword-backend
 ```
 
-The daemon will read config from `/config/shadoword/config.json` and models from `/data/shadoword/models`.
-Start by copying `docker/config/config.json.example` to `docker/config/shadoword/config.json`.
-
-Daemon HTTP docs are available at:
+Daemon endpoints:
 
 ```text
 GET /
 GET /docs
 ```
-
-The daemon also supports startup model downloads via environment variables:
-
-```bash
-SHADOWORD_DOWNLOAD_MODELS=tiny,base,small,medium,turbo,large-v3
-SHADOWORD_DOWNLOAD_DIR=/data/shadoword/models
-```
-
-Notes:
-- `SHADOWORD_DOWNLOAD_MODELS` is a comma-separated list of Whisper model ids.
-- existing files are skipped
-- `SHADOWORD_DOWNLOAD_DIR` is optional
-- default download directory on a normal host install: `~/.local/share/shadoword/models`
-- default download directory inside the Docker container: `/data/shadoword/models`
-- downloading models does not change `config.model_path`; it only ensures the files exist on disk
-
-Supported download ids:
-- `tiny`
-- `base`
-- `small`
-- `medium`
-- `turbo`
-- `large-v3`
-
-This runtime contract is now self-contained from the application side:
-- no host `/nix/store` mount
-- no host `/run/opengl-driver` mount
-- no manual `/dev/nvidia*` or `/dev/dri` mounts
-
-The only host requirement is NVIDIA CDI / container-toolkit support so Docker can inject the GPU
-devices and matching driver userspace into the container. On this NixOS machine, the working form
-is `--device nvidia.com/gpu=all`.
-
-## Current Direction
-
-This repo is the Rust-native workspace only: desktop client, shared core, and daemon API.
