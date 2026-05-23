@@ -19,6 +19,9 @@ struct ClipRun {
     infer_secs: f64,
     realtime_x: f64,
     wer: f64,
+    transcript: String,
+    reference: String,
+    word_diff: String,
 }
 
 fn clips() -> [Clip; 4] {
@@ -53,11 +56,7 @@ fn corpus_dir() -> PathBuf {
         .to_path_buf();
 
     let bench_corpus = root.join("bench_corpus");
-    if bench_corpus.exists() {
-        return bench_corpus;
-    }
-
-    root.join("test_corpus")
+    return bench_corpus;
 }
 
 fn default_model_path() -> PathBuf {
@@ -77,14 +76,30 @@ fn model_path() -> PathBuf {
     default_model_path()
 }
 
-fn report_path() -> PathBuf {
+fn model_slug(model_path: &Path) -> String {
+    let file_name = model_path
+        .file_name()
+        .and_then(|n| n.to_str())
+        .unwrap_or("model");
+    let without_ext = file_name.strip_suffix(".bin").unwrap_or(file_name);
+    without_ext
+        .strip_prefix("ggml-")
+        .unwrap_or(without_ext)
+        .to_string()
+}
+
+fn report_path(model_path: &Path) -> PathBuf {
     if let Ok(path) = std::env::var("SHADOWORD_WHISPER_REPORT_PATH") {
         return PathBuf::from(path);
     }
 
     Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("bench-results")
-        .join(format!("whisper-integration-report-{}.md", backend_name()))
+        .join(format!(
+            "whisper-integration-report-{}-{}.md",
+            backend_name(),
+            model_slug(model_path)
+        ))
 }
 
 fn backend_name() -> &'static str {
@@ -182,8 +197,143 @@ fn write_markdown_report(
         ));
     }
 
+    markdown.push_str("\n## Transcripts and diffs\n\n");
+    markdown.push_str("`-word` = expected-only, `+word` = predicted-only\n\n");
+    for run in runs {
+        let reference = run.reference.trim().replace('\n', " ");
+        let transcript = run.transcript.trim().replace('\n', " ");
+        let word_diff = run.word_diff.trim().replace('\n', " ");
+        markdown.push_str(&format!("### {}\n", run.name));
+        markdown.push_str(&format!("Reference: {}\n", reference));
+        markdown.push_str(&format!("Transcription: {}\n", transcript));
+        markdown.push_str(&format!("Word diff: {}\n\n", word_diff));
+    }
+
     fs::write(path, markdown)
         .unwrap_or_else(|err| panic!("failed to write report {}: {err}", path.display()));
+}
+
+struct ModelSummary {
+    model: String,
+    total_infer_secs: f64,
+    realtime_x: f64,
+    avg_wer_pct: f64,
+    report_file: String,
+}
+
+fn parse_metric(line: &str) -> Option<f64> {
+    let start = line.find('`')? + 1;
+    let end = line[start..].find('`')? + start;
+    let raw = &line[start..end];
+    let value = raw
+        .strip_suffix('%')
+        .or_else(|| raw.strip_suffix('x'))
+        .unwrap_or(raw);
+    value.parse::<f64>().ok()
+}
+
+fn summary_from_report(path: &Path, backend: &str) -> Option<ModelSummary> {
+    let file_name = path.file_name()?.to_str()?.to_string();
+    let prefix = format!("whisper-integration-report-{}-", backend);
+    let model = file_name
+        .strip_prefix(&prefix)?
+        .strip_suffix(".md")?
+        .to_string();
+
+    let content = fs::read_to_string(path).ok()?;
+    let mut total_infer_secs = None;
+    let mut realtime_x = None;
+    let mut avg_wer_pct = None;
+
+    for line in content.lines() {
+        if line.starts_with("- Total inference seconds:") {
+            total_infer_secs = parse_metric(line);
+        } else if line.starts_with("- Aggregate realtime factor:") {
+            realtime_x = parse_metric(line);
+        } else if line.starts_with("- Average WER:") {
+            avg_wer_pct = parse_metric(line);
+        }
+    }
+
+    Some(ModelSummary {
+        model,
+        total_infer_secs: total_infer_secs?,
+        realtime_x: realtime_x?,
+        avg_wer_pct: avg_wer_pct?,
+        report_file: file_name,
+    })
+}
+
+fn write_backend_summary(bench_results_dir: &Path, backend: &str) {
+    let mut summaries = Vec::<ModelSummary>::new();
+    let prefix = format!("whisper-integration-report-{}-", backend);
+
+    let entries = fs::read_dir(bench_results_dir).unwrap_or_else(|err| {
+        panic!(
+            "failed to read bench-results dir {}: {err}",
+            bench_results_dir.display()
+        )
+    });
+
+    for entry in entries.flatten() {
+        let path = entry.path();
+        let Some(file_name) = path.file_name().and_then(|n| n.to_str()) else {
+            continue;
+        };
+        if !file_name.starts_with(&prefix) || !file_name.ends_with(".md") {
+            continue;
+        }
+        if let Some(summary) = summary_from_report(&path, backend) {
+            summaries.push(summary);
+        }
+    }
+
+    if summaries.is_empty() {
+        return;
+    }
+
+    summaries.sort_by(|a, b| a.total_infer_secs.total_cmp(&b.total_infer_secs));
+    let mut accuracy = summaries
+        .iter()
+        .map(|s| (s.model.clone(), s.avg_wer_pct))
+        .collect::<Vec<_>>();
+    accuracy.sort_by(|a, b| a.1.total_cmp(&b.1));
+
+    let summary_path = bench_results_dir.join(format!("whisper-model-size-comparison-{}.md", backend));
+    let mut markdown = String::new();
+    markdown.push_str(&format!("# Whisper Model Size Comparison ({}, GPU {})\n\n", backend.to_uppercase(), whisper_gpu_device_index()));
+    markdown.push_str("- Corpus: `bench_corpus` (clip_10s/15s/20s/30s)\n");
+    markdown.push_str(&format!("- Backend: `{}`\n", backend));
+    markdown.push_str(&format!("- GPU device: `{}`\n\n", whisper_gpu_device_index()));
+    markdown.push_str("## Summary table\n\n");
+    markdown.push_str("| Model | Total inference (s) | Realtime (x) | Avg WER (%) | Report |\n");
+    markdown.push_str("|---|---:|---:|---:|---|\n");
+    for s in &summaries {
+        markdown.push_str(&format!(
+            "| {} | {:.2} | {:.2} | {:.2} | `{}` |\n",
+            s.model, s.total_infer_secs, s.realtime_x, s.avg_wer_pct, s.report_file
+        ));
+    }
+
+    markdown.push_str("\n## Ranking\n\n");
+    markdown.push_str("### Fastest (lower total inference is better)\n");
+    for (idx, s) in summaries.iter().enumerate() {
+        markdown.push_str(&format!(
+            "{}. `{}` - {:.2}s ({:.2}x)\n",
+            idx + 1,
+            s.model,
+            s.total_infer_secs,
+            s.realtime_x
+        ));
+    }
+
+    markdown.push_str("\n### Best accuracy (lower WER is better)\n");
+    for (idx, (model, wer)) in accuracy.iter().enumerate() {
+        markdown.push_str(&format!("{}. `{}` - {:.2}% WER\n", idx + 1, model, wer));
+    }
+
+    fs::write(&summary_path, markdown)
+        .unwrap_or_else(|err| panic!("failed to write summary {}: {err}", summary_path.display()));
 }
 
 fn load_wav(path: &Path) -> (Vec<f32>, u32) {
@@ -230,6 +380,52 @@ fn word_error_rate(hypothesis: &str, reference: &str) -> f64 {
         std::mem::swap(&mut prev, &mut curr);
     }
     prev[ref_words.len()] as f64 / ref_words.len() as f64
+}
+
+fn word_level_diff(reference: &str, hypothesis: &str) -> String {
+    let ref_words: Vec<&str> = reference.split_whitespace().collect();
+    let hyp_words: Vec<&str> = hypothesis.split_whitespace().collect();
+    let m = ref_words.len();
+    let n = hyp_words.len();
+
+    let mut dp = vec![vec![0usize; n + 1]; m + 1];
+    for i in (0..m).rev() {
+        for j in (0..n).rev() {
+            if ref_words[i] == hyp_words[j] {
+                dp[i][j] = dp[i + 1][j + 1] + 1;
+            } else {
+                dp[i][j] = dp[i + 1][j].max(dp[i][j + 1]);
+            }
+        }
+    }
+
+    let mut i = 0usize;
+    let mut j = 0usize;
+    let mut out: Vec<String> = Vec::new();
+    while i < m && j < n {
+        if ref_words[i] == hyp_words[j] {
+            out.push(ref_words[i].to_string());
+            i += 1;
+            j += 1;
+        } else if dp[i + 1][j] >= dp[i][j + 1] {
+            out.push(format!("-{}", ref_words[i]));
+            i += 1;
+        } else {
+            out.push(format!("+{}", hyp_words[j]));
+            j += 1;
+        }
+    }
+
+    while i < m {
+        out.push(format!("-{}", ref_words[i]));
+        i += 1;
+    }
+    while j < n {
+        out.push(format!("+{}", hyp_words[j]));
+        j += 1;
+    }
+
+    out.join(" ")
 }
 
 #[test]
@@ -305,6 +501,7 @@ fn whisper_transcribes_corpus_with_quality_and_speed_metrics() {
         let ref_norm = normalize(&reference);
         let hyp_norm = normalize(&output.text);
         let wer = word_error_rate(&hyp_norm, &ref_norm);
+        let word_diff = word_level_diff(&ref_norm, &hyp_norm);
 
         println!(
             "clip={} audio_secs={:.2} infer_secs={:.2} rt_mult={:.2} wer={:.3}",
@@ -329,6 +526,9 @@ fn whisper_transcribes_corpus_with_quality_and_speed_metrics() {
                 0.0
             },
             wer,
+            transcript: output.text,
+            reference,
+            word_diff,
         });
 
         assert!(!hyp_norm.is_empty(), "empty transcription for {}", clip.name);
@@ -353,7 +553,7 @@ fn whisper_transcribes_corpus_with_quality_and_speed_metrics() {
         processed, avg_wer, total_audio_secs, total_infer_secs, rt_mult
     );
 
-    let report = report_path();
+    let report = report_path(&model_path);
     let hardware = backend_hardware_label();
     write_markdown_report(
         &report,
@@ -366,6 +566,9 @@ fn whisper_transcribes_corpus_with_quality_and_speed_metrics() {
         rt_mult,
     );
     println!("report_path={}", report.display());
+    if let Some(report_dir) = report.parent() {
+        write_backend_summary(report_dir, backend_name());
+    }
 
     assert!(avg_wer <= 0.70, "average WER too high: {:.3}", avg_wer);
     assert!(total_infer_secs > 0.0, "inference timing did not advance");
