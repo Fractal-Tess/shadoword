@@ -3,8 +3,11 @@ use crate::config::{ServiceMode, ShadowwordConfig, WhisperAccelerator};
 use crate::wav;
 use anyhow::{anyhow, Context, Result};
 use base64::Engine;
+use reqwest::blocking::Client;
 use rubato::{FftFixedIn, Resampler};
 use serde::{Deserialize, Serialize};
+use std::fs::File;
+use std::io::{Read, Write};
 use std::path::Path;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex, RwLock};
@@ -86,6 +89,119 @@ pub struct LocalService {
 }
 
 impl LocalService {
+    fn default_model_filename() -> String {
+        "ggml-large-v3-turbo.bin".to_string()
+    }
+
+    fn resolve_model_path(config: &ShadowwordConfig) -> Result<std::path::PathBuf> {
+        if !config.model_path.as_os_str().is_empty() {
+            return Ok(config.model_path.clone());
+        }
+
+        let models_dir = ShadowwordConfig::models_dir()?;
+        Ok(models_dir.join(Self::default_model_filename()))
+    }
+
+    fn default_download_url(model_path: &Path) -> Option<String> {
+        let file_name = model_path.file_name()?.to_str()?;
+        Some(format!(
+            "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/{}",
+            file_name
+        ))
+    }
+
+    fn maybe_download_model(config: &ShadowwordConfig) -> Result<()> {
+        let model_path = Self::resolve_model_path(config)?;
+        if model_path.exists() {
+            return Ok(());
+        }
+        if !config.auto_download_model_if_missing {
+            return Err(anyhow!(
+                "model path does not exist: {}",
+                model_path.display()
+            ));
+        }
+
+        let url = if let Some(url) = &config.model_download_url {
+            url.clone()
+        } else {
+            Self::default_download_url(&model_path).ok_or_else(|| {
+                anyhow!(
+                    "model path does not exist and no download URL could be inferred: {}",
+                    model_path.display()
+                )
+            })?
+        };
+
+        let parent = model_path
+            .parent()
+            .ok_or_else(|| anyhow!("model path has no parent: {}", model_path.display()))?;
+        std::fs::create_dir_all(parent).with_context(|| {
+            format!(
+                "failed to create model parent directory {}",
+                parent.display()
+            )
+        })?;
+
+        tracing::info!(
+            target: "shadowword.backend",
+            model_path = %model_path.display(),
+            %url,
+            "model missing; attempting automatic download"
+        );
+
+        let mut response = Client::new()
+            .get(&url)
+            .send()
+            .with_context(|| format!("failed to start model download from {url}"))?
+            .error_for_status()
+            .with_context(|| format!("model download returned error status from {url}"))?;
+
+        let tmp_path = model_path.with_extension("bin.part");
+        let mut file = File::create(&tmp_path)
+            .with_context(|| format!("failed to create temp model file {}", tmp_path.display()))?;
+
+        let total = response.content_length().unwrap_or(0);
+        let mut downloaded: u64 = 0;
+
+        let mut buf = vec![0u8; 64 * 1024];
+        loop {
+            let n = response
+                .read(&mut buf)
+                .context("download read error")?;
+            if n == 0 {
+                break;
+            }
+            file.write_all(&buf[..n])
+                .context("failed to write downloaded model bytes")?;
+            downloaded += n as u64;
+            if total > 0 {
+                tracing::info!(
+                    target: "shadowword.backend",
+                    model_path = %model_path.display(),
+                    downloaded,
+                    total,
+                    "model download progress"
+                );
+            }
+        }
+        file.flush().context("failed to flush downloaded model file")?;
+
+        std::fs::rename(&tmp_path, &model_path).with_context(|| {
+            format!(
+                "failed to move downloaded model into place {}",
+                model_path.display()
+            )
+        })?;
+
+        tracing::info!(
+            target: "shadowword.backend",
+            model_path = %model_path.display(),
+            "model auto-download complete"
+        );
+        Ok(())
+    }
+
     fn compiled_backend_summary() -> &'static str {
         if cfg!(feature = "whisper-vulkan") {
             "whisper-vulkan"
@@ -180,6 +296,7 @@ impl LocalService {
 
     fn ensure_loaded(&self) -> Result<bool> {
         let config = self.config();
+        let model_path = Self::resolve_model_path(&config)?;
         Self::log_backend_request(&config, "ensure_loaded");
         Self::apply_accelerator(&config);
 
@@ -188,24 +305,19 @@ impl LocalService {
             tracing::info!(
                 target: "shadowword.backend",
                 engine = "whisper",
-                model_path = %config.model_path.display(),
+                model_path = %model_path.display(),
                 compiled_backends = Self::compiled_backend_summary(),
                 "model already loaded"
             );
             return Ok(false);
         }
 
-        if !config.model_path.exists() {
-            return Err(anyhow!(
-                "model path does not exist: {}",
-                config.model_path.display()
-            ));
-        }
+        Self::maybe_download_model(&config)?;
 
-        let loaded = WhisperEngine::load(Path::new(&config.model_path)).with_context(|| {
+        let loaded = WhisperEngine::load(Path::new(&model_path)).with_context(|| {
             format!(
                 "failed to load whisper model from {}",
-                config.model_path.display()
+                model_path.display()
             )
         })?;
 
@@ -214,7 +326,7 @@ impl LocalService {
         tracing::info!(
             target: "shadowword.backend",
             engine = "whisper",
-            model_path = %config.model_path.display(),
+            model_path = %model_path.display(),
             compiled_backends = Self::compiled_backend_summary(),
             "model load complete"
         );

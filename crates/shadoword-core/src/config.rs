@@ -117,6 +117,10 @@ impl Default for HotkeyConfig {
 pub struct ShadowwordConfig {
     pub mode: ServiceMode,
     pub model_path: PathBuf,
+    #[serde(default = "default_auto_download_model_if_missing")]
+    pub auto_download_model_if_missing: bool,
+    #[serde(default)]
+    pub model_download_url: Option<String>,
     #[serde(default)]
     pub preload_on_startup: bool,
     pub recording: RecordingConfig,
@@ -134,6 +138,8 @@ impl Default for ShadowwordConfig {
         Self {
             mode: ServiceMode::Local,
             model_path: PathBuf::new(),
+            auto_download_model_if_missing: default_auto_download_model_if_missing(),
+            model_download_url: None,
             preload_on_startup: false,
             recording: RecordingConfig {
                 input_device: None,
@@ -150,6 +156,10 @@ impl Default for ShadowwordConfig {
             whisper_accelerator: WhisperAccelerator::Auto,
         }
     }
+}
+
+fn default_auto_download_model_if_missing() -> bool {
+    true
 }
 
 impl ShadowwordConfig {
@@ -175,14 +185,18 @@ impl ShadowwordConfig {
     }
 
     pub fn models_dir() -> Result<PathBuf> {
+        if let Ok(path) = env::var("SHADOWORD_MODELS_DIR") {
+            let trimmed = path.trim();
+            if !trimmed.is_empty() {
+                let override_dir = PathBuf::from(trimmed);
+                fs::create_dir_all(&override_dir)
+                    .context("failed to create models directory override")?;
+                return Ok(override_dir);
+            }
+        }
+
         let shadoword_dirs = Self::project_dirs("shadoword")?;
         let shadoword_models_dir = shadoword_dirs.data_dir().join("models");
-        let legacy_dirs = Self::project_dirs("shadowword")?;
-        let legacy_models_dir = legacy_dirs.data_dir().join("models");
-
-        if legacy_models_dir.exists() && !shadoword_models_dir.exists() {
-            return Ok(legacy_models_dir);
-        }
 
         fs::create_dir_all(&shadoword_models_dir).context("failed to create models directory")?;
         Ok(shadoword_models_dir)

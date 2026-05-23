@@ -43,3 +43,7 @@ blob-report/
 # Nix build output
 result
 .codex
+
+# OMO
+.omo
+.sisyphus
