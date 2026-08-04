@@ -8,6 +8,7 @@
     "build": "astro build",
     "preview": "astro preview",
     "check": "astro check",
+    "og": "astro build && bun run ./scripts/render-og.mjs",
     "format": "prettier --write \"**/*.{astro,js,jsx,ts,tsx,css,md}\"",
     "lint": "prettier --check \"**/*.{astro,js,jsx,ts,tsx,css,md}\""
   },

@@ -18,15 +18,57 @@ import '../styles/global.css'
  */
 import displayFace from '@fontsource/league-gothic/files/league-gothic-latin-400-normal.woff2?url'
 
-const { title, description } = Astro.props as {
+import { repoUrl } from '../data/site'
+
+/**
+ * `noindex` is the error page's flag, and it turns off two things besides the
+ * robots directive. A canonical URL on a 404 asks a crawler to treat "no page at
+ * this address" as the preferred version of itself, and the SoftwareApplication
+ * block would have the error page assert that it *is* the product. Neither is
+ * true of a page whose entire message is that nothing is here.
+ */
+const {
+  title,
+  description,
+  noindex = false,
+} = Astro.props as {
   title?: string
   description?: string
+  noindex?: boolean
 }
 
 const pageTitle = title ?? 'Shadoword — offline speech to text, Linux first'
 const pageDescription =
   description ??
   'Shadoword turns speech into text entirely on your own machine. Local Whisper inference by default, an optional self-hosted daemon, and explicit control over model and accelerator. Linux first.'
+
+const canonical = new URL(Astro.url.pathname, Astro.site)
+const ogImage = new URL('/images/shadoword-og.jpg', Astro.site)
+
+/**
+ * Structured data, held to the same rule as the page itself: every field is one
+ * the workspace can be checked against.
+ *
+ * Deliberately absent: `offers`, `license` and `softwareVersion`. Google wants an
+ * `offers` block to grant a rich result and it would be trivial to write
+ * `price: 0` — but the status plate says "Pre-launch. Build from source." and
+ * "None published yet", so there is nothing on offer to price. The license is
+ * omitted for the same reason the page omits it: the plate says "See LICENSE in
+ * the repository", and the repository's LICENSE is not this project's to
+ * summarise in a machine-readable claim. A missing rich result is cheaper than
+ * an invented fact — which is the trade this whole site is built on.
+ */
+const structuredData = {
+  '@context': 'https://schema.org',
+  '@type': 'SoftwareApplication',
+  name: 'Shadoword',
+  description: pageDescription,
+  applicationCategory: 'UtilitiesApplication',
+  operatingSystem: 'Linux',
+  url: canonical.href,
+  codeRepository: repoUrl,
+  programmingLanguage: 'Rust',
+}
 ---
 
 <!doctype html>
@@ -37,37 +79,51 @@ const pageDescription =
     <title>{pageTitle}</title>
     <meta name="description" content={pageDescription} />
     <meta name="theme-color" content="#07090d" />
+    {noindex && <meta name="robots" content="noindex, follow" />}
+    {!noindex && <link rel="canonical" href={canonical} />}
     <link rel="preload" href={displayFace} as="font" type="font/woff2" crossorigin />
+
     <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Shadoword" />
+    <meta property="og:locale" content="en_US" />
     <meta property="og:title" content={pageTitle} />
     <meta property="og:description" content={pageDescription} />
-    <!-- Not a rendered composite and not the square mark: this is the shipped
-         hero, screenshotted at 1200 wide. `summary_large_image` centre-crops or
-         letterboxes a square, and on a page whose only action is "go to the
-         source" the card is the first viewport for most of the traffic that ever
-         sees this — so it had better be the same first viewport the site has.
-         Shooting the page also means the card cannot drift from it.
+    <meta property="og:url" content={canonical} />
 
-         JPEG, not PNG: the hero is a continuous-tone raster with thousands of
-         fine bright strokes in it, which is the case PNG is worst at — the same
-         crop is far larger lossless, at no visible gain over 145 KB here. -->
-    <meta property="og:image" content={new URL('/images/shadoword-og.jpg', Astro.site)} />
-    <!-- 1200x532, not 1200x630. The crop's bottom edge *is* the scarlet band
-         hairline under the hero — row 531 of the shot, the last row of the band —
-         because on a page whose only structural device is that hairline, ending
-         the card on one is composing it. Reaching the nominal 1.91:1 would mean
-         slicing 100px into the mode strip below, which is 11px type that no feed
-         renders legibly anyway. 2.26:1 is inside every consumer's tolerance. -->
+    <!-- Composed at 1200x630 by `src/pages/og-card.astro` and shot by
+         `bun run og`, not cropped out of a browser viewport.
+
+         It was a screenshot of the shipped hero for exactly one good reason —
+         a shot cannot drift from the site — and that reason is kept here, because
+         the card page imports the same stylesheet, the same traced mark and the
+         same `site.ts` strings the index does, and is still *shot* rather than
+         drawn. What it drops is everything the crop decided by accident: the
+         wordmark squeezed into a 48px bar at the top edge, the F2 plate sliced
+         off at the bottom, and the scarlet CTA rendering as a button in an image
+         nobody can press.
+
+         JPEG, not PNG: the ground is a continuous-tone raster of thousands of
+         fine bright strokes, which is the case PNG is worst at — the same frame
+         is several times larger lossless, at no visible gain over ~190 KB. -->
+    <meta property="og:image" content={ogImage} />
+    <meta property="og:image:type" content="image/jpeg" />
+    <!-- The nominal 1.91:1 exactly, which a composed card can simply be authored
+         at. The previous 1200x532 was the crop's aspect rather than a decision. -->
     <meta property="og:image:width" content="1200" />
-    <meta property="og:image:height" content="532" />
+    <meta property="og:image:height" content="630" />
     <meta
       property="og:image:alt"
-      content="The Shadoword site's hero: the headline 'Speech to text that never leaves your machine' set in heavy condensed off-white type over an abstract spectrogram burning in magenta and cyan, with one perfectly black column at the centre carrying no signal, and a riveted metal plate at the right reading 'Push to talk — F2 — hold to capture'."
+      content="The Shadoword share card: the wordmark above the headline 'Speech to text that never leaves your machine', set in heavy condensed off-white type on the left of an abstract spectrogram burning in magenta and cyan. One column at the centre is perfectly black and carries a scarlet line down its length. A flat black strip along the foot reads 'github.com/Fractal-Tess/shadoword' and 'Pre-launch. Build from source.'"
     />
-    <meta property="og:url" content={new URL(Astro.url.pathname, Astro.site)} />
+
+    <!-- Twitter falls back to the OpenGraph tags for title, description, image
+         and alt, so only the card type is declared here. Duplicating the rest as
+         `twitter:*` is four more strings that can disagree with the four above. -->
     <meta name="twitter:card" content="summary_large_image" />
+
     <link rel="icon" href="/favicon/favicon-32.png" />
     <link rel="apple-touch-icon" href="/favicon/favicon-128.png" />
+    {!noindex && <script type="application/ld+json" set:html={JSON.stringify(structuredData)} />}
   </head>
   <body class="min-h-screen antialiased">
     <!--

@@ -1,0 +1,197 @@
+---
+import '../styles/global.css'
+import Wordmark from '../components/Wordmark.astro'
+import { repoUrl, subLegend, typePlate } from '../data/site'
+
+/**
+ * The source of the share card, and not a page anyone is meant to arrive at.
+ *
+ * The card used to be a 1200x532 screenshot of the shipped hero. Shooting the
+ * page had one real virtue — the card could not drift from the site — and one
+ * real cost: a browser viewport is not a 1.91:1 frame, so the composition was
+ * whatever survived the crop. The wordmark ended up in a 48px bar at the very
+ * top edge, the F2 plate was cut off at the bottom, and the CTA rendered as a
+ * button in an image nobody can press.
+ *
+ * So the card is composed instead, and the drift protection is kept by other
+ * means: this page imports the same stylesheet, the same traced Wordmark and the
+ * same `site.ts` strings the index does. There is no literal here that the site
+ * does not already own, and no type size that is not a step on the ramp — at a
+ * 1200x630 viewport `display-hero` computes to 88.2px on its own, which is what
+ * the site would set at this size, so the headline is not resized by hand.
+ *
+ * `noindex, nofollow` and no sitemap entry. The route ships because the renderer
+ * shoots the *built* page rather than a dev server, so a third HTML file in
+ * `dist/` is the price of the card being made of exactly what the site is made
+ * of. It states no product facts of its own beyond the ones below.
+ *
+ * Regenerate with `bun run og`.
+ */
+
+const headline = ['Speech to text', 'that never leaves', 'your machine']
+
+/** Verbatim from the status plate at the foot of the index. */
+const status = typePlate.find((row) => row.k === 'Status')!.v
+
+/** The URL as a reader would type it, not as an href. */
+const repoLabel = repoUrl.replace(/^https:\/\//, '')
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Shadoword — share card source</title>
+    <meta name="robots" content="noindex, nofollow" />
+  </head>
+  <body>
+    <div class="card">
+      {
+        /*
+          The same raster the hero loads, and the crop is the reason the card can
+          carry the argument at all.
+
+          `cover` on a 1200x558 box scales the 1536x617 plate by 0.9044 and trims
+          189px of width, 94.65px from each side. That maps the void column's
+          measured centre — raster x 49.64% — to 49.57% of the card, and leaves
+          its contiguous black run at 48.5% of the height, because a uniform
+          scale with no vertical crop cannot change a vertical fraction. Those
+          two numbers are the lance's placement below. If the plate is
+          regenerated, or this box stops being 1200x558, both have to be
+          recomputed from the hero's own measurements.
+        */
+      }
+      <div class="stage">
+        <img src="/images/hero-spectrum.webp" width="1536" height="617" alt="" class="raster" />
+
+        {
+          /*
+            The lance, static. On the site it breathes on a 6s loop; a still
+            frame of a breathing element is that element caught at an arbitrary
+            opacity, so here it is simply at full strength — the same choice the
+            reduced-motion rule already makes for it.
+          */
+        }
+        <div class="lance"></div>
+
+        {
+          /*
+            Wrapped rather than styled through the `class` prop. Astro's scoped
+            CSS compiles `.lockup` to `.lockup[data-astro-cid-…]`, and it stamps
+            that attribute onto elements in *this* template only — a class handed
+            to a component lands on the component's own root, which never carries
+            the parent's scope. The rule silently matched nothing and the lockup
+            rendered unpositioned in the corner.
+          */
+        }
+        <div class="lockup"><Wordmark /></div>
+
+        <div class="copy">
+          <h1 class="display-hero text-ink">
+            {headline.map((line) => <span class="hl-line">{line}</span>)}
+          </h1>
+          <p class="mono-legend text-ink legend">{subLegend}</p>
+        </div>
+      </div>
+
+      {
+        /*
+          The flat matte strip, bounded above by the scarlet hairline that bounds
+          every band in this world. It is opaque for a compositional reason, not
+          a stylistic one: the raster carries a solid rail of low-frequency light
+          along its bottom edge, so this is the one region of the frame where
+          type on the image would be unreadable at any weight. The index solves
+          the same problem in the same place with the mode strip.
+        */
+      }
+      <div class="strip band-top">
+        <p class="mono-legend text-ink">{repoLabel}</p>
+        <p class="mono-caption text-ink-soft uppercase">{status}</p>
+      </div>
+    </div>
+  </body>
+</html>
+
+<style>
+  /* A fixed frame, because this surface has exactly one size. The renderer sets
+     a 1200x630 viewport at dpr 1 and shoots the whole page, so these two numbers
+     and the viewport are one measurement in two places. */
+  .card {
+    position: relative;
+    width: 1200px;
+    height: 630px;
+    overflow: hidden;
+    background-color: var(--color-night);
+  }
+
+  .stage {
+    position: relative;
+    height: 558px;
+    overflow: hidden;
+  }
+
+  .raster {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  /* Measured placement — see the note in the markup. */
+  .lance {
+    position: absolute;
+    top: 0;
+    left: 49.57%;
+    width: 2px;
+    height: 48.5%;
+    background-image: linear-gradient(
+      to bottom,
+      transparent 0%,
+      color-mix(in srgb, var(--color-scarlet) 45%, transparent) 35%,
+      var(--color-scarlet) 88%,
+      var(--color-scarlet-lamp) 100%
+    );
+  }
+
+  /* The lockup is placed larger, not restyled larger: `display-wordmark` is the
+     wordmark's one recorded treatment and its 0.34em tracking is calibrated to
+     its own size, so scaling the assembled lockup as an object keeps the mark
+     and the letterspacing in the ratio the identity was drawn at. A local
+     font-size here would be a ramp step this project has not recorded. */
+  .lockup {
+    position: absolute;
+    top: 2.75rem;
+    left: 3.5rem;
+    transform: scale(1.7);
+    transform-origin: left center;
+  }
+
+  /* Left of the void column and clear of the bottom light rail. x 3.5rem to
+     ~450px maps to raster x 10.9-39.2%, inside the region the hero measured at
+     0.4% median luminance — which is why there is no scrim on this card. */
+  .copy {
+    position: absolute;
+    top: 50%;
+    left: 3.5rem;
+    translate: 0 -50%;
+  }
+
+  /* Same 40ch as the hero, and for the same reason: it puts the wrap on the
+     sentence boundary rather than mid-clause. Two claims, two lines. */
+  .legend {
+    max-width: 40ch;
+    margin-top: 1.75rem;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+  }
+
+  .strip {
+    display: flex;
+    height: 72px;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 3.5rem;
+    background-color: var(--color-night);
+  }
+</style>
