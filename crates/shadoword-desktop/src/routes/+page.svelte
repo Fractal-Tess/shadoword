@@ -27,6 +27,7 @@ FORM: Neo-Tokyo Neon Night, abstracted from cityscape to spectrum; seed 322d3899
 	import ModelsView from '$lib/views/ModelsView.svelte';
 	import SettingsView from '$lib/views/SettingsView.svelte';
 	import TranscribeView from '$lib/views/TranscribeView.svelte';
+	import WindowChrome from '$lib/components/WindowChrome.svelte';
 	import type { PageId } from '$lib/types';
 	import { inferencePoolSummary } from '$lib/inference-pool';
 	import { onMount } from 'svelte';
@@ -68,6 +69,7 @@ FORM: Neo-Tokyo Neon Night, abstracted from cityscape to spectrum; seed 322d3899
 		bins for no reason, and the mark that matters stopped being the only one. In
 		Operate mode the shell's job is to be a window, not a picture.
 	-->
+	<WindowChrome {activePage} />
 	<CommandRail {app} bind:activePage />
 	<main tabindex="-1">
 		<div class="work-surface">
@@ -129,13 +131,16 @@ FORM: Neo-Tokyo Neon Night, abstracted from cityscape to spectrum; seed 322d3899
 	.app-shell {
 		display: grid;
 		grid-template-columns: 14rem minmax(0, 1fr) 14rem;
-		min-width: 47.5rem;
+		grid-template-rows: 2.75rem minmax(0, 1fr);
+		min-width: 0;
 		height: 100dvh;
 		overflow: hidden;
 		background: var(--surface-0);
 	}
 
 	main {
+		grid-column: 2;
+		grid-row: 2;
 		min-width: 0;
 		overflow: auto;
 		background: var(--surface-0);
@@ -202,6 +207,16 @@ FORM: Neo-Tokyo Neon Night, abstracted from cityscape to spectrum; seed 322d3899
 		overflow: hidden;
 		clip-path: inset(50%);
 		white-space: nowrap;
+	}
+
+	:global(.command-rail) {
+		grid-column: 1;
+		grid-row: 2;
+	}
+
+	:global(.context-strip) {
+		grid-column: 3;
+		grid-row: 2;
 	}
 
 	@media (max-width: 1180px) {

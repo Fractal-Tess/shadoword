@@ -53,7 +53,7 @@
 		min-width: 0;
 		color: var(--ink-dim);
 		font-family: var(--font-mono);
-		font-size: 0.75rem;
+		font-size: 0.8125rem;
 	}
 
 	.label {
@@ -64,8 +64,8 @@
 
 	.glyph {
 		position: relative;
-		width: 0.4375rem;
-		height: 0.4375rem;
+		width: 0.5rem;
+		height: 0.5rem;
 		flex-shrink: 0;
 		background: var(--ink);
 	}
@@ -107,7 +107,7 @@
 	}
 
 	.compact {
-		font-size: 0.6875rem;
+		font-size: 0.75rem;
 	}
 
 	@keyframes glyph-scan {

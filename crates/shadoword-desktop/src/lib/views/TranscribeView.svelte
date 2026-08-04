@@ -135,7 +135,7 @@
 						onclick={() => app.setMode('local')}
 						aria-pressed={mode === 'local'}
 					>
-						<Mic2 size={13} strokeWidth={1.8} aria-hidden="true" />
+						<Mic2 size={16} strokeWidth={1.9} aria-hidden="true" />
 						<span class="mono-micro">This machine</span>
 					</button>
 					<button
@@ -145,7 +145,7 @@
 						onclick={() => app.setMode('remote')}
 						aria-pressed={mode === 'remote'}
 					>
-						<Radio size={13} strokeWidth={1.8} aria-hidden="true" />
+						<Radio size={16} strokeWidth={1.9} aria-hidden="true" />
 						<span class="mono-micro">Remote API</span>
 					</button>
 				</div>
@@ -176,9 +176,9 @@
 				>
 					<span class="pulse" aria-hidden="true"></span>
 					{#if app.recording}
-						<Square size={24} fill="currentColor" strokeWidth={0} aria-hidden="true" />
+						<Square size={27} fill="currentColor" strokeWidth={0} aria-hidden="true" />
 					{:else}
-						<Mic2 size={28} strokeWidth={1.6} aria-hidden="true" />
+						<Mic2 size={32} strokeWidth={1.8} aria-hidden="true" />
 					{/if}
 				</button>
 				<strong class="display-panel">
@@ -499,7 +499,7 @@
 		display: flex;
 		align-items: center;
 		gap: 0.5rem;
-		height: 1.95rem;
+		height: 2.25rem;
 		border: 0;
 		padding: 0 0.75rem;
 		background: var(--surface-1);
@@ -545,8 +545,8 @@
 	.record-slab {
 		position: relative;
 		display: grid;
-		width: 4.5rem;
-		height: 4.5rem;
+		width: 5rem;
+		height: 5rem;
 		place-items: center;
 		border: 0;
 		background: var(--scarlet);

@@ -55,7 +55,7 @@
 					     scarlet fill in this window that means "recording right now". -->
 					<span class="marker" aria-hidden="true"></span>
 				{/if}
-				<Icon size={16} strokeWidth={1.6} aria-hidden="true" />
+				<Icon size={20} strokeWidth={1.8} aria-hidden="true" />
 				<span class="destination-label display-legend">{destination.label}</span>
 			</button>
 		{/each}
@@ -119,11 +119,11 @@
 	nav button {
 		position: relative;
 		display: grid;
-		grid-template-columns: 1rem 1fr;
+		grid-template-columns: 1.25rem 1fr;
 		align-items: center;
-		gap: 0.7rem;
+		gap: 0.75rem;
 		width: 100%;
-		min-height: 2.4rem;
+		min-height: 2.75rem;
 		border: 0;
 		padding: 0 1.15rem;
 		background: transparent;
@@ -261,7 +261,7 @@
 		}
 
 		nav button {
-			grid-template-columns: 1rem;
+			grid-template-columns: 1.25rem;
 			justify-content: center;
 			padding: 0;
 		}

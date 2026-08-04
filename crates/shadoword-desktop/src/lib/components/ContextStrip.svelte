@@ -90,7 +90,7 @@
 
 	<div class="path" class:live={app.recording}>
 		<section>
-			<div class="path-icon"><Mic2 size={15} strokeWidth={1.7} /></div>
+			<div class="path-icon"><Mic2 size={18} strokeWidth={1.8} /></div>
 			<div>
 				<span class="mono-label">Input</span>
 				<strong class="mono-caption">{app.settings?.input_device ?? 'System default'}</strong>
@@ -102,9 +102,9 @@
 		<section>
 			<div class="path-icon marked">
 				{#if mode === 'remote'}
-					<Radio size={15} strokeWidth={1.7} />
+					<Radio size={18} strokeWidth={1.8} />
 				{:else}
-					<Cpu size={15} strokeWidth={1.7} />
+					<Cpu size={18} strokeWidth={1.8} />
 				{/if}
 			</div>
 			<div>
@@ -114,7 +114,7 @@
 			</div>
 		</section>
 		<section>
-			<div class="path-icon"><ClipboardCheck size={15} strokeWidth={1.7} /></div>
+			<div class="path-icon"><ClipboardCheck size={18} strokeWidth={1.8} /></div>
 			<div>
 				<span class="mono-label">Delivery</span>
 				<strong class="mono-caption">{delivery}</strong>
@@ -189,7 +189,7 @@
 		position: absolute;
 		top: 2.6rem;
 		bottom: 3.4rem;
-		left: calc(1.15rem + 0.9rem);
+		left: calc(1.15rem + 1rem);
 		width: 1px;
 		background: var(--line-strong);
 	}
@@ -197,7 +197,7 @@
 	.path section {
 		position: relative;
 		display: grid;
-		grid-template-columns: 1.8rem 1fr;
+		grid-template-columns: 2rem 1fr;
 		align-items: start;
 		gap: 0.85rem;
 		padding: 0.55rem 0;
@@ -205,8 +205,8 @@
 
 	.path-icon {
 		display: grid;
-		width: 1.8rem;
-		height: 1.8rem;
+		width: 2rem;
+		height: 2rem;
 		place-items: center;
 		border: 1px solid var(--line);
 		background: var(--surface-0);

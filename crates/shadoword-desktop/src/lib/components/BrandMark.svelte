@@ -40,7 +40,7 @@
 
 	svg {
 		width: auto;
-		height: 1.0625rem;
+		height: 1.25rem;
 		flex-shrink: 0;
 	}
 
@@ -55,6 +55,6 @@
 	}
 
 	.compact svg {
-		height: 0.9375rem;
+		height: 1.0625rem;
 	}
 </style>

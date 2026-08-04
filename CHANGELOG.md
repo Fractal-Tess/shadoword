@@ -6,6 +6,18 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## [Unreleased]
 
+## [0.10.1] - 2026-08-04
+
+### Changed
+
+- Increased the desktop typography, control, brand-mark, status, and navigation-icon scales for comfortable reading on high-resolution Linux displays.
+- Increased the default desktop window to 1440 × 900 with a practical 900 × 640 minimum.
+
+### Fixed
+
+- Replaced native window decorations with draggable Shadoword chrome and visible minimize, maximize, and close controls.
+- Restored visual prominence to navigation, signal-path, target, and recording icons that previously rendered too small.
+
 ## [0.10.0] - 2026-08-04
 
 ### Added
@@ -68,7 +80,8 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 - Prevented duplicate model loads after eager-preload timeouts.
 - Added bounded remote connect, handshake, read, write, and finalization waits.
 
-[Unreleased]: https://github.com/Fractal-Tess/shadoword/compare/v0.10.0...HEAD
+[Unreleased]: https://github.com/Fractal-Tess/shadoword/compare/v0.10.1...HEAD
+[0.10.1]: https://github.com/Fractal-Tess/shadoword/compare/v0.10.0...v0.10.1
 [0.10.0]: https://github.com/Fractal-Tess/shadoword/compare/v0.9.2...v0.10.0
 [0.9.2]: https://github.com/Fractal-Tess/shadoword/compare/v0.9.1...v0.9.2
 [0.9.1]: https://github.com/Fractal-Tess/shadoword/compare/v0.9.0...v0.9.1
