@@ -48,7 +48,7 @@ jobs:
         run: nix develop --command cargo test --workspace
 
       - name: Test desktop-only client profile
-        run: nix develop --command cargo test -p shadoword-desktop --no-default-features --features remote-client,custom-protocol
+        run: nix develop --command cargo test -p shadoword-desktop --no-default-features --features remote-client
 
       - name: Lint Vulkan workspace
         run: nix develop --command cargo clippy --workspace --all-targets --features whisper-vulkan -- -D warnings
