@@ -36,7 +36,7 @@ jobs:
       - name: Check Rust 1.88 compatibility
         run: |
           nix develop --command "$HOME/.cargo/bin/rustup" run 1.88.0 cargo check --workspace --all-targets --locked
-          nix develop --command "$HOME/.cargo/bin/rustup" run 1.88.0 cargo check -p shadoword-desktop --locked --no-default-features --features local-runtime,custom-protocol
+          nix develop --command "$HOME/.cargo/bin/rustup" run 1.88.0 cargo check -p shadoword-desktop --locked --no-default-features --features remote-client
 
       - name: Check formatting
         run: nix develop --command cargo fmt --all -- --check
