@@ -27,7 +27,7 @@ FORM: Neo-Tokyo Neon Night, abstracted from cityscape to spectrum; seed 322d3899
 	import TranscribeView from '$lib/views/TranscribeView.svelte';
 	import type { PageId } from '$lib/types';
 	import { inferencePoolSummary } from '$lib/inference-pool';
-	import { onMount } from 'svelte';
+	import { onMount, tick } from 'svelte';
 
 	const requestedPage = browser ? new URLSearchParams(window.location.search).get('page') : null;
 	const initialPage =
@@ -49,6 +49,12 @@ FORM: Neo-Tokyo Neon Night, abstracted from cityscape to spectrum; seed 322d3899
 		void app.initialize();
 		return () => app.dispose();
 	});
+
+	const openSettings = async () => {
+		activePage = 'settings';
+		await tick();
+		document.querySelector<HTMLElement>('.app-shell > main')?.scrollTo({ top: 0 });
+	};
 </script>
 
 <svelte:head>
@@ -83,10 +89,14 @@ FORM: Neo-Tokyo Neon Night, abstracted from cityscape to spectrum; seed 322d3899
 				</div>
 			{/if}
 			<div class="sr-only" aria-live="polite">
-				{activePage} view · {mode === 'remote' ? 'Remote API' : 'Local machine'} · {poolSummary}
+				{activePage} view · {mode === 'remote'
+					? 'Remote API'
+					: mode === 'open_router'
+						? 'OpenRouter'
+						: 'Local machine'} · {poolSummary}
 			</div>
 			{#if activePage === 'transcribe'}
-				<TranscribeView {app} />
+				<TranscribeView {app} onOpenSettings={openSettings} />
 			{:else if activePage === 'models'}
 				<ModelsView {app} />
 			{:else if activePage === 'history'}

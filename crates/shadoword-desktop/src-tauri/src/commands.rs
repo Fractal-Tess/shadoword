@@ -1,9 +1,11 @@
 use crate::contracts::{
     ConnectionInput, ConnectionReport, DesktopBootstrap, DesktopError, DesktopEvent,
-    DesktopSettings, DesktopSettingsInput, RecordingPhase, RecordingState, RecordingStatus,
-    SecretUpdate, TranscriptionResult, DESKTOP_EVENT_NAME,
+    DesktopSettings, DesktopSettingsInput, OpenRouterConnectionInput, OpenRouterKeyReport,
+    OpenRouterModelInfo, RecordingPhase, RecordingState, RecordingStatus, SecretUpdate,
+    TranscriptionResult, DESKTOP_EVENT_NAME,
 };
 use crate::hotkeys::{validate_shortcut, HotkeyBackend, HotkeyEventState};
+use crate::openrouter::OpenRouterClient;
 use crate::recording::{
     emit_error, spawn_streaming_worker, StreamCommand, StreamingWorker, TranscriptionTarget,
 };
@@ -60,6 +62,7 @@ pub struct DesktopState {
     recording: Mutex<RecordingController>,
     mutation: tokio::sync::Mutex<()>,
     remote: RemoteClient,
+    openrouter: OpenRouterClient,
     #[cfg(feature = "local-runtime")]
     local: Arc<InferenceRuntime>,
     #[cfg(feature = "local-runtime")]
@@ -73,7 +76,9 @@ pub struct DesktopState {
 
 impl DesktopState {
     pub fn load() -> Result<Self> {
-        let config = DesktopConfig::load().context("failed to load desktop config")?;
+        let config = normalize_config_for_build(
+            DesktopConfig::load().context("failed to load desktop config")?,
+        );
         #[cfg(feature = "local-runtime")]
         let (local, local_startup_error) = initialize_local_runtime(&config)?;
         Ok(Self {
@@ -81,6 +86,7 @@ impl DesktopState {
             recording: Mutex::new(RecordingController::default()),
             mutation: tokio::sync::Mutex::new(()),
             remote: RemoteClient::new()?,
+            openrouter: OpenRouterClient::new()?,
             #[cfg(feature = "local-runtime")]
             local,
             #[cfg(feature = "local-runtime")]
@@ -103,6 +109,7 @@ impl DesktopState {
             recording: Mutex::new(RecordingController::default()),
             mutation: tokio::sync::Mutex::new(()),
             remote: RemoteClient::new().expect("build test HTTP client"),
+            openrouter: OpenRouterClient::new().expect("build test OpenRouter client"),
             #[cfg(feature = "local-runtime")]
             local,
             #[cfg(feature = "local-runtime")]
@@ -187,10 +194,24 @@ fn initialize_local_runtime(
     }
 }
 
+#[cfg(feature = "local-runtime")]
+fn normalize_config_for_build(config: DesktopConfig) -> DesktopConfig {
+    config
+}
+
+#[cfg(not(feature = "local-runtime"))]
+fn normalize_config_for_build(mut config: DesktopConfig) -> DesktopConfig {
+    if config.mode == ServiceMode::Local {
+        config.mode = ServiceMode::Remote;
+    }
+    config
+}
+
 impl DesktopSettings {
     fn from_config(config: &DesktopConfig) -> Self {
         Self {
             mode: config.mode,
+            local_runtime_available: cfg!(feature = "local-runtime"),
             model_path: config.model_path.to_string_lossy().into_owned(),
             preload_on_startup: config.preload_on_startup,
             whisper_accelerator: config.whisper_accelerator,
@@ -201,6 +222,12 @@ impl DesktopSettings {
                 .api_token
                 .as_deref()
                 .is_some_and(|token| !token.trim().is_empty()),
+            openrouter_model: config.openrouter.model.clone(),
+            openrouter_key_configured: config
+                .openrouter
+                .api_key
+                .as_deref()
+                .is_some_and(|key| !key.trim().is_empty()),
             input_device: config.recording.input_device.clone(),
             sample_rate: config.recording.sample_rate,
             transcription_mode: config.recording.transcription_mode,
@@ -278,6 +305,7 @@ pub fn setup_native(app: &AppHandle) {
 pub fn shutdown(app: &AppHandle) {
     let state = app.state::<DesktopState>();
     let _ = cancel_recording_inner(app, &state);
+    crate::tray::set_icon_for_phase(app, RecordingPhase::Idle);
     #[cfg(feature = "local-runtime")]
     state.local.begin_shutdown();
     if let Ok(mut hotkey) = state.hotkey.lock() {
@@ -361,6 +389,10 @@ pub async fn save_desktop_settings(
     let current = state.config()?;
     let mut next = current.clone();
     apply_settings(&mut next, input).map_err(config_error)?;
+    #[cfg(not(feature = "local-runtime"))]
+    if next.mode == ServiceMode::Local {
+        return unavailable_local();
+    }
     #[cfg(feature = "local-runtime")]
     if current.mode == ServiceMode::Local || next.mode == ServiceMode::Local {
         state.ensure_local_runtime_mutable("change desktop settings")?;
@@ -424,6 +456,54 @@ pub async fn test_remote_connection(
         status_model_loaded: status.service.model_loaded,
         overview,
         runtime_config,
+    })
+}
+
+#[tauri::command]
+#[specta::specta]
+pub async fn list_openrouter_models(
+    state: tauri::State<'_, DesktopState>,
+) -> CommandResult<Vec<OpenRouterModelInfo>> {
+    state
+        .openrouter
+        .list_transcription_models()
+        .await
+        .map(|models| {
+            models
+                .into_iter()
+                .map(|model| OpenRouterModelInfo {
+                    id: model.id,
+                    name: model.name,
+                    description: model.description,
+                })
+                .collect()
+        })
+        .map_err(openrouter_error)
+}
+
+#[tauri::command]
+#[specta::specta]
+pub async fn test_openrouter_key(
+    input: OpenRouterConnectionInput,
+    state: tauri::State<'_, DesktopState>,
+) -> CommandResult<OpenRouterKeyReport> {
+    let saved_key = state.config()?.openrouter.api_key;
+    let key = if input.use_saved_key {
+        saved_key.as_deref().ok_or_else(openrouter_key_required)?
+    } else {
+        input.key.as_deref().ok_or_else(openrouter_key_required)?
+    };
+    let report = state
+        .openrouter
+        .test_api_key(key)
+        .await
+        .map_err(openrouter_error)?;
+    Ok(OpenRouterKeyReport {
+        label: report.label,
+        is_free_tier: report.is_free_tier,
+        limit: report.limit,
+        limit_remaining: report.limit_remaining,
+        usage: report.usage,
     })
 }
 
@@ -809,7 +889,9 @@ async fn start_recording_inner(
 ) -> CommandResult<RecordingStatus> {
     let _mutation = state.mutation.lock().await;
     let config = state.config()?;
-    let target = transcription_target(state, &config)?;
+    if config.mode == ServiceMode::OpenRouter {
+        validate_openrouter_config(&config)?;
+    }
     let session = {
         let recording = state
             .recording
@@ -826,17 +908,15 @@ async fn start_recording_inner(
     };
     let started_at = Instant::now();
     let sample_rate = session.snapshot_source().sample_rate();
-    let kind = if config.recording.transcription_mode == TranscriptionMode::Streaming {
-        let source = session.snapshot_source();
-        ActiveKind::Streaming(spawn_streaming_worker(
-            app.clone(),
-            config.clone(),
-            target,
-            source,
-            started_at,
-        ))
+    let effective_transcription_mode = if config.mode == ServiceMode::OpenRouter {
+        TranscriptionMode::Batch
     } else {
-        ActiveKind::Batch
+        config.recording.transcription_mode
+    };
+    let target = if effective_transcription_mode == TranscriptionMode::Streaming {
+        Some(transcription_target(state, &config)?)
+    } else {
+        None
     };
     let mut recording = state
         .recording
@@ -849,9 +929,21 @@ async fn start_recording_inner(
     recording.state = RecordingState {
         phase: RecordingPhase::Recording,
         service_mode: Some(config.mode),
-        transcription_mode: Some(config.recording.transcription_mode),
+        transcription_mode: Some(effective_transcription_mode),
         sample_rate: Some(sample_rate),
         segment_count: 0,
+    };
+    let kind = if let Some(target) = target {
+        let source = session.snapshot_source();
+        ActiveKind::Streaming(spawn_streaming_worker(
+            app.clone(),
+            config.clone(),
+            target,
+            source,
+            started_at,
+        ))
+    } else {
+        ActiveKind::Batch
     };
     recording.active = Some(ActiveRecording {
         session,
@@ -860,6 +952,7 @@ async fn start_recording_inner(
         config,
         kind,
     });
+    crate::tray::set_icon_for_phase(app, RecordingPhase::Recording);
     drop(recording);
     let _ = app.emit(
         DESKTOP_EVENT_NAME,
@@ -886,11 +979,14 @@ async fn finish_recording_inner(
                 "no recording is active",
             ));
         }
+        let Some(active) = recording.active.take() else {
+            recording.state = RecordingState::default();
+            crate::tray::set_icon_for_phase(app, RecordingPhase::Idle);
+            return Err(internal_error("recording state had no active session"));
+        };
         recording.state.phase = RecordingPhase::Finalizing;
-        recording
-            .active
-            .take()
-            .ok_or_else(|| internal_error("recording state had no active session"))?
+        crate::tray::set_icon_for_phase(app, RecordingPhase::Finalizing);
+        active
     };
     let _ = app.emit(
         DESKTOP_EVENT_NAME,
@@ -1010,6 +1106,30 @@ async fn finish_batch(
                 .await
                 .map_err(remote_error)?
         }
+        ServiceMode::OpenRouter => {
+            let wav = shadoword_core::wav::encode_wav(&audio).map_err(local_error)?;
+            let api_key = active
+                .config
+                .openrouter
+                .api_key
+                .as_deref()
+                .ok_or_else(openrouter_key_required)?;
+            let response = state
+                .openrouter
+                .transcribe_wav(
+                    api_key,
+                    &active.config.openrouter.model,
+                    wav,
+                    active.config.recording.english_only,
+                )
+                .await
+                .map_err(openrouter_error)?;
+            shadoword_core::TranscriptResponse {
+                text: response.text,
+                elapsed_ms: response.elapsed_ms,
+                engine: format!("OpenRouter · {}", active.config.openrouter.model),
+            }
+        }
     };
     let result = TranscriptionResult {
         text: response.text,
@@ -1048,9 +1168,11 @@ fn cancel_recording_inner(app: &AppHandle, state: &DesktopState) -> CommandResul
             .with_action("Wait for the transcription result or error event."));
         }
         if recording.state.phase == RecordingPhase::Idle {
+            crate::tray::set_icon_for_phase(app, RecordingPhase::Idle);
             return Ok(());
         }
         recording.state = RecordingState::default();
+        crate::tray::set_icon_for_phase(app, RecordingPhase::Idle);
         recording.active.take()
     };
     if let Some(active) = active {
@@ -1068,12 +1190,14 @@ pub fn stream_worker_failed(app: &AppHandle, error: &DesktopError) {
     let state = app.state::<DesktopState>();
     let active = {
         let Ok(mut recording) = state.recording.lock() else {
+            crate::tray::set_icon_for_phase(app, RecordingPhase::Idle);
             return;
         };
         if recording.state.phase != RecordingPhase::Recording {
             return;
         }
         recording.state = RecordingState::default();
+        crate::tray::set_icon_for_phase(app, RecordingPhase::Idle);
         recording.active.take()
     };
     if let Some(active) = active {
@@ -1176,6 +1300,11 @@ fn transcription_target(
                 unavailable_local()
             }
         }
+        ServiceMode::OpenRouter => Err(DesktopError::new(
+            "openrouter_streaming_unsupported",
+            "OpenRouter transcription runs after capture completes",
+        )
+        .with_action("Use batch capture for OpenRouter transcription.")),
     }
 }
 
@@ -1205,6 +1334,18 @@ fn apply_settings(config: &mut DesktopConfig, input: DesktopSettingsInput) -> Re
             config.remote.api_token = Some(value.to_string());
         }
         SecretUpdate::Clear => config.remote.api_token = None,
+    }
+    let openrouter_model = input.openrouter_model.trim();
+    crate::openrouter::validate_model(openrouter_model)?;
+    config.openrouter.model = openrouter_model.to_string();
+    match input.openrouter_key {
+        SecretUpdate::Keep => {}
+        SecretUpdate::Set { value } => {
+            let value = value.trim();
+            crate::openrouter::validate_api_key(value)?;
+            config.openrouter.api_key = Some(value.to_string());
+        }
+        SecretUpdate::Clear => config.openrouter.api_key = None,
     }
     config.recording.input_device = input
         .input_device
@@ -1491,6 +1632,35 @@ fn config_error(error: impl std::fmt::Display) -> DesktopError {
         .with_action("Correct the highlighted setting and try again.")
 }
 
+fn validate_openrouter_config(config: &DesktopConfig) -> CommandResult<()> {
+    config
+        .openrouter
+        .api_key
+        .as_deref()
+        .ok_or_else(openrouter_key_required)
+        .and_then(|key| {
+            crate::openrouter::validate_api_key(key)
+                .map(|_| ())
+                .map_err(config_error)
+        })?;
+    crate::openrouter::validate_model(&config.openrouter.model).map_err(config_error)?;
+    Ok(())
+}
+
+fn openrouter_key_required() -> DesktopError {
+    DesktopError::new(
+        "openrouter_key_required",
+        "an OpenRouter API key is required",
+    )
+    .with_action("Enter an OpenRouter API key in Settings and save the configuration.")
+}
+
+fn openrouter_error(error: impl std::fmt::Display) -> DesktopError {
+    DesktopError::new("openrouter_transcription_failed", error.to_string()).with_action(
+        "Check the OpenRouter API key, transcription model, account credits, and network connection.",
+    )
+}
+
 fn remote_error(error: anyhow::Error) -> DesktopError {
     if error
         .downcast_ref::<crate::remote::RemoteApiError>()
@@ -1537,6 +1707,8 @@ mod tests {
             whisper_gpu_device: -1,
             remote_endpoint: "http://127.0.0.1:47813/".to_string(),
             remote_token: secret,
+            openrouter_model: "openai/whisper-large-v3".to_string(),
+            openrouter_key: SecretUpdate::Keep,
             input_device: None,
             sample_rate: 16_000,
             transcription_mode: TranscriptionMode::Batch,
@@ -1555,8 +1727,13 @@ mod tests {
     fn applies_local_and_desktop_settings_without_exporting_secret() {
         let mut config = DesktopConfig::default();
         config.remote.api_token = Some("saved-secret".to_string());
+        config.openrouter.api_key = Some("sk-or-saved-secret".to_string());
         apply_settings(&mut config, input(SecretUpdate::Keep)).unwrap();
         assert_eq!(config.remote.api_token.as_deref(), Some("saved-secret"));
+        assert_eq!(
+            config.openrouter.api_key.as_deref(),
+            Some("sk-or-saved-secret")
+        );
         assert_eq!(config.remote.endpoint, "http://127.0.0.1:47813");
         assert_eq!(config.model_path, PathBuf::from("/models/custom.bin"));
         assert_eq!(config.whisper_accelerator, WhisperAccelerator::Cpu);
@@ -1564,7 +1741,25 @@ mod tests {
         let snapshot = DesktopSettings::from_config(&config);
         let json = serde_json::to_string(&snapshot).unwrap();
         assert!(snapshot.remote_token_configured);
+        assert!(snapshot.openrouter_key_configured);
         assert!(!json.contains("saved-secret"));
+        assert!(!json.contains("sk-or-saved-secret"));
+    }
+
+    #[test]
+    fn openrouter_key_updates_are_explicit_and_validated() {
+        let mut config = DesktopConfig::default();
+        let mut set = input(SecretUpdate::Keep);
+        set.openrouter_key = SecretUpdate::Set {
+            value: "  sk-or-test-key  ".to_string(),
+        };
+        apply_settings(&mut config, set).expect("set valid OpenRouter key");
+        assert_eq!(config.openrouter.api_key.as_deref(), Some("sk-or-test-key"));
+
+        let mut clear = input(SecretUpdate::Keep);
+        clear.openrouter_key = SecretUpdate::Clear;
+        apply_settings(&mut config, clear).expect("clear OpenRouter key");
+        assert!(config.openrouter.api_key.is_none());
     }
 
     #[test]
@@ -1575,6 +1770,17 @@ mod tests {
         invalid.hotkey_shortcut = "a".to_string();
         assert!(apply_settings(&mut config, invalid).is_err());
         assert_eq!(config, original);
+    }
+
+    #[test]
+    fn openrouter_mode_requires_a_native_api_key_before_capture() {
+        let config = DesktopConfig {
+            mode: ServiceMode::OpenRouter,
+            ..DesktopConfig::default()
+        };
+
+        let error = validate_openrouter_config(&config).expect_err("missing key must fail");
+        assert_eq!(error.code, "openrouter_key_required");
     }
 
     #[test]

@@ -6,6 +6,18 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## [Unreleased]
 
+## [0.10.3] - 2026-08-04
+
+### Added
+
+- Direct OpenRouter speech-to-text as a desktop transcription target, with native API-key storage and validation, dynamic transcription-model discovery, bounded WAV uploads, and batch-only capture semantics.
+- A full CPU desktop release archive and Nix package that combine the Tauri UI with the embedded local Whisper runtime while retaining remote and OpenRouter modes.
+
+### Changed
+
+- The tray icon now switches from neutral gray to scarlet while microphone recording is active and returns to gray during finalization, cancellation, failure, and idle states.
+- Linux releases now cover API-only, remote/OpenRouter desktop-only, and combined desktop/runtime installations.
+
 ## [0.10.2] - 2026-08-04
 
 ### Changed
@@ -87,7 +99,8 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 - Prevented duplicate model loads after eager-preload timeouts.
 - Added bounded remote connect, handshake, read, write, and finalization waits.
 
-[Unreleased]: https://github.com/Fractal-Tess/shadoword/compare/v0.10.2...HEAD
+[Unreleased]: https://github.com/Fractal-Tess/shadoword/compare/v0.10.3...HEAD
+[0.10.3]: https://github.com/Fractal-Tess/shadoword/compare/v0.10.2...v0.10.3
 [0.10.2]: https://github.com/Fractal-Tess/shadoword/compare/v0.10.1...v0.10.2
 [0.10.1]: https://github.com/Fractal-Tess/shadoword/compare/v0.10.0...v0.10.1
 [0.10.0]: https://github.com/Fractal-Tess/shadoword/compare/v0.9.2...v0.10.0

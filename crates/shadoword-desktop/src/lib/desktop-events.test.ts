@@ -36,6 +36,9 @@ describe('desktop event routing helpers', () => {
 		expect(historyRecordFromCompletion('2', '09:43', 'remote', result('hello', 10), 1).engine).toBe(
 			'Remote · whisper.cpp'
 		);
+		expect(
+			historyRecordFromCompletion('3', '09:44', 'open_router', result('hello', 10), 1).engine
+		).toBe('OpenRouter · whisper.cpp');
 	});
 
 	test('completion fingerprints distinguish target and segment count', () => {

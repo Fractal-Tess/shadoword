@@ -14,6 +14,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 pub enum ServiceMode {
     Local,
     Remote,
+    OpenRouter,
 }
 
 #[derive(Debug, Clone, Copy, Default, Serialize, Deserialize, PartialEq, Eq, Type)]
@@ -327,6 +328,36 @@ impl std::fmt::Debug for RemoteConfig {
     }
 }
 
+fn default_openrouter_model() -> String {
+    "openai/whisper-large-v3".to_string()
+}
+
+#[derive(Clone, PartialEq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct OpenRouterConfig {
+    pub api_key: Option<String>,
+    pub model: String,
+}
+
+impl Default for OpenRouterConfig {
+    fn default() -> Self {
+        Self {
+            api_key: None,
+            model: default_openrouter_model(),
+        }
+    }
+}
+
+impl std::fmt::Debug for OpenRouterConfig {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct("OpenRouterConfig")
+            .field("api_key", &self.api_key.as_ref().map(|_| "[REDACTED]"))
+            .field("model", &self.model)
+            .finish()
+    }
+}
+
 #[derive(Debug, Clone, Copy, Default, Serialize, Deserialize, PartialEq, Eq, Type)]
 #[serde(rename_all = "snake_case")]
 pub enum HotkeyMode {
@@ -438,6 +469,8 @@ pub struct DesktopConfig {
     pub output: OutputConfig,
     pub remote: RemoteConfig,
     #[serde(default)]
+    pub openrouter: OpenRouterConfig,
+    #[serde(default)]
     pub hotkey: HotkeyConfig,
     #[serde(default = "default_close_to_tray")]
     pub close_to_tray: bool,
@@ -458,6 +491,7 @@ impl Default for DesktopConfig {
             recording: RecordingConfig::default(),
             output: OutputConfig::default(),
             remote: RemoteConfig::default(),
+            openrouter: OpenRouterConfig::default(),
             hotkey: HotkeyConfig::default(),
             close_to_tray: default_close_to_tray(),
             whisper_accelerator: WhisperAccelerator::Auto,
@@ -834,6 +868,27 @@ mod tests {
                 .expect("deserialize recording config without PCM format");
 
         assert_eq!(recording.streaming_pcm_format, StreamingPcmFormat::F32le);
+    }
+
+    #[test]
+    fn legacy_desktop_config_defaults_openrouter_without_exposing_a_key() {
+        let config: DesktopConfig = serde_json::from_str(r#"{"mode":"remote"}"#)
+            .expect("deserialize desktop config without OpenRouter settings");
+
+        assert_eq!(config.openrouter, OpenRouterConfig::default());
+        assert!(!format!("{config:?}").contains("sk-or-test-secret"));
+    }
+
+    #[test]
+    fn openrouter_debug_output_redacts_the_api_key() {
+        let config = OpenRouterConfig {
+            api_key: Some("sk-or-test-secret".to_string()),
+            model: "openai/whisper-large-v3".to_string(),
+        };
+        let debug = format!("{config:?}");
+
+        assert!(debug.contains("[REDACTED]"));
+        assert!(!debug.contains("sk-or-test-secret"));
     }
 
     #[test]

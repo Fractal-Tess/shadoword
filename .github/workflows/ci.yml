@@ -25,8 +25,18 @@ jobs:
       - name: Enable Nix cache
         uses: DeterminateSystems/magic-nix-cache-action@v13
 
+      - name: Install Rust 1.88 MSRV toolchain
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: 1.88.0
+
       - name: Validate workspace metadata
         run: nix develop --command cargo metadata --locked --no-deps
+
+      - name: Check Rust 1.88 compatibility
+        run: |
+          nix develop --command "$HOME/.cargo/bin/rustup" run 1.88.0 cargo check --workspace --all-targets --locked
+          nix develop --command "$HOME/.cargo/bin/rustup" run 1.88.0 cargo check -p shadoword-desktop --locked --no-default-features --features local-runtime,custom-protocol
 
       - name: Check formatting
         run: nix develop --command cargo fmt --all -- --check
@@ -36,6 +46,9 @@ jobs:
 
       - name: Test CPU workspace
         run: nix develop --command cargo test --workspace
+
+      - name: Test desktop-only client profile
+        run: nix develop --command cargo test -p shadoword-desktop --no-default-features --features remote-client,custom-protocol
 
       - name: Lint Vulkan workspace
         run: nix develop --command cargo clippy --workspace --all-targets --features whisper-vulkan -- -D warnings
@@ -63,11 +76,13 @@ jobs:
           nix eval .#packages.x86_64-linux.shadoword-api.drvPath
           nix eval .#packages.x86_64-linux.shadoword-api-cuda.drvPath
           nix eval .#packages.x86_64-linux.shadoword-desktop-client.drvPath
+          nix eval .#packages.x86_64-linux.shadoword-desktop.drvPath
           nix eval .#packages.x86_64-linux.shadoword-api-source.drvPath
           nix eval .#packages.x86_64-linux.shadoword-desktop-client-source.drvPath
+          nix eval .#packages.x86_64-linux.shadoword-desktop-source.drvPath
 
       - name: Build API package from source
         run: nix build .#shadoword-api-source -L --show-trace
 
-      - name: Build remote desktop package from source
-        run: nix build .#shadoword-desktop-client-source -L --show-trace
+      - name: Build desktop packages from source
+        run: nix build .#shadoword-desktop-client-source .#shadoword-desktop-source -L --show-trace

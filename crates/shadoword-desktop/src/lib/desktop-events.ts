@@ -32,7 +32,7 @@ export function historyRecordFromCompletion(
 	return {
 		id,
 		timestamp,
-		engine: `${mode === 'local' ? 'Local' : 'Remote'} · ${result.engine}`,
+		engine: `${serviceModeLabel(mode)} · ${result.engine}`,
 		duration: formatDuration(result.audio_duration_ms),
 		latency: `${result.elapsed_ms}ms`,
 		text: result.text,
@@ -54,6 +54,12 @@ export function transcriptionFingerprint(
 		result.sample_rate,
 		segments
 	].join('\u001f');
+}
+
+function serviceModeLabel(mode: ServiceMode) {
+	if (mode === 'local') return 'Local';
+	if (mode === 'open_router') return 'OpenRouter';
+	return 'Remote';
 }
 
 function transcriptionResultsEqual(left: TranscriptionResult, right: TranscriptionResult) {

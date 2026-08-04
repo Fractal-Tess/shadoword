@@ -12,6 +12,9 @@ export const commands = {
 		__TAURI_INVOKE<DesktopSettings>('save_desktop_settings', { input }),
 	testRemoteConnection: (input: ConnectionInput) =>
 		__TAURI_INVOKE<ConnectionReport_Serialize>('test_remote_connection', { input }),
+	listOpenrouterModels: () => __TAURI_INVOKE<OpenRouterModelInfo[]>('list_openrouter_models'),
+	testOpenrouterKey: (input: OpenRouterConnectionInput) =>
+		__TAURI_INVOKE<OpenRouterKeyReport>('test_openrouter_key', { input }),
 	refreshRemoteOverview: () => __TAURI_INVOKE<OverviewDto_Serialize>('refresh_remote_overview'),
 	updateRemoteRuntime: (runtime: RuntimeConfigDto_Deserialize) =>
 		__TAURI_INVOKE<OverviewDto_Serialize>('update_remote_runtime', { runtime }),
@@ -117,12 +120,15 @@ export type DesktopEvent =
 
 export type DesktopSettings = {
 	mode: ServiceMode;
+	local_runtime_available: boolean;
 	model_path: string;
 	preload_on_startup: boolean;
 	whisper_accelerator: WhisperAccelerator;
 	whisper_gpu_device: number;
 	remote_endpoint: string;
 	remote_token_configured: boolean;
+	openrouter_model: string;
+	openrouter_key_configured: boolean;
 	input_device: string | null;
 	sample_rate: number;
 	transcription_mode: TranscriptionMode;
@@ -144,6 +150,8 @@ export type DesktopSettingsInput = {
 	whisper_gpu_device: number;
 	remote_endpoint: string;
 	remote_token: SecretUpdate;
+	openrouter_model: string;
+	openrouter_key: SecretUpdate;
 	input_device: string | null;
 	sample_rate: number;
 	transcription_mode: TranscriptionMode;
@@ -284,6 +292,25 @@ export type ModelInfoDto = {
 	installed: boolean;
 };
 
+export type OpenRouterConnectionInput = {
+	key: string | null;
+	use_saved_key: boolean;
+};
+
+export type OpenRouterKeyReport = {
+	label: string | null;
+	is_free_tier: boolean;
+	limit: number | null;
+	limit_remaining: number | null;
+	usage: number | null;
+};
+
+export type OpenRouterModelInfo = {
+	id: string;
+	name: string;
+	description: string;
+};
+
 export type OverviewDto = OverviewDto_Serialize | OverviewDto_Deserialize;
 
 export type OverviewDto_Deserialize = {
@@ -350,7 +377,7 @@ export type RuntimeConfigDto_Serialize = {
 export type SecretUpdate =
 	{ action: 'keep' } | { action: 'set'; value: string } | { action: 'clear' };
 
-export type ServiceMode = 'local' | 'remote';
+export type ServiceMode = 'local' | 'remote' | 'open_router';
 
 export type ServiceStatus = ServiceStatus_Serialize | ServiceStatus_Deserialize;
 

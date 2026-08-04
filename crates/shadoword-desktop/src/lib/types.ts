@@ -1,6 +1,6 @@
 export type PageId = 'transcribe' | 'models' | 'history' | 'settings' | 'about';
 
-export type RuntimeMode = 'local' | 'remote';
+export type RuntimeMode = 'local' | 'remote' | 'open_router';
 
 export type RuntimeState = 'ready' | 'loading' | 'offline' | 'warning';
 

@@ -1,10 +1,12 @@
 mod commands;
 mod contracts;
 mod hotkeys;
+mod openrouter;
 mod output;
 mod recording;
 mod remote;
 mod remote_stream;
+mod tray;
 
 use commands::DesktopState;
 use contracts::DesktopEvent;
@@ -23,6 +25,8 @@ fn bindings() -> tauri_specta::Builder<Wry> {
             commands::list_input_devices,
             commands::save_desktop_settings,
             commands::test_remote_connection,
+            commands::list_openrouter_models,
+            commands::test_openrouter_key,
             commands::refresh_remote_overview,
             commands::update_remote_runtime,
             commands::select_remote_model,
@@ -70,7 +74,8 @@ fn setup_tray(app: &tauri::AppHandle) -> tauri::Result<()> {
     let hide = MenuItem::with_id(app, "hide", "Hide Shadoword", true, None::<&str>)?;
     let quit = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
     let menu = Menu::with_items(app, &[&show, &hide, &quit])?;
-    let mut tray = TrayIconBuilder::new()
+    let tray = TrayIconBuilder::with_id(tray::TRAY_ICON_ID)
+        .icon(tray::idle_icon()?)
         .tooltip("Shadoword")
         .menu(&menu)
         .show_menu_on_left_click(false)
@@ -93,9 +98,6 @@ fn setup_tray(app: &tauri::AppHandle) -> tauri::Result<()> {
                 show_main_window(tray.app_handle());
             }
         });
-    if let Some(icon) = app.default_window_icon().cloned() {
-        tray = tray.icon(icon);
-    }
     tray.build(app)?;
     Ok(())
 }

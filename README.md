@@ -33,20 +33,21 @@ bun run tauri dev -- --features whisper-vulkan
 bun run tauri dev -- --features whisper-cuda
 ```
 
-### Remote client profile
+### Desktop client profile
 
-The remote-only desktop profile keeps microphone capture, VAD streaming, history,
-hotkeys, tray behavior, and transcript delivery, but removes local Whisper
-inference and local model management from the build:
+The desktop-only client profile keeps microphone capture, VAD streaming, direct
+OpenRouter transcription, history, hotkeys, tray behavior, and transcript delivery,
+but removes local Whisper inference and local model management from the build:
 
 ```bash
 cd crates/shadoword-desktop
 bun run tauri dev -- --no-default-features --features remote-client
 ```
 
-This profile always uses the configured remote API and presents only remote
-runtime and model controls. The default desktop package remains the full
-local/remote application.
+This profile can use either a configured remote API or direct OpenRouter
+transcription and presents daemon runtime and model controls only in remote mode.
+The full desktop package embeds the portable CPU Whisper runtime in the same
+executable while retaining both remote options.
 
 ## Releases
 
@@ -56,9 +57,11 @@ x86_64 archives:
 - `shadoword-api-cpu-x86_64-linux.tar.gz`
 - `shadoword-api-cuda-x86_64-linux.tar.gz`
 - `shadoword-api-vulkan-x86_64-linux.tar.gz`
-- `shadoword-desktop-client-x86_64-linux.tar.gz`
+- `shadoword-desktop-client-x86_64-linux.tar.gz` — desktop UI and native capture for remote/OpenRouter transcription
+- `shadoword-desktop-cpu-x86_64-linux.tar.gz` — desktop UI with the embedded CPU Whisper runtime
 
-Each release also includes `SHA256SUMS`. The archives contain the stripped ELF
+Together these cover API-only, desktop-only, and combined desktop/runtime
+installations. Each release also includes `SHA256SUMS`. The archives contain the stripped ELF
 executables used by the Nix packages, allowing NixOS deployments to download
 and patch the release binaries without compiling Rust, CUDA, or the desktop
 frontend locally.
@@ -87,7 +90,10 @@ bun run tauri dev -- --features whisper-cuda
 
 ### Desktop client
 
-The Tauri desktop supports local Whisper, remote API inference, batch and VAD-segmented streaming transcription, global shortcuts, tray behavior, and transcript delivery.
+The Tauri desktop supports local Whisper, remote API inference, direct OpenRouter
+speech-to-text, batch and VAD-segmented streaming transcription, global shortcuts,
+tray behavior, and transcript delivery. OpenRouter credentials remain in the
+native desktop configuration and audio is sent only when OpenRouter is selected.
 
 ```bash
 cd crates/shadoword-desktop

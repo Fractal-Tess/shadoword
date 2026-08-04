@@ -10,6 +10,7 @@
 	let mode = $derived(app.settings?.mode ?? 'remote');
 	let poolStatus = $derived(app.overview?.status.inference_pool ?? null);
 	let modelName = $derived.by(() => {
+		if (mode === 'open_router') return app.settings?.openrouter_model ?? 'No model';
 		const path = app.overview?.runtime.model_path;
 		return app.overview?.models.find((model) => path?.endsWith(model.filename))?.name ?? 'No model';
 	});
@@ -18,9 +19,13 @@
 			? 'loading'
 			: (poolStatus?.unhealthy_units ?? 0) > 0
 				? 'warning'
-				: app.overview
-					? 'ready'
-					: 'offline'
+				: mode === 'open_router'
+					? app.settings?.openrouter_key_configured
+						? 'ready'
+						: 'offline'
+					: app.overview
+						? 'ready'
+						: 'offline'
 	);
 
 	const destinations = [
@@ -39,7 +44,7 @@
 	</div>
 
 	<nav aria-label="Primary navigation">
-		{#each destinations as destination (destination.id)}
+		{#each destinations.filter((destination) => mode !== 'open_router' || destination.id !== 'models') as destination (destination.id)}
 			{@const Icon = destination.icon}
 			<button
 				type="button"
@@ -70,7 +75,13 @@
 	-->
 	<div class="runtime-station rivet-plate">
 		<div class="runtime-heading">
-			<span class="mono-label">{mode === 'local' ? 'Local runtime' : 'Remote API'}</span>
+			<span class="mono-label"
+				>{mode === 'local'
+					? 'Local runtime'
+					: mode === 'open_router'
+						? 'OpenRouter'
+						: 'Remote API'}</span
+			>
 			<StatusPill
 				state={runtimeState}
 				label={app.activity === 'busy' ? 'Updating' : 'Live'}
@@ -79,12 +90,22 @@
 		</div>
 		<strong class="display-panel">{modelName}</strong>
 		<p class="mono-micro">
-			{mode === 'local' ? 'Native host' : (app.settings?.remote_endpoint ?? 'Not connected')}
+			{mode === 'local'
+				? 'Native host'
+				: mode === 'open_router'
+					? 'openrouter.ai'
+					: (app.settings?.remote_endpoint ?? 'Not connected')}
 		</p>
 		<div class="runtime-meta">
-			<span class="mono-micro">{inferencePoolSummary(poolStatus)}</span>
 			<span class="mono-micro"
-				>Gen {poolStatus?.generation ?? app.overview?.runtime.generation ?? '—'}</span
+				>{mode === 'open_router' ? 'Batch STT' : inferencePoolSummary(poolStatus)}</span
+			>
+			<span class="mono-micro"
+				>{mode === 'open_router'
+					? app.settings?.openrouter_key_configured
+						? 'Key set'
+						: 'Key needed'
+					: `Gen ${poolStatus?.generation ?? app.overview?.runtime.generation ?? '—'}`}</span
 			>
 			<span class="mono-micro">{app.settings?.sample_rate ?? 0} Hz</span>
 		</div>

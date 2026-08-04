@@ -14,6 +14,7 @@
 		HotkeyMode,
 		PasteMethod,
 		SecretUpdate,
+		ServiceMode,
 		StreamingPcmFormat,
 		TranscriptionMode
 	} from '$lib/bindings';
@@ -29,12 +30,17 @@
 	let { app }: { app: DesktopAppState } = $props();
 	const initial = untrack(() => app.settings);
 	const initialOverview = untrack(() => app.overview);
-	let mode = $state(initial?.mode ?? 'remote');
+	let mode = $state<ServiceMode>(initial?.mode ?? 'remote');
 	let endpoint = $state(initial?.remote_endpoint ?? 'http://127.0.0.1:47813');
 	let token = $state('');
 	let tokenDirty = $state(false);
 	let clearToken = $state(false);
 	let showToken = $state(false);
+	let openRouterModel = $state(initial?.openrouter_model ?? 'openai/whisper-large-v3');
+	let openRouterKey = $state('');
+	let openRouterKeyDirty = $state(false);
+	let clearOpenRouterKey = $state(false);
+	let showOpenRouterKey = $state(false);
 	let microphone = $state(initial?.input_device ?? '');
 	let sampleRate = $state(String(initial?.sample_rate ?? 16000));
 	let shortcutMode = $state<HotkeyMode>(initial?.hotkey_mode ?? 'push_to_talk');
@@ -49,11 +55,22 @@
 	let pasteDelay = $state(initial?.paste_delay_ms ?? 120);
 	let closeToTray = $state(initial?.close_to_tray ?? true);
 	let connectionState = $state<'idle' | 'testing' | 'success' | 'failed'>('idle');
+	let openRouterConnectionState = $state<'idle' | 'testing' | 'success' | 'failed'>('idle');
 	let saveState = $state<'saved' | 'saving' | 'failed'>('saved');
 	let localError = $state('');
 	let settingsLocked = $derived(app.poolMutationLocked || saveState === 'saving');
 	let activeRuntime = $derived(app.overview?.runtime ?? null);
 	let poolSummary = $derived(inferencePoolSummary(app.overview?.status.inference_pool));
+	let selectedOpenRouterModel = $derived(
+		app.openRouterModels.find((model) => model.id === openRouterModel) ?? null
+	);
+
+	const selectMode = (next: ServiceMode) => {
+		mode = next;
+		if (next === 'open_router' && app.openRouterModelsState === 'idle') {
+			void app.refreshOpenRouterModels();
+		}
+	};
 
 	const testConnection = async () => {
 		connectionState = 'testing';
@@ -71,6 +88,21 @@
 		}
 	};
 
+	const testOpenRouterKey = async () => {
+		openRouterConnectionState = 'testing';
+		localError = '';
+		try {
+			await app.testOpenRouterKey(
+				openRouterKeyDirty && !clearOpenRouterKey ? openRouterKey : null,
+				!openRouterKeyDirty && !clearOpenRouterKey
+			);
+			openRouterConnectionState = 'success';
+		} catch (error) {
+			openRouterConnectionState = 'failed';
+			localError = errorMessage(error);
+		}
+	};
+
 	const save = async () => {
 		if (!app.settings) return;
 		saveState = 'saving';
@@ -80,6 +112,11 @@
 			: tokenDirty
 				? { action: 'set', value: token }
 				: { action: 'keep' };
+		const openRouterKeyUpdate: SecretUpdate = clearOpenRouterKey
+			? { action: 'clear' }
+			: openRouterKeyDirty
+				? { action: 'set', value: openRouterKey }
+				: { action: 'keep' };
 		const input: DesktopSettingsInput = {
 			mode,
 			model_path: app.settings.model_path,
@@ -88,9 +125,11 @@
 			whisper_gpu_device: app.settings.whisper_gpu_device,
 			remote_endpoint: endpoint,
 			remote_token: remoteToken,
+			openrouter_model: openRouterModel,
+			openrouter_key: openRouterKeyUpdate,
 			input_device: microphone || null,
 			sample_rate: Number(sampleRate),
-			transcription_mode: transcriptionMode,
+			transcription_mode: mode === 'open_router' ? 'batch' : transcriptionMode,
 			streaming_pcm_format: streamingPcmFormat,
 			english_only: englishOnly,
 			copy_to_clipboard: copyFinal,
@@ -108,6 +147,9 @@
 			token = '';
 			tokenDirty = false;
 			clearToken = false;
+			openRouterKey = '';
+			openRouterKeyDirty = false;
+			clearOpenRouterKey = false;
 			saveState = 'saved';
 		} catch (error) {
 			saveState = 'failed';
@@ -234,7 +276,7 @@
 					<div class="section-icon"><SlidersHorizontal size={16} /></div>
 					<div>
 						<h2 class="display-legend">Runtime</h2>
-						<p>Choose where Whisper executes and how this desktop connects.</p>
+						<p>Choose where transcription runs and how this desktop connects.</p>
 					</div>
 				</header>
 				<div class="setting-list">
@@ -244,19 +286,28 @@
 							<p>Audio is always captured on this computer.</p>
 						</div>
 						<div class="segmented-control" aria-labelledby="target-label">
-							<button
-								class:active={mode === 'local'}
-								type="button"
-								disabled={settingsLocked}
-								onclick={() => (mode = 'local')}
-								aria-pressed={mode === 'local'}>Local</button
-							>
+							{#if app.settings?.local_runtime_available}
+								<button
+									class:active={mode === 'local'}
+									type="button"
+									disabled={settingsLocked}
+									onclick={() => selectMode('local')}
+									aria-pressed={mode === 'local'}>Local</button
+								>
+							{/if}
 							<button
 								class:active={mode === 'remote'}
 								type="button"
 								disabled={settingsLocked}
-								onclick={() => (mode = 'remote')}
+								onclick={() => selectMode('remote')}
 								aria-pressed={mode === 'remote'}>Remote API</button
+							>
+							<button
+								class:active={mode === 'open_router'}
+								type="button"
+								disabled={settingsLocked}
+								onclick={() => selectMode('open_router')}
+								aria-pressed={mode === 'open_router'}>OpenRouter</button
 							>
 						</div>
 					</div>
@@ -331,6 +382,125 @@
 								/>{/if}
 						</div>
 					{/if}
+					{#if mode === 'open_router'}
+						<div class="stacked-setting">
+							<div>
+								<label for="openrouter-model">Transcription model</label>
+								<p>Use an OpenRouter model with transcription output.</p>
+							</div>
+							<div class="model-picker">
+								<select
+									id="openrouter-model"
+									bind:value={openRouterModel}
+									disabled={settingsLocked || app.openRouterModelsState === 'loading'}
+								>
+									{#if !app.openRouterModels.some((model) => model.id === openRouterModel)}
+										<option value={openRouterModel}>{openRouterModel}</option>
+									{/if}
+									{#each app.openRouterModels as model (model.id)}
+										<option value={model.id}>{model.name}</option>
+									{/each}
+								</select>
+								<Button
+									variant="outline"
+									size="sm"
+									onclick={() => app.refreshOpenRouterModels()}
+									disabled={settingsLocked || app.openRouterModelsState === 'loading'}
+								>
+									<span class:spin={app.openRouterModelsState === 'loading'}
+										><RefreshCw size={14} /></span
+									>
+									{app.openRouterModelsState === 'loading' ? 'Loading…' : 'Refresh models'}
+								</Button>
+							</div>
+							{#if selectedOpenRouterModel}
+								<p class="model-description">{selectedOpenRouterModel.description}</p>
+							{:else if app.openRouterModelsError}
+								<p class="inline-error" role="alert">{app.openRouterModelsError}</p>
+							{/if}
+						</div>
+						<div class="stacked-setting">
+							<div>
+								<label for="openrouter-key">OpenRouter API key</label>
+								<p>Stored only in the native Shadoword desktop configuration.</p>
+							</div>
+							<div class="secret-input">
+								<Input
+									id="openrouter-key"
+									bind:value={openRouterKey}
+									type={showOpenRouterKey ? 'text' : 'password'}
+									placeholder={app.settings?.openrouter_key_configured
+										? 'Stored key unchanged'
+										: 'Enter an OpenRouter API key'}
+									disabled={settingsLocked}
+									oninput={() => {
+										openRouterKeyDirty = true;
+										clearOpenRouterKey = false;
+										openRouterConnectionState = 'idle';
+										app.openRouterKeyReport = null;
+									}}
+								/>
+								<Button
+									variant="ghost"
+									size="icon-sm"
+									onclick={() => (showOpenRouterKey = !showOpenRouterKey)}
+									aria-label={showOpenRouterKey ? 'Hide OpenRouter key' : 'Show OpenRouter key'}
+									disabled={settingsLocked}
+								>
+									{#if showOpenRouterKey}<EyeOff size={14} />{:else}<Eye size={14} />{/if}
+								</Button>
+							</div>
+							{#if app.settings?.openrouter_key_configured}
+								<Button
+									variant="ghost"
+									size="sm"
+									disabled={settingsLocked}
+									onclick={() => {
+										clearOpenRouterKey = !clearOpenRouterKey;
+										openRouterKeyDirty = false;
+										openRouterKey = '';
+										openRouterConnectionState = 'idle';
+										app.openRouterKeyReport = null;
+									}}
+								>
+									{clearOpenRouterKey ? 'Keep stored key' : 'Clear stored key on save'}
+								</Button>
+							{/if}
+							<div class="connection-row">
+								<Button
+									variant="outline"
+									size="sm"
+									onclick={testOpenRouterKey}
+									disabled={settingsLocked ||
+										openRouterConnectionState === 'testing' ||
+										(!openRouterKeyDirty && !app.settings?.openrouter_key_configured) ||
+										clearOpenRouterKey}
+								>
+									<span class:spin={openRouterConnectionState === 'testing'}
+										><RefreshCw size={14} /></span
+									>
+									{openRouterConnectionState === 'testing' ? 'Testing…' : 'Test API key'}
+								</Button>
+								{#if openRouterConnectionState === 'success'}
+									<StatusPill label="Key verified" />
+								{:else if openRouterConnectionState === 'failed'}
+									<StatusPill state="offline" label="Key test failed" />
+								{/if}
+							</div>
+							{#if openRouterConnectionState === 'success' && app.openRouterKeyReport}
+								<p class="key-report">
+									{app.openRouterKeyReport.label ?? 'OpenRouter key'} ·
+									{app.openRouterKeyReport.limit_remaining == null
+										? 'No credit limit reported'
+										: `${app.openRouterKeyReport.limit_remaining.toFixed(4)} credits remaining`}
+								</p>
+							{/if}
+						</div>
+						<p class="provider-note">
+							Audio is sent to OpenRouter only after recording stops. OpenRouter mode uses batch
+							transcription.
+						</p>
+					{/if}
 				</div>
 			</section>
 
@@ -346,7 +516,7 @@
 					<div class="setting-row">
 						<div>
 							<label for="microphone">Microphone</label>
-							<p>Used for local and remote transcription.</p>
+							<p>Used for local, self-hosted, and OpenRouter transcription.</p>
 						</div>
 						<div class="inline-control">
 							<Button
@@ -388,7 +558,7 @@
 						<select
 							id="streaming-pcm-format"
 							bind:value={streamingPcmFormat}
-							disabled={settingsLocked}
+							disabled={settingsLocked || mode === 'open_router'}
 						>
 							<option value="s16le">16-bit integer · half bandwidth</option>
 							<option value="f32le">32-bit float · capture-native</option>
@@ -456,12 +626,16 @@
 					<div class="setting-row">
 						<div>
 							<label for="streaming-segments">Stream pause-separated segments</label>
-							<p>Commit pause-separated segments while recording, or transcribe once after stop.</p>
+							<p>
+								{mode === 'open_router'
+									? 'OpenRouter receives one WAV file after recording stops.'
+									: 'Commit pause-separated segments while recording, or transcribe once after stop.'}
+							</p>
 						</div>
 						<Switch
 							id="streaming-segments"
-							checked={transcriptionMode === 'streaming'}
-							disabled={settingsLocked}
+							checked={mode !== 'open_router' && transcriptionMode === 'streaming'}
+							disabled={settingsLocked || mode === 'open_router'}
 							onclick={() =>
 								(transcriptionMode = transcriptionMode === 'streaming' ? 'batch' : 'streaming')}
 							aria-label="Stream pause-separated segments"
@@ -625,6 +799,16 @@
 		font-size: 0.6875rem;
 	}
 
+	.provider-note {
+		margin: 0;
+		border-left: 2px solid var(--scarlet);
+		padding: 0.65rem 0.8rem;
+		background: var(--surface-1);
+		color: var(--ink-muted);
+		font-size: 0.6875rem;
+		line-height: 1.55;
+	}
+
 	.settings-layout {
 		display: grid;
 		grid-template-columns: 8.5rem minmax(0, 1fr);
@@ -766,10 +950,33 @@
 
 	.connection-row,
 	.inline-control,
+	.model-picker,
 	.delay-control {
 		display: flex;
 		align-items: center;
 		gap: 0.5rem;
+	}
+
+	.model-picker select {
+		min-width: 0;
+		flex: 1;
+	}
+
+	.model-description,
+	.key-report,
+	.stacked-setting > .inline-error {
+		grid-column: 2;
+		color: var(--ink-muted);
+		font-size: 0.65rem;
+		line-height: 1.5;
+	}
+
+	.model-description {
+		margin-top: -0.8rem;
+	}
+
+	.key-report {
+		margin: -0.55rem 0 0;
 	}
 
 	.delay-control :global(input) {

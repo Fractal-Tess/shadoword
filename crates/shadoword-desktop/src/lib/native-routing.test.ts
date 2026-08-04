@@ -21,4 +21,10 @@ describe('mode-specific native command routing', () => {
 			pollDownload: 'pollRemoteDownload'
 		});
 	});
+
+	test('keeps OpenRouter outside Whisper runtime management routing', () => {
+		expect(() => commandNamesForMode('open_router')).toThrow(
+			'OpenRouter does not expose Whisper runtime management commands.'
+		);
+	});
 });

@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { Check, Copy, Mic2, Radio, Square, Trash2 } from '@lucide/svelte';
+	import { Check, Cloud, Copy, Mic2, Radio, Square, Trash2 } from '@lucide/svelte';
 	import type { DesktopAppState } from '$lib/app-state.svelte';
 	import { Button } from '$lib/components/ui/button';
 	import { Textarea } from '$lib/components/ui/textarea';
@@ -24,25 +24,32 @@
 	 * column off its measured 49.64% the moment the window resizes. Layered
 	 * gradients hold the registration exactly, cost no bytes, and can drift.
 	 */
-	let { app }: { app: DesktopAppState } = $props();
+	let { app, onOpenSettings = () => {} }: { app: DesktopAppState; onOpenSettings?: () => void } =
+		$props();
 	let copied = $state(false);
 	let mode = $derived(app.settings?.mode ?? 'remote');
-	let transcriptionMode = $derived(app.settings?.transcription_mode ?? 'batch');
+	let transcriptionMode = $derived(
+		mode === 'open_router' ? 'batch' : (app.settings?.transcription_mode ?? 'batch')
+	);
 	let captureBlocked = $derived(
 		app.activity === 'booting' ||
-			app.activity === 'offline' ||
 			app.activity === 'busy' ||
 			!app.settings ||
-			!app.overview ||
+			(mode === 'open_router'
+				? !app.settings.openrouter_key_configured
+				: app.activity === 'offline' || !app.overview) ||
 			app.captureState === 'error'
 	);
 	let modelName = $derived.by(() => {
+		if (mode === 'open_router') return app.settings?.openrouter_model ?? 'Unselected';
 		const path = app.overview?.runtime.model_path;
 		return (
 			app.overview?.models.find((model) => path?.endsWith(model.filename))?.name ?? 'Unselected'
 		);
 	});
-	let endpointHost = $derived(endpointLabel(app.settings?.remote_endpoint));
+	let endpointHost = $derived(
+		mode === 'open_router' ? 'openrouter.ai' : endpointLabel(app.settings?.remote_endpoint)
+	);
 	let surfaceTitle = $derived(
 		app.recording
 			? 'Listening now'
@@ -68,6 +75,12 @@
 		}
 	};
 
+	function modeLabel(value: typeof mode) {
+		if (value === 'local') return 'Local';
+		if (value === 'open_router') return 'OpenRouter';
+		return 'Remote';
+	}
+
 	function endpointLabel(endpoint: string | undefined) {
 		if (!endpoint) return 'Not configured';
 		try {
@@ -82,7 +95,7 @@
 	<SurfaceHeader
 		kicker="Transcribe"
 		title={surfaceTitle}
-		description="Private speech to text on this machine or through your self-hosted API."
+		description="Private local speech to text, your self-hosted API, or direct OpenRouter transcription."
 	>
 		{#snippet actions()}
 			<StatusPill
@@ -90,7 +103,7 @@
 					? 'loading'
 					: captureBlocked
 						? 'offline'
-						: app.overview?.status.model_loaded
+						: mode === 'open_router' || app.overview?.status.model_loaded
 							? 'ready'
 							: 'warning'}
 				label={app.recording
@@ -99,9 +112,11 @@
 						? 'Finalizing'
 						: captureBlocked
 							? 'Action required'
-							: app.overview?.status.model_loaded
-								? 'Model ready'
-								: 'Loads on demand'}
+							: mode === 'open_router'
+								? 'Provider ready'
+								: app.overview?.status.model_loaded
+									? 'Model ready'
+									: 'Loads on demand'}
 			/>
 		{/snippet}
 	</SurfaceHeader>
@@ -128,16 +143,18 @@
 			<fieldset class="target-switch">
 				<legend class="mono-label">Transcription target</legend>
 				<div>
-					<button
-						class:active={mode === 'local'}
-						type="button"
-						disabled={app.captureLocked || app.activity === 'busy' || !app.settings}
-						onclick={() => app.setMode('local')}
-						aria-pressed={mode === 'local'}
-					>
-						<Mic2 size={16} strokeWidth={1.9} aria-hidden="true" />
-						<span class="mono-micro">This machine</span>
-					</button>
+					{#if app.settings?.local_runtime_available}
+						<button
+							class:active={mode === 'local'}
+							type="button"
+							disabled={app.captureLocked || app.activity === 'busy' || !app.settings}
+							onclick={() => app.setMode('local')}
+							aria-pressed={mode === 'local'}
+						>
+							<Mic2 size={16} strokeWidth={1.9} aria-hidden="true" />
+							<span class="mono-micro">This machine</span>
+						</button>
+					{/if}
 					<button
 						class:active={mode === 'remote'}
 						type="button"
@@ -148,14 +165,22 @@
 						<Radio size={16} strokeWidth={1.9} aria-hidden="true" />
 						<span class="mono-micro">Remote API</span>
 					</button>
+					<button
+						class:active={mode === 'open_router'}
+						type="button"
+						disabled={app.captureLocked || app.activity === 'busy' || !app.settings}
+						onclick={() => app.setMode('open_router')}
+						aria-pressed={mode === 'open_router'}
+					>
+						<Cloud size={16} strokeWidth={1.9} aria-hidden="true" />
+						<span class="mono-micro">OpenRouter</span>
+					</button>
 				</div>
 			</fieldset>
 
 			<div class="capture-core">
 				<p id="capture-title" class="mono-label">
-					{app.recording
-						? `${mode === 'local' ? 'Local' : 'Remote'} ${transcriptionMode}`
-						: 'Capture'}
+					{app.recording ? `${modeLabel(mode)} ${transcriptionMode}` : 'Capture'}
 				</p>
 				<!--
 					A square scarlet slab, not a round mic bubble. Round is the generic
@@ -221,25 +246,38 @@
 						? `Finalizing ${transcriptionMode} transcription`
 						: app.captureState === 'error'
 							? 'The last capture failed'
-							: `${mode === 'local' ? 'Local' : 'Remote'} runtime unavailable`}
+							: `${modeLabel(mode)} transcription unavailable`}
 				</strong>
 				<span class="mono-micro">
 					{app.processing
 						? transcriptionMode === 'streaming'
 							? 'Committing the final pause-separated segment and assembling the transcript.'
-							: `The captured audio is being transcribed by the ${mode} runtime.`
+							: `The captured audio is being transcribed by ${modeLabel(mode)}.`
 						: (app.error ??
 							(mode === 'remote'
 								? 'Check the endpoint and bearer token in Settings, then retry.'
-								: 'Select or download a local model, then refresh the runtime.'))}
+								: mode === 'open_router'
+									? 'Enter an OpenRouter API key in Settings, choose a transcription model, and save.'
+									: 'Select or download a local model, then refresh the runtime.'))}
 				</span>
 				{#if captureBlocked}
 					<Button
 						variant="outline"
 						size="sm"
-						onclick={() =>
-							app.captureState === 'error' ? app.clearError() : app.refreshOverview()}
-						>{app.captureState === 'error' ? 'Dismiss error' : 'Try again'}</Button
+						onclick={() => {
+							if (mode === 'open_router' && !app.settings?.openrouter_key_configured) {
+								onOpenSettings();
+							} else if (app.captureState === 'error') {
+								app.clearError();
+							} else {
+								void app.refreshOverview();
+							}
+						}}
+						>{mode === 'open_router' && !app.settings?.openrouter_key_configured
+							? 'Configure key'
+							: app.captureState === 'error'
+								? 'Dismiss error'
+								: 'Try again'}</Button
 					>
 				{/if}
 			</div>
@@ -250,7 +288,7 @@
 		<div class="stage-readout" aria-live="polite">
 			<div>
 				<span class="mono-label">Target</span>
-				<strong class="mono-caption">{mode === 'remote' ? endpointHost : 'This machine'}</strong>
+				<strong class="mono-caption">{mode === 'local' ? 'This machine' : endpointHost}</strong>
 			</div>
 			<div>
 				<span class="mono-label">Model</span>
@@ -295,7 +333,7 @@
 			class="transcript-editor"
 		/>
 		<footer class="mono-micro">
-			<span>{mode === 'local' ? 'Local' : 'Remote'} · {modelName}</span>
+			<span>{modeLabel(mode)} · {modelName}</span>
 			<span>{app.history.length} session results</span>
 			<span
 				>{app.lastResult ? `${app.lastResult.elapsed_ms} ms inference` : 'No inference yet'}</span

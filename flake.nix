@@ -176,6 +176,7 @@
           noDefaultFeatures ? false,
           minimalBuildDeps ? false,
           frontendNodeModules ? null,
+          extraEnv ? { },
         }:
         let
           packageRuntimeDeps = runtimeDeps ++ pkgs.lib.optionals cudaSupport (cudaRuntimeDeps pkgs);
@@ -206,12 +207,13 @@
           buildInputs = packageBuildDeps;
 
           env =
-            if cudaSupport then
+            (if cudaSupport then
               cudaEnv pkgs
             else if minimalBuildDeps then
               { }
             else
-              commonEnv pkgs;
+              commonEnv pkgs)
+            // extraEnv;
           preBuild = pkgs.lib.optionalString (frontendNodeModules != null) ''
             unset LIBOPUS_STATIC OPUS_STATIC
             cp -R ${frontendNodeModules} crates/shadoword-desktop/node_modules
@@ -320,6 +322,20 @@
               minimalBuildDeps = true;
               frontendNodeModules = desktopNodeModules;
             };
+
+            shadoword-desktop = mkRustPackage {
+              inherit pkgs system;
+              pname = "shadoword-desktop";
+              cargoPackage = "shadoword-desktop";
+              runtimeDeps = clientRuntimeDeps pkgs;
+              cargoFeatures = [
+                "local-runtime"
+                "custom-protocol"
+              ];
+              noDefaultFeatures = true;
+              frontendNodeModules = desktopNodeModules;
+              extraEnv.GGML_NATIVE = "OFF";
+            };
           };
           packageFor =
             packageName:
@@ -367,11 +383,17 @@
             runtimeDeps = clientRuntimeDeps pkgs;
             extraLibraryPath = "/run/opengl-driver/lib";
           };
+          shadoword-desktop = packageFor "shadoword-desktop" {
+            executable = "shadoword-desktop";
+            runtimeDeps = clientRuntimeDeps pkgs;
+            extraLibraryPath = "/run/opengl-driver/lib";
+          };
 
           shadoword-api-source = sourcePackages.shadoword-api;
           shadoword-api-cuda-source = sourcePackages.shadoword-api-cuda;
           shadoword-api-vulkan-source = sourcePackages.shadoword-api-vulkan;
           shadoword-desktop-client-source = sourcePackages.shadoword-desktop-client;
+          shadoword-desktop-source = sourcePackages.shadoword-desktop;
         }
       );
 

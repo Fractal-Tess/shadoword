@@ -8,6 +8,8 @@ import {
 	type DownloadJobStatus,
 	type InferencePoolConfig,
 	type InputDeviceInfo,
+	type OpenRouterKeyReport,
+	type OpenRouterModelInfo,
 	type OverviewDto,
 	type RecordingState,
 	type RuntimeConfigDto,
@@ -43,12 +45,15 @@ export type PoolApplyState = 'idle' | 'applying' | 'applied' | 'failed' | 'stale
 
 const demoSettings: DesktopSettings = {
 	mode: 'remote',
+	local_runtime_available: true,
 	model_path: '/var/lib/shadoword/models/ggml-turbo.bin',
 	preload_on_startup: true,
 	whisper_accelerator: 'gpu',
 	whisper_gpu_device: 0,
 	remote_endpoint: 'http://127.0.0.1:47813',
 	remote_token_configured: true,
+	openrouter_model: 'openai/whisper-large-v3',
+	openrouter_key_configured: false,
 	input_device: null,
 	sample_rate: 16000,
 	transcription_mode: 'batch',
@@ -203,6 +208,11 @@ export class DesktopAppState {
 	errorRetry = $state<'overview' | null>(null);
 	inputDevicesError = $state<string | null>(null);
 	connectionMessage = $state<string | null>(null);
+	openRouterModels = $state.raw<OpenRouterModelInfo[]>([]);
+	openRouterModelsState = $state<'idle' | 'loading' | 'ready' | 'failed'>('idle');
+	openRouterModelsError = $state<string | null>(null);
+	openRouterKeyReport = $state.raw<OpenRouterKeyReport | null>(null);
+	openRouterKeyMessage = $state<string | null>(null);
 	hotkeyError = $state<string | null>(null);
 	statusMessage = $state('Starting native desktop…');
 	captureState = $state<CaptureState>('idle');
@@ -305,6 +315,15 @@ export class DesktopAppState {
 		this.error = null;
 		this.errorRetry = null;
 		try {
+			if (mode === 'open_router') {
+				this.overview = null;
+				await this.refreshOpenRouterModels();
+				this.activity = this.settings?.openrouter_key_configured ? 'ready' : 'offline';
+				this.statusMessage = this.settings?.openrouter_key_configured
+					? 'OpenRouter transcription ready'
+					: 'OpenRouter API key required';
+				return;
+			}
 			const route = commandNamesForMode(mode);
 			this.overview = await commands[route.refreshOverview]();
 			this.activity = 'ready';
@@ -336,20 +355,57 @@ export class DesktopAppState {
 		}
 	}
 
+	async refreshOpenRouterModels() {
+		this.openRouterModelsState = 'loading';
+		this.openRouterModelsError = null;
+		try {
+			this.openRouterModels = this.demo ? [] : await commands.listOpenrouterModels();
+			this.openRouterModelsState = 'ready';
+		} catch (error) {
+			this.openRouterModelsState = 'failed';
+			this.openRouterModelsError = errorMessage(error);
+		}
+	}
+
+	async testOpenRouterKey(key: string | null, useSavedKey: boolean) {
+		this.openRouterKeyMessage = null;
+		this.openRouterKeyReport = null;
+		if (this.demo) {
+			this.openRouterKeyMessage = 'Simulated OpenRouter key verified';
+			return;
+		}
+		try {
+			const report = await commands.testOpenrouterKey({ key, use_saved_key: useSavedKey });
+			this.openRouterKeyReport = report;
+			this.openRouterKeyMessage =
+				report.limit_remaining == null
+					? 'OpenRouter key verified'
+					: `OpenRouter key verified · ${report.limit_remaining.toFixed(4)} credits remaining`;
+		} catch (error) {
+			this.openRouterKeyMessage = `OpenRouter key test failed: ${errorMessage(error)}`;
+			throw error;
+		}
+	}
+
 	async saveSettings(input: DesktopSettingsInput) {
 		if (this.captureLocked) throw new Error('Stop the active recording before saving settings.');
 		this.activity = 'busy';
 		this.error = null;
 		const previousMode = this.settings?.mode;
 		if (this.demo) {
-			const { remote_token: remoteToken, ...settings } = input;
-			this.settings = {
+			const { remote_token: remoteToken, openrouter_key: openRouterKey, ...settings } = input;
+			const savedSettings: DesktopSettings = {
 				...settings,
+				local_runtime_available: this.settings?.local_runtime_available ?? true,
 				remote_token_configured:
 					remoteToken.action === 'set' ||
-					(remoteToken.action === 'keep' && (this.settings?.remote_token_configured ?? false))
+					(remoteToken.action === 'keep' && (this.settings?.remote_token_configured ?? false)),
+				openrouter_key_configured:
+					openRouterKey.action === 'set' ||
+					(openRouterKey.action === 'keep' && (this.settings?.openrouter_key_configured ?? false))
 			};
-			this.overview = demoOverviewForSettings(this.settings, this.overview ?? demoOverview);
+			this.settings = savedSettings;
+			this.overview = demoOverviewForSettings(savedSettings, this.overview ?? demoOverview);
 			this.activity = 'ready';
 			this.statusMessage = 'Simulated settings saved';
 			return;
@@ -368,7 +424,9 @@ export class DesktopAppState {
 
 	async setMode(mode: ServiceMode) {
 		if (!this.settings || this.settings.mode === mode || this.captureLocked) return;
-		await this.saveSettings(settingsInput(this.settings, { action: 'keep' }, mode));
+		await this.saveSettings(
+			settingsInput(this.settings, { action: 'keep' }, mode, { action: 'keep' })
+		);
 	}
 
 	async refreshInputDevices() {
@@ -743,7 +801,10 @@ export class DesktopAppState {
 			this.activeSessionId = this.nextSessionId();
 			this.completedSessionId = null;
 			this.recordingMode = this.settings?.mode ?? null;
-			this.recordingTranscriptionMode = this.settings?.transcription_mode ?? null;
+			this.recordingTranscriptionMode =
+				this.settings?.mode === 'open_router'
+					? 'batch'
+					: (this.settings?.transcription_mode ?? null);
 			this.segmentResults = {};
 			this.transcript = '';
 			this.lastResult = null;
@@ -876,6 +937,8 @@ export class DesktopAppState {
 		this.downloads = {};
 		this.downloadWatching = {};
 		this.overview = null;
+		this.openRouterKeyReport = null;
+		this.openRouterKeyMessage = null;
 	}
 
 	private syncLocalSettingsFromRuntime(mode: ServiceMode, runtime: RuntimeConfigDto) {
@@ -918,7 +981,8 @@ export class DesktopAppState {
 export function settingsInput(
 	settings: DesktopSettings,
 	remoteToken: SecretUpdate,
-	mode = settings.mode
+	mode = settings.mode,
+	openRouterKey: SecretUpdate = { action: 'keep' }
 ): DesktopSettingsInput {
 	return {
 		mode,
@@ -928,6 +992,8 @@ export function settingsInput(
 		whisper_gpu_device: settings.whisper_gpu_device,
 		remote_endpoint: settings.remote_endpoint,
 		remote_token: remoteToken,
+		openrouter_model: settings.openrouter_model,
+		openrouter_key: openRouterKey,
 		input_device: settings.input_device,
 		sample_rate: settings.sample_rate,
 		transcription_mode: settings.transcription_mode,

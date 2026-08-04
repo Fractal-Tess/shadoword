@@ -1,5 +1,7 @@
 import type { ServiceMode } from '$lib/bindings';
 
+type WhisperServiceMode = Exclude<ServiceMode, 'open_router'>;
+
 export const MODE_COMMAND_NAMES = {
 	local: {
 		refreshOverview: 'refreshLocalOverview',
@@ -16,7 +18,7 @@ export const MODE_COMMAND_NAMES = {
 		pollDownload: 'pollRemoteDownload'
 	}
 } as const satisfies Record<
-	ServiceMode,
+	WhisperServiceMode,
 	{
 		refreshOverview: 'refreshLocalOverview' | 'refreshRemoteOverview';
 		updateRuntime: 'updateLocalRuntime' | 'updateRemoteRuntime';
@@ -27,5 +29,8 @@ export const MODE_COMMAND_NAMES = {
 >;
 
 export function commandNamesForMode(mode: ServiceMode) {
+	if (mode === 'open_router') {
+		throw new Error('OpenRouter does not expose Whisper runtime management commands.');
+	}
 	return MODE_COMMAND_NAMES[mode];
 }

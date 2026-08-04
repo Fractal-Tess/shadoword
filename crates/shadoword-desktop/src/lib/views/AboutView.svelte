@@ -10,7 +10,7 @@
 	<SurfaceHeader
 		kicker="About"
 		title="Private speech, in your hands."
-		description="Shadoword is a Linux-first speech-to-text workspace powered by Whisper and designed for local or self-hosted inference."
+		description="Shadoword is a Linux-first speech-to-text workspace for local, self-hosted, or direct provider transcription."
 	/>
 
 	<section class="identity-block">
@@ -19,9 +19,7 @@
 			<p>Speech capture and transcription without surrendering your audio.</p>
 		</div>
 		<div class="version-block">
-			<span>Tauri remote client</span><strong>0.1.0</strong><Badge variant="outline"
-				>Tauri design phase</Badge
-			>
+			<span>Linux desktop</span><strong>0.10.3</strong><Badge variant="outline">Production</Badge>
 		</div>
 	</section>
 

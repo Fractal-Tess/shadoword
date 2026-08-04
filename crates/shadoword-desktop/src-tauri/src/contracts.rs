@@ -9,12 +9,15 @@ use specta::Type;
 #[derive(Debug, Clone, Serialize, Type)]
 pub struct DesktopSettings {
     pub mode: ServiceMode,
+    pub local_runtime_available: bool,
     pub model_path: String,
     pub preload_on_startup: bool,
     pub whisper_accelerator: WhisperAccelerator,
     pub whisper_gpu_device: i32,
     pub remote_endpoint: String,
     pub remote_token_configured: bool,
+    pub openrouter_model: String,
+    pub openrouter_key_configured: bool,
     pub input_device: Option<String>,
     pub sample_rate: u32,
     pub transcription_mode: TranscriptionMode,
@@ -38,6 +41,8 @@ pub struct DesktopSettingsInput {
     pub whisper_gpu_device: i32,
     pub remote_endpoint: String,
     pub remote_token: SecretUpdate,
+    pub openrouter_model: String,
+    pub openrouter_key: SecretUpdate,
     pub input_device: Option<String>,
     pub sample_rate: u32,
     pub transcription_mode: TranscriptionMode,
@@ -84,6 +89,28 @@ pub struct ConnectionReport {
     pub status_model_loaded: bool,
     pub overview: OverviewDto,
     pub runtime_config: RuntimeConfigDto,
+}
+
+#[derive(Debug, Clone, Deserialize, Type)]
+pub struct OpenRouterConnectionInput {
+    pub key: Option<String>,
+    pub use_saved_key: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Type)]
+pub struct OpenRouterKeyReport {
+    pub label: Option<String>,
+    pub is_free_tier: bool,
+    pub limit: Option<f64>,
+    pub limit_remaining: Option<f64>,
+    pub usage: f64,
+}
+
+#[derive(Debug, Clone, Serialize, Type)]
+pub struct OpenRouterModelInfo {
+    pub id: String,
+    pub name: String,
+    pub description: String,
 }
 
 #[derive(Debug, Clone, Serialize, Type)]
