@@ -1,0 +1,5 @@
+[build]
+
+[env]
+# Keep compatibility for crates that still invoke older vendored CMake projects.
+CMAKE_POLICY_VERSION_MINIMUM = "3.5"

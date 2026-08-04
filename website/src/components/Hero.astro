@@ -1,0 +1,515 @@
+---
+import { repoUrl, subLegend, pushToTalk } from '../data/site'
+
+/**
+ * The first viewport's argument, made as an image before a word is read: a whole
+ * spectrum burning across every frequency, and one column in it that carries no
+ * signal at all. That silent column is your machine.
+ *
+ * The headline is authored as three lines rather than wrapped, because the
+ * display face is synthetically compressed and compression must never interact
+ * with line breaking — a reflow would change the ink width of every line at
+ * once. Each line is its own `.hl-line` block.
+ */
+const headline = ['Speech to text', 'that never leaves', 'your machine']
+---
+
+<section class="hero relative isolate overflow-hidden" aria-labelledby="hero-headline">
+  {
+    /*
+      1536x617 at 2.489:1, cropped from the generated plate to exactly the
+      band's aspect so `cover` has almost nothing to trim on a desktop viewport.
+      That matters because the scarlet lance below is drawn in CSS and must
+      register to the void column inside this raster: a plate composed at the
+      wrong aspect drifts the column out from under the lance.
+
+      The image is an abstract spectrogram, not a photograph of anything, and
+      the argument is carried by one feature of it — a single perfectly black
+      column at the centre of a field that is otherwise blazing. Measured off the
+      delivered plate: the void spans x 738-787 of 1536 (centre 49.64%) and is
+      contiguously black from the top edge down to row 299 of 617 (48.5%), where
+      the spectrum reclaims it. The whole page says audio never leaves the
+      machine; this is that sentence as a picture — everywhere signal, and one
+      channel that never lights up. If the plate is regenerated, those three
+      numbers have to be re-measured with it.
+
+      eager + high priority and no lazy attribute: this is the LCP element, and
+      an above-the-fold hero that fades in late is a slower page pretending to
+      be a considered one.
+    */
+  }
+  <img
+    src="/images/hero-spectrum.webp"
+    width="1536"
+    height="617"
+    alt="An abstract spectrogram: hundreds of fine vertical frequency bins burning in magenta and cyan on black, densest at the right and dissolving to darkness at the left, over a solid rail of low-frequency light along the bottom. One column at the centre is perfectly black, carrying no signal at all."
+    class="absolute inset-0 -z-20 h-full w-full object-cover"
+    fetchpriority="high"
+  />
+
+  {
+    /*
+      Scrim, and only below lg. The plate earns its type zone by construction:
+      the spectrum dissolves leftward, so the block the headline occupies at lg
+      (x 2.86–55%) measures 0.4% median luminance and 19.2% at p95 — the type
+      sits on the plate unassisted, no scrim required. Below lg the plate is
+      cover-cropped hard toward its dense, bright right side, which is exactly
+      the region the desktop composition keeps the type out of, so there the
+      type needs a graded ground. A flat neutral ramp, not a glow behind the
+      words: this world has no bloom under any text.
+    */
+  }
+  <div
+    class="from-night/95 via-night/70 absolute inset-0 -z-10 bg-gradient-to-t to-transparent lg:hidden"
+    aria-hidden="true"
+  >
+  </div>
+
+  {
+    /*
+      The lance. Not baked into the raster, because it animates, and because a
+      mark painted into the plate cannot be turned off for reduced motion.
+
+      It runs down the inside of the void column: `left: 49.64%` is that column's
+      measured centre and `height: 48.5%` is exactly its contiguous black run, so
+      the lance stops on the row where the spectrum closes over it. Scarlet is
+      the interface accent and this is the only place it touches the imagery,
+      which is the point — the page's one accent colour marking the page's one
+      silent channel, and stopping precisely where the silence does.
+
+      A 2px scarlet line is invisible over a lit spectrogram and unmissable
+      inside a black column, so the composition does the work that a scrim would
+      otherwise have to.
+    */
+  }
+  <div
+    class="lance pointer-events-none absolute top-0 -z-10 hidden w-0.5 sm:block"
+    style="left: 49.64%; height: 48.5%;"
+    aria-hidden="true"
+  >
+  </div>
+
+  {
+    /*
+      Three flaring bins and the drift, and that is the whole motion budget for
+      the first viewport. The previous world's answer to "make it feel alive" was a
+      waveform and a signal meter animating numbers the product had never
+      measured, which is the thing this rebuild exists to remove. So the motion
+      here does nothing but light: it makes no claim, reports no value, and
+      carries no data.
+
+      Each lamp is a soft radial gradient in `screen` blend mode, placed over a
+      bin cluster measured in the plate — 69.8%/8%, 85.5%/30% and 55%/26%, at
+      29.4%, 32.1% and 19.1% mean luminance. Screen over bins that are already
+      burning reads as those bins surging; a rectangle or a hard-edged div over
+      the plate would read as a div over a plate. Gradients also have no edge to
+      misregister, which is why they can be placed approximately where the lance
+      cannot. Their colours follow the plate's own two pigments: magenta at
+      69.8% and 55%, cyan at 85.5%.
+
+      All of it is decorative and all of it is behind the type.
+    */
+  }
+  <div class="pointer-events-none absolute inset-0 -z-10 hidden lg:block" aria-hidden="true">
+    <span class="lamp lamp-a"></span>
+    <span class="lamp lamp-b"></span>
+    <span class="lamp lamp-c"></span>
+  </div>
+
+  <div class="drift pointer-events-none absolute inset-0 -z-10 overflow-hidden" aria-hidden="true">
+    <span class="drift-near"></span>
+    <span class="drift-far"></span>
+  </div>
+
+  <div class="hero-content">
+    <div class="max-w-[92%] lg:max-w-none">
+      <h1 id="hero-headline" class="display-hero text-ink">
+        {headline.map((line) => <span class="hl-line">{line}</span>)}
+      </h1>
+
+      {
+        /*
+          The comp sets this legend on one line, and one line of it is 638px —
+          which runs 158px past the edge of the plate's dark zone and puts the
+          words "and the silicon" over the road's specular reflections, measured
+          at 2.17% of pixels above 40% luminance against 0% under the rest of the
+          line. So the measure is 40ch, chosen so the wrap lands exactly on the
+          sentence boundary rather than mid-clause: two claims, two lines. The
+          comp loses this one to the plate it was drawn against.
+        */
+      }
+      <p class="mono-legend text-ink mt-7 max-w-[40ch] tracking-[0.02em] uppercase">
+        {subLegend}
+      </p>
+
+      {
+        /*
+          The comp sets the caption beside the button. It cannot go there: its
+          right edge is a fixed ~547px from the content's left edge, and the
+          narrower the viewport the further right that pixel maps into the
+          raster — at 1280 it reaches raster x 681 at 97% of the band height,
+          which is the brightest wet asphalt in the frame, and the words stop
+          being readable. Stacked, it starts at the content's left edge and
+          never leaves the unlit left wall at any width.
+
+          Stacking also lets it precede the button, which is the better order
+          anyway: the caveat is what a reader needs before the click, not after
+          it. This is the second thing the plate has taken off the comp, after
+          the sub-legend's measure.
+        */
+      }
+      <div class="mt-7 flex flex-col items-start gap-y-6">
+        <p class="mono-caption text-ink-soft uppercase">Build from source — no packages yet.</p>
+        <a class="cta-solid" href={repoUrl} rel="noopener">Read the source</a>
+      </div>
+    </div>
+  </div>
+
+  {
+    /*
+      The one rounded object in the world, and the only element here that claims
+      to be a physical thing rather than printed matter: radius, an inner bevel,
+      an outer shadow and eight domed rivets, none of which any other element on
+      this page is permitted. It carries the real default shortcut, so it stays
+      live text.
+    */
+  }
+  <div class="hero-plate rivet-plate text-center">
+    <p class="mono-micro text-ink-soft mt-6 uppercase">{pushToTalk.above}</p>
+    <p class="display-plate text-scarlet-lamp mt-1">{pushToTalk.key}</p>
+    <p class="mono-micro text-ink-soft mt-1 uppercase">{pushToTalk.below}</p>
+    {
+      /*
+        The note is not decoration and not an afterthought: without it the plate
+        asserts F2 as though the product had one shortcut, when F2 is a default
+        the user can rebind and the hold is a mode they can switch to a toggle.
+        `site.ts` already recorded that the page says "default" — this line is
+        the page keeping that promise. Hairline above it because it is a footnote
+        to the key, not a fourth peer label.
+      */
+    }
+    <p class="mono-caption text-ink-soft border-rule mx-4 mt-3 mb-7 border-t pt-2.5 normal-case">
+      {pushToTalk.note}
+    </p>
+    <div class="chevron-strip absolute inset-x-0 top-0 h-1.5 rounded-t-[9px]" aria-hidden="true">
+    </div>
+  </div>
+</section>
+
+<style>
+  /*
+     Comp geometry, held as a ratio rather than a pixel height. The plate is
+     2.489:1, so at a desktop viewport the band's own aspect is the right height
+     and `cover` trims nothing; the vh cap keeps a wide monitor from pushing the
+     mode strip below the fold, and the floor keeps a short laptop from
+     flattening the spectrum into a letterbox slot — the plate's whole argument
+     is vertical bins, and a band too short to give them height destroys it.
+
+     `min-height`, not `height`, and a flex column anchored to the bottom. Below
+     lg the type and the plate are in the flow, and at 390px they are 40px taller
+     than the 26rem floor — with a fixed height and `justify-content: flex-end`
+     that surplus is pushed off the *top* of an `overflow-hidden` band, which
+     decapitates the headline. A floor lets the band grow instead.
+  */
+  .hero {
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+    min-height: clamp(26rem, min(100vw / 2.489, 66svh), 46rem);
+  }
+
+  /* Below lg the composition changes rather than shrinking: the type stacks at
+     the foot of the frame over the scrim, and the spectrum with its one silent
+     column reads above it. The top padding is what guarantees the spectrum keeps
+     a band of its own even when the content grows past the floor. */
+  .hero-content {
+    position: relative;
+    padding: 4rem 1.25rem 1.75rem;
+  }
+
+  @media (min-width: 640px) {
+    .hero-content {
+      padding: 4rem 2rem 1.75rem;
+    }
+  }
+
+  /*
+     At lg the block leaves the flow and is placed on the plate: left edge
+     at 2.86% of the viewport, stopping 24% short of the right so it never runs
+     under the plate.
+
+     Vertically centred rather than pinned to the comp's 15.6%. That pin is a
+     1536px measurement, and the block does not scale with the band: the
+     headline is sized in vw, but the legend, the caveat and the button are in
+     rem, so the block runs 83% of the band's height at 1536 and 85% at 1440. A
+     15.6% top there puts its foot 4px through the bottom edge of an
+     `overflow-hidden` section, and 23px through at 1280. The pin survives only
+     above about 1500px, which is too narrow a window to hold a breakpoint.
+     Centring is stable at every width and costs 43px of upward shift at 1536.
+  */
+  @media (min-width: 1024px) {
+    /* A higher floor once the block is on the plate. The aspect term only
+       overtakes 30rem at about 1195px wide, and below that the band would be
+       417px tall holding a 410px block — the type would run edge to edge with
+       nothing of the spectrum left above or below it. */
+    .hero {
+      min-height: clamp(30rem, min(100vw / 2.489, 66svh), 46rem);
+    }
+
+    .hero-content {
+      position: absolute;
+      top: 50%;
+      translate: 0 -50%;
+      left: 2.86%;
+      right: 24%;
+      padding: 0;
+    }
+  }
+
+  /* Below lg the plate is in the flow under the CTA. It cannot be absolute
+     there: the flowed content already fills the band at those widths, so a
+     bottom-right plate lands on the caption and a top-right one lands on the
+     headline. Flowed, it is also finally present at 390px, where the previous
+     `hidden sm:block` dropped the product's one concrete affordance from the
+     phone entirely. */
+  .hero-plate {
+    position: relative;
+    width: 15.5rem;
+    max-width: calc(100% - 2.5rem);
+    margin: 0 1.25rem 2.5rem;
+  }
+
+  @media (min-width: 640px) {
+    .hero-plate {
+      margin: 0 2rem 2.5rem;
+    }
+  }
+
+  /* The hazard strip occupies the plate's top edge, so the upper rivet row has
+     to sit below it rather than under it. Only this instance of the plate has a
+     strip, so the offset is local rather than baked into the component. */
+  .hero-plate::before {
+    top: 0.875rem;
+  }
+
+  @media (min-width: 1024px) {
+    .hero-plate {
+      position: absolute;
+      right: 1.9%;
+      bottom: 2.3%;
+      width: 16.5%;
+      min-width: 13.25rem;
+      max-width: none;
+      margin: 0;
+    }
+  }
+
+  /* Nothing at the top, full pigment at the foot, where the void column ends
+     and the spectrum takes over. The pulse is 6s and moves opacity only — a
+     lance that lengthened or swept would be a screensaver, and one that swept
+     would also be pretending to scan something. */
+  .lance {
+    background-image: linear-gradient(
+      to bottom,
+      transparent 0%,
+      color-mix(in srgb, var(--color-scarlet) 45%, transparent) 35%,
+      var(--color-scarlet) 88%,
+      var(--color-scarlet-lamp) 100%
+    );
+    animation: lance-breathe 6s ease-in-out infinite;
+  }
+
+  @keyframes lance-breathe {
+    0%,
+    100% {
+      opacity: 0.55;
+    }
+    50% {
+      opacity: 1;
+    }
+  }
+
+  /* ---- Flaring bins ----------------------------------------------------- */
+  /* Three soft glows sitting on three of the plate's brightest clusters, so what
+     flickers is energy the raster already has rather than a light source the
+     image never contained. Positions are measured off the delivered plate: each
+     region below carries a mean luminance of 47-82 out of 255, which is bright
+     enough that a screen-blended glow reads as a bin flaring and not as a stain
+     on empty black. All three sit right of the void column and none touches it —
+     the one thing on this plate that must never appear to emit anything. */
+  .lamp {
+    position: absolute;
+    mix-blend-mode: screen;
+    border-radius: 50%;
+  }
+
+  .lamp-a {
+    left: 69.8%;
+    top: 8%;
+    width: 13%;
+    height: 20%;
+    background-image: radial-gradient(ellipse at center, var(--sign-magenta) 0%, transparent 70%);
+    /* Energy in a real spectrum does not swell and fade on a sine. It holds,
+       stumbles, double-blinks and holds again, so the keyframes are deliberately
+       uneven and the three share no period — 7s, 5.4s and 11s never line up into
+       a visible pulse. */
+    animation: flicker-a 7s steps(1, end) infinite;
+  }
+
+  .lamp-b {
+    left: 85.5%;
+    top: 30%;
+    width: 12%;
+    height: 20%;
+    background-image: radial-gradient(ellipse at center, var(--sign-cyan) 0%, transparent 70%);
+    animation: flicker-b 5.4s steps(1, end) infinite;
+  }
+
+  .lamp-c {
+    left: 55%;
+    top: 26%;
+    width: 12%;
+    height: 20%;
+    background-image: radial-gradient(ellipse at center, var(--sign-magenta) 0%, transparent 70%);
+    animation: flicker-c 11s steps(1, end) infinite;
+  }
+
+  @keyframes flicker-a {
+    0%,
+    44%,
+    47%,
+    100% {
+      opacity: 0.18;
+    }
+    45% {
+      opacity: 0.5;
+    }
+    46% {
+      opacity: 0.06;
+    }
+    72%,
+    74% {
+      opacity: 0.44;
+    }
+    73% {
+      opacity: 0.1;
+    }
+  }
+
+  @keyframes flicker-b {
+    0%,
+    100% {
+      opacity: 0.22;
+    }
+    26% {
+      opacity: 0.4;
+    }
+    27%,
+    29% {
+      opacity: 0.08;
+    }
+    28% {
+      opacity: 0.36;
+    }
+  }
+
+  @keyframes flicker-c {
+    0%,
+    62%,
+    100% {
+      opacity: 0.14;
+    }
+    63% {
+      opacity: 0.05;
+    }
+    64% {
+      opacity: 0.32;
+    }
+    65% {
+      opacity: 0.12;
+    }
+  }
+
+  /* ---- Drift ------------------------------------------------------------ */
+  /* The previous world's atmosphere here was falling rain, which belonged to a
+     wet street and belongs to nothing in a spectrogram — nothing in this plate
+     falls. What a spectrogram does instead is advance: the field slides as time
+     passes. So the two streak layers survive as two layers of vertical striation
+     travelling sideways, which is the same restraint doing the same job in the
+     new world's own idiom.
+
+     Two scales at two speeds, so the near layer moves visibly faster than the
+     far one and the frame gains depth rather than a single moving texture. Each
+     layer is 200% *wide* and travels exactly 50% of its own width, so the loop
+     has no seam.
+
+     90deg exactly, not the rain's 100deg. The angle in
+     `repeating-linear-gradient` orients the gradient *axis* and the bands run
+     perpendicular to it, so 90deg gives bands precisely plumb. The rain leaned
+     10deg off vertical because falling water does; frequency bins do not lean,
+     and a raked striation over an upright spectrum reads as a printing error. */
+  .drift-near,
+  .drift-far {
+    position: absolute;
+    inset: 0 -50%;
+    width: 200%;
+    background-repeat: repeat;
+  }
+
+  .drift-near {
+    background-image: repeating-linear-gradient(
+      90deg,
+      transparent 0 9px,
+      rgb(255 255 255 / 0.055) 9px 10px,
+      transparent 10px 22px
+    );
+    animation: drift-scan 0.75s linear infinite;
+  }
+
+  .drift-far {
+    background-image: repeating-linear-gradient(
+      90deg,
+      transparent 0 15px,
+      rgb(255 255 255 / 0.03) 15px 16px,
+      transparent 16px 40px
+    );
+    animation: drift-scan 1.9s linear infinite;
+  }
+
+  /* Leftward, because a spectrogram's newest column arrives at the right edge
+     and the history slides away from it. */
+  @keyframes drift-scan {
+    from {
+      transform: translate3d(25%, 0, 0);
+    }
+    to {
+      transform: translate3d(-25%, 0, 0);
+    }
+  }
+
+  /*
+     Reduced motion needs a rendering, not a freeze. The global rule neutralises
+     every duration, which would leave the drift as a static hatch of vertical
+     lines ruled across the spectrum and the lamps stuck at whatever opacity
+     their first keyframe happens to hold — both worse than the plate on its own.
+     So the drift is removed outright, the lamps are pinned to a plausible steady
+     glow, and the lance simply stops breathing at full strength, since it is a
+     composition element and not an effect.
+  */
+  @media (prefers-reduced-motion: reduce) {
+    .drift {
+      display: none;
+    }
+
+    .lance {
+      opacity: 1;
+    }
+
+    .lamp-a,
+    .lamp-b,
+    .lamp-c {
+      animation: none;
+      opacity: 0.2;
+    }
+  }
+</style>

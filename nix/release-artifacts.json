@@ -1,0 +1,23 @@
+{
+  "version": "0.10.0",
+  "systems": {
+    "x86_64-linux": {
+      "shadoword-api": {
+        "url": "https://github.com/Fractal-Tess/shadoword/releases/download/v0.10.0/shadoword-api-cpu-x86_64-linux.tar.gz",
+        "hash": "sha256-+UF1hyOLzecdbWDd8eTfs6gVYjUmatsHg4uR8XndydU="
+      },
+      "shadoword-api-cuda": {
+        "url": "https://github.com/Fractal-Tess/shadoword/releases/download/v0.10.0/shadoword-api-cuda-x86_64-linux.tar.gz",
+        "hash": "sha256-1v66kAMcjGSyyUuooTk3sBvSIF9w4Kn2eJvKe0h9lrQ="
+      },
+      "shadoword-api-vulkan": {
+        "url": "https://github.com/Fractal-Tess/shadoword/releases/download/v0.10.0/shadoword-api-vulkan-x86_64-linux.tar.gz",
+        "hash": "sha256-oeKDwRUxJJ3FVqvCICX0Wxo85M+ate7n2MqirLdqusU="
+      },
+      "shadoword-desktop-client": {
+        "url": "https://github.com/Fractal-Tess/shadoword/releases/download/v0.10.0/shadoword-desktop-client-x86_64-linux.tar.gz",
+        "hash": "sha256-y/vDyx+1jeueTcG6KVpYq+418bbq6H0lbc8YFqoJ3Us="
+      }
+    }
+  }
+}

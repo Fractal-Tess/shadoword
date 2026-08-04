@@ -1,0 +1,132 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing version tag to publish
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+  cancel-in-progress: false
+
+env:
+  RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+
+jobs:
+  linux-x86_64:
+    name: Build Linux x86_64 binaries
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout release tag
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.RELEASE_TAG }}
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@v31
+
+      - name: Verify release metadata
+        shell: bash
+        run: |
+          set -euo pipefail
+          version=$(nix eval --impure --raw --expr '(builtins.fromTOML (builtins.readFile ./Cargo.toml)).workspace.package.version')
+          test "$RELEASE_TAG" = "v$version"
+          grep -Fq "## [$version]" CHANGELOG.md
+
+      - name: Extract release notes
+        shell: bash
+        run: |
+          set -euo pipefail
+          version=${RELEASE_TAG#v}
+          awk -v version="$version" '
+            $0 ~ "^## \\[" version "\\]( |$)" { found = 1; next }
+            found && /^## \[/ { exit }
+            found { print }
+          ' CHANGELOG.md > release-notes.md
+          test -s release-notes.md
+
+      - name: Build release binaries
+        shell: bash
+        run: |
+          set -euo pipefail
+          api_cpu=$(nix build .#shadoword-api-source --no-link --print-out-paths -L)
+          api_cuda=$(nix build .#shadoword-api-cuda-source --no-link --print-out-paths -L)
+          api_vulkan=$(nix build .#shadoword-api-vulkan-source --no-link --print-out-paths -L)
+          desktop=$(nix build .#shadoword-desktop-client-source --no-link --print-out-paths -L)
+
+          mkdir -p dist/stage/api-cpu/bin dist/stage/api-cuda/bin dist/stage/api-vulkan/bin dist/stage/desktop-client/bin
+          install -m755 "$api_cpu/bin/.shadoword-api-wrapped" dist/stage/api-cpu/bin/shadoword-api
+          install -m755 "$api_cuda/bin/.shadoword-api-wrapped" dist/stage/api-cuda/bin/shadoword-api
+          install -m755 "$api_vulkan/bin/.shadoword-api-wrapped" dist/stage/api-vulkan/bin/shadoword-api
+          install -m755 "$desktop/bin/.shadoword-desktop-wrapped" dist/stage/desktop-client/bin/shadoword-desktop
+
+          cp README.md CHANGELOG.md dist/stage/api-cpu/
+          cp README.md CHANGELOG.md dist/stage/api-cuda/
+          cp README.md CHANGELOG.md dist/stage/api-vulkan/
+          cp README.md CHANGELOG.md dist/stage/desktop-client/
+
+          tar -C dist/stage/api-cpu -czf dist/shadoword-api-cpu-x86_64-linux.tar.gz .
+          tar -C dist/stage/api-cuda -czf dist/shadoword-api-cuda-x86_64-linux.tar.gz .
+          tar -C dist/stage/api-vulkan -czf dist/shadoword-api-vulkan-x86_64-linux.tar.gz .
+          tar -C dist/stage/desktop-client -czf dist/shadoword-desktop-client-x86_64-linux.tar.gz .
+          (cd dist && sha256sum ./*.tar.gz > SHA256SUMS)
+
+          version=${RELEASE_TAG#v}
+          release_base="https://github.com/Fractal-Tess/shadoword/releases/download/$RELEASE_TAG"
+          sri_hash() {
+            nix hash convert --hash-algo sha256 --to sri "$(sha256sum "$1" | cut -d' ' -f1)"
+          }
+          jq -n \
+            --arg version "$version" \
+            --arg release_base "$release_base" \
+            --arg api_hash "$(sri_hash dist/shadoword-api-cpu-x86_64-linux.tar.gz)" \
+            --arg cuda_hash "$(sri_hash dist/shadoword-api-cuda-x86_64-linux.tar.gz)" \
+            --arg vulkan_hash "$(sri_hash dist/shadoword-api-vulkan-x86_64-linux.tar.gz)" \
+            --arg desktop_hash "$(sri_hash dist/shadoword-desktop-client-x86_64-linux.tar.gz)" \
+            '{
+              version: $version,
+              systems: {
+                "x86_64-linux": {
+                  "shadoword-api": {
+                    url: ($release_base + "/shadoword-api-cpu-x86_64-linux.tar.gz"),
+                    hash: $api_hash
+                  },
+                  "shadoword-api-cuda": {
+                    url: ($release_base + "/shadoword-api-cuda-x86_64-linux.tar.gz"),
+                    hash: $cuda_hash
+                  },
+                  "shadoword-api-vulkan": {
+                    url: ($release_base + "/shadoword-api-vulkan-x86_64-linux.tar.gz"),
+                    hash: $vulkan_hash
+                  },
+                  "shadoword-desktop-client": {
+                    url: ($release_base + "/shadoword-desktop-client-x86_64-linux.tar.gz"),
+                    hash: $desktop_hash
+                  }
+                }
+              }
+            }' > dist/nix-release-artifacts.json
+
+      - name: Publish GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ env.RELEASE_TAG }}
+          name: Shadoword ${{ env.RELEASE_TAG }}
+          body_path: release-notes.md
+          fail_on_unmatched_files: true
+          files: |
+            dist/shadoword-api-cpu-x86_64-linux.tar.gz
+            dist/shadoword-api-cuda-x86_64-linux.tar.gz
+            dist/shadoword-api-vulkan-x86_64-linux.tar.gz
+            dist/shadoword-desktop-client-x86_64-linux.tar.gz
+            dist/SHA256SUMS
+            dist/nix-release-artifacts.json

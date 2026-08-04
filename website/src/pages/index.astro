@@ -1,0 +1,32 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro'
+import TopBar from '../components/TopBar.astro'
+import Hero from '../components/Hero.astro'
+import ModeStrip from '../components/ModeStrip.astro'
+import SignalPath from '../components/SignalPath.astro'
+import Choices from '../components/Choices.astro'
+import Daemon from '../components/Daemon.astro'
+import Operation from '../components/Operation.astro'
+import TypePlate from '../components/TypePlate.astro'
+
+/**
+ * The page reads as one argument in six moves: the image makes the claim, the
+ * mode strip shows the three places audio can go, the signal path says what
+ * happens to it, the catalog proves the choice is real, the daemon shows its own
+ * surface, and the commands hand it over. Every band is bounded by a scarlet
+ * hairline, which is the only structural device the page uses.
+ */
+---
+
+<BaseLayout>
+  <TopBar />
+  <main>
+    <Hero />
+    <ModeStrip />
+    <SignalPath />
+    <Choices />
+    <Daemon />
+    <Operation />
+  </main>
+  <TypePlate />
+</BaseLayout>

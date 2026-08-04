@@ -1,0 +1,60 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro'
+import TopBar from '../components/TopBar.astro'
+
+/**
+ * The only route on this site other than the index, and it exists because the
+ * nginx config serves it: `error_page 404 /404.html`. Without this page a bad URL
+ * returns the base image's white "404 Not Found", which is the one screen in the
+ * whole deployment that would not belong to this world.
+ *
+ * Built from the page's existing parts and nothing new — TopBar, the outlined
+ * numeral, a section heading, the mono legend and the one CTA. A 404 is not the
+ * place to introduce a device the site does not otherwise have.
+ */
+---
+
+<BaseLayout
+  title="Not found — Shadoword"
+  description="No page at this address. Shadoword turns speech into text entirely on your own machine."
+>
+  <TopBar />
+  <main class="band-bottom flex items-center" aria-labelledby="notfound-headline">
+    <div class="mx-auto w-full max-w-[1536px] px-5 py-24 sm:px-8 sm:py-32">
+      <!-- The signature device at the scale this page can afford: nothing else
+           competes for the viewport, so the numeral carries it. It rides the
+           `display-hero` step rather than a size of its own — the ramp already
+           has a value for "largest thing in the viewport" and this is that. -->
+      <p class="display-hero notfound-numeral" aria-hidden="true">404</p>
+      <h1 id="notfound-headline" class="display-section text-ink mt-5">Nothing on this path.</h1>
+      <p class="mono-legend text-ink-soft mt-6 max-w-[44ch]">
+        The page you asked for was never built. Everything this site has is on one page.
+      </p>
+      <a class="cta-solid mt-10" href="/">Back to Shadoword</a>
+    </div>
+  </main>
+</BaseLayout>
+
+<style>
+  /* The outline treatment from `numeral-outline`, lifted onto the display-hero
+     step. Only the stroke and the transparent fill are ours: no font-size here,
+     because the size belongs to the ramp. The stroke is 2px rather than the
+     device's 1px — on a glyph this large a hairline reads as an accident rather
+     than as a drawn numeral. */
+  .notfound-numeral {
+    color: transparent;
+    -webkit-text-stroke: 2px var(--color-rule-strong);
+  }
+
+  /* Fills the viewport below the bar so the closing scarlet hairline lands at the
+     foot of the screen. Nothing follows this band, so a content-sized one would
+     leave the rule floating mid-screen over empty ground.
+
+     The subtrahend is 3rem *plus 1px*: TopBar is `h-12` and carries its own
+     scarlet hairline, so its outer height is 49px, not 48. Subtracting only the
+     3rem overshoots by exactly that pixel — enough to push this band's own rule
+     out of the viewport and give the page a 1px scroll. */
+  main {
+    min-height: calc(100svh - 3rem - 1px);
+  }
+</style>

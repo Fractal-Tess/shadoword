@@ -1,0 +1,41 @@
+[package]
+name = "shadoword-core"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+
+[features]
+default = ["local-whisper"]
+desktop-audio = ["dep:cpal", "dep:log", "dep:tokio"]
+local-whisper = [
+  "dep:reqwest",
+  "dep:rubato",
+  "dep:sha2",
+  "dep:shadoword-model-whisper",
+]
+whisper-vulkan = ["local-whisper", "shadoword-model-whisper/whisper-vulkan"]
+whisper-cuda = ["local-whisper", "shadoword-model-whisper/whisper-cuda"]
+
+[dependencies]
+anyhow.workspace = true
+cpal = { workspace = true, optional = true }
+directories.workspace = true
+hound.workspace = true
+log = { workspace = true, optional = true }
+reqwest = { workspace = true, optional = true }
+rubato = { workspace = true, optional = true }
+serde.workspace = true
+serde_json.workspace = true
+specta.workspace = true
+shadoword-shared = { path = "../shadoword-shared" }
+shadoword-model-whisper = { path = "../shadoword-model-whisper", optional = true }
+sha2 = { workspace = true, optional = true }
+tracing.workspace = true
+tokio = { workspace = true, optional = true }
+
+[dev-dependencies]
+ort = { version = "2.0.0-rc.12", features = ["preload-dylibs"] }
+tracing-subscriber.workspace = true

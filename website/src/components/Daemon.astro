@@ -1,0 +1,218 @@
+---
+import { endpoints, streamProtocol } from '../data/site'
+
+/**
+ * Remote is a real mode, so this band is the daemon's actual surface: every
+ * route it exposes and every frame its socket speaks, verbatim. This is the
+ * specificity that cannot be copy-pasted by a competitor and cannot be faked by
+ * this page — which is exactly why it is here instead of a diagram of arrows.
+ *
+ * Mutating routes are set in scarlet lamp rather than the off-white. That is the
+ * accent doing work: the reader scanning for what the daemon will let a caller
+ * change finds it without reading a legend.
+ */
+---
+
+<section class="daemon-band band-top bg-night" aria-labelledby="daemon-heading">
+  {
+    /*
+      The world re-enters the page here, and this is the only band below the fold
+      where it does. Above the mode strip the page is a lit spectrum; below it, it was
+      six consecutive flat matte bands, which is how a distinctive world becomes
+      an ordinary spec sheet by the second scroll.
+
+      It re-enters *here* because this is the band about sending audio somewhere
+      else, and the bottom of the hero plate is the one part of it that reads as
+      transmission: `object-position: 50% 100%` shows the raster's last rows, the
+      solid rail of low-frequency light that runs the full width — a signal on a
+      wire rather than a field of it. And it is the same file the hero already
+      loaded, so a second image costs zero additional bytes.
+
+      The image stops well before the route tables, and that restraint is the
+      point: the world's own rule is that neon lives in the imagery and every
+      data-bearing region is flat matte with crisp type. So the rail gets the
+      band's head and the tables get flat night. The heading's cap sits in the
+      last quarter of the fade, which is the one overlap allowed — the claim
+      coming up out of the signal, and nothing to read on top of a hot bin.
+    */
+  }
+  <div class="daemon-rail" aria-hidden="true">
+    <img
+      src="/images/hero-spectrum.webp"
+      width="1536"
+      height="617"
+      alt=""
+      loading="lazy"
+      decoding="async"
+    />
+  </div>
+  <div class="relative mx-auto max-w-[1536px] px-5 pt-[8.5rem] pb-14 sm:px-8 lg:pb-16">
+    <div class="lg:flex lg:items-end lg:justify-between lg:gap-10">
+      <div>
+        <h2 id="daemon-heading" class="display-section text-ink">The daemon is yours to host</h2>
+      </div>
+      {
+        /* Secondary ink, like every other lead-in: `lg:items-end` bottom-aligns
+          this against a heading whose own top is already past the fade, so this
+          paragraph can only ever sit on flat night, where the token is 5.01:1. */
+      }
+      <p class="mono-legend text-ink-soft mt-5 max-w-[52ch] lg:mt-0">
+        Authenticated, and pointed wherever you point it. Nothing below is illustrative — it is the
+        router and the socket as shipped.
+      </p>
+    </div>
+
+    {
+      /*
+        Both plates run the full width and stack, rather than sitting side by
+        side. Eleven routes against six frames is a 190px height difference, and
+        in a two-column grid that is either a ragged bottom edge or — worse — a
+        stretched plate with a large hollow in it. Stacking lets the eleven
+        routes run in two internal columns, which is also how a route table is
+        actually read: down, then down again.
+      */
+    }
+    <div class="mt-10 space-y-6">
+      <div class="plate">
+        <h3 class="display-label text-ink border-rule border-b px-5 py-3.5">HTTP surface</h3>
+        <ul class="endpoints grid grid-cols-1 md:grid-flow-col md:grid-rows-6">
+          {
+            endpoints.map((e, i) => (
+              <li
+                class:list={[
+                  'flex flex-wrap items-baseline gap-x-4 gap-y-1 px-5 py-2.5',
+                  i > 0 && 'border-rule border-t',
+                  i === 6 && 'md:border-t-0',
+                ]}
+              >
+                <span
+                  class:list={[
+                    'mono-micro w-11 shrink-0 font-medium',
+                    e.method === 'GET' ? 'text-ink-soft' : 'text-scarlet-lamp',
+                  ]}
+                >
+                  {e.method}
+                </span>
+                <code class="mono-legend text-ink">{e.path}</code>
+                {e.note && <span class="mono-caption text-ink-soft ml-auto">{e.note}</span>}
+              </li>
+            ))
+          }
+        </ul>
+      </div>
+
+      <div class="plate">
+        <h3 class="display-label text-ink border-rule border-b px-5 py-3.5">Streaming, in order</h3>
+        <ol>
+          {
+            streamProtocol.map((f, i) => (
+              <li
+                class:list={[
+                  'flex flex-wrap items-baseline gap-x-4 gap-y-1 px-5 py-2.5',
+                  i > 0 && 'border-rule border-t',
+                ]}
+              >
+                <span
+                  class:list={[
+                    'mono-micro w-11 shrink-0 font-medium',
+                    f.dir === 'tx' ? 'text-ink-soft' : 'text-scarlet-lamp',
+                  ]}
+                >
+                  {f.dir === 'tx' ? 'send' : 'recv'}
+                </span>
+                <code class="mono-caption text-ink break-all">{f.frame}</code>
+                {f.note && <span class="mono-caption text-ink-soft ml-auto">{f.note}</span>}
+              </li>
+            ))
+          }
+        </ol>
+        <p class="mono-caption text-ink-soft border-rule border-t px-5 py-3">
+          Opus in, credit granted at Started and returned at Accepted, one partial per committed
+          segment, one Done at the end.
+        </p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<style>
+  .daemon-band {
+    position: relative;
+    overflow: hidden;
+  }
+
+  /* The strip is pinned to the band's top edge, under the scarlet hairline, and
+     it is 10rem tall regardless of viewport: this is a reprise, not a second
+     hero, and a reprise that grows with the window competes with the one it is
+     recalling. */
+  .daemon-rail {
+    position: absolute;
+    inset: 0 0 auto;
+    height: 10rem;
+    pointer-events: none;
+  }
+
+  .daemon-rail img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    /* Bottom-pinned, so what shows is the raster's last rows — the low-frequency
+       rail — and never the void column, which belongs to the hero alone. The
+       column is the page's whole argument in one mark; setting it twice would
+       spend it, and it would also be making the offline claim on the one band
+       that is about sending audio to another machine. */
+    object-position: 50% 100%;
+    /* The image does not end at an edge; it drowns in the page. The mask
+       holds the image at full strength through the top 45% and is gone by the
+       foot, and the content's 8.5rem top padding lands the heading where the mask
+       is already down to roughly a quarter — dark enough for off-white type,
+       bright enough that the type reads as emerging from the signal. */
+    /* Written in the same `rgb(0 0 0 / a)` form as the scrims below, because in
+       a mask only the alpha channel is read — these stops are opacity, not a
+       colour the palette needs an opinion about. */
+    mask-image: linear-gradient(
+      to bottom,
+      rgb(0 0 0 / 1) 0%,
+      rgb(0 0 0 / 1) 45%,
+      rgb(0 0 0 / 0) 100%
+    );
+  }
+
+  /* One flat scrim under the mask, because a mask alone leaves the brightest
+     reflections at full luminance. This is the same move the hero makes over its
+     own asphalt.
+
+     All three stops are the *page ground* at rising strength, so all three are
+     derived from `--color-night` rather than the two upper ones repeating its
+     hex with an alpha on it. A literal `rgb(7 9 13 / …)` here reads identically
+     today and silently stops matching the band it dissolves into the moment the
+     ground token moves. */
+  .daemon-rail::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background-image: linear-gradient(
+      to bottom,
+      color-mix(in srgb, var(--color-night) 35%, transparent) 0%,
+      color-mix(in srgb, var(--color-night) 70%, transparent) 60%,
+      var(--color-night) 100%
+    );
+  }
+
+  /* The column divider is drawn on the list rather than on the items in the
+     right-hand column, because the right column holds five routes against the
+     left's six — a per-item border would stop one row short and leave the rule
+     hanging in mid-plate. Painted on the container it runs the full height, the
+     way a printed panel's rule does. */
+  @media (min-width: 768px) {
+    .endpoints {
+      background-image: linear-gradient(
+        to right,
+        transparent calc(50% - 0.5px),
+        var(--color-rule) calc(50% - 0.5px),
+        var(--color-rule) calc(50% + 0.5px),
+        transparent calc(50% + 0.5px)
+      );
+    }
+  }
+</style>

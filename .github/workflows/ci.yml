@@ -1,0 +1,73 @@
+name: CI
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  rust-nix:
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@v31
+
+      - name: Enable Nix cache
+        uses: DeterminateSystems/magic-nix-cache-action@v13
+
+      - name: Validate workspace metadata
+        run: nix develop --command cargo metadata --locked --no-deps
+
+      - name: Check formatting
+        run: nix develop --command cargo fmt --all -- --check
+
+      - name: Lint CPU workspace
+        run: nix develop --command cargo clippy --workspace --all-targets -- -D warnings
+
+      - name: Test CPU workspace
+        run: nix develop --command cargo test --workspace
+
+      - name: Lint Vulkan workspace
+        run: nix develop --command cargo clippy --workspace --all-targets --features whisper-vulkan -- -D warnings
+
+      - name: Test Vulkan workspace
+        run: nix develop --command cargo test --workspace --features whisper-vulkan
+
+      - name: Check desktop frontend
+        run: |
+          nix develop --command bash -c '
+            set -euo pipefail
+            cd crates/shadoword-desktop
+            bun install --frozen-lockfile
+            bun run generate:bindings
+            git diff --exit-code -- src/lib/bindings.ts
+            bun run check
+            bun run lint
+            bun run test
+            bun run build
+          '
+
+      - name: Evaluate flake outputs
+        run: |
+          nix flake show
+          nix eval .#packages.x86_64-linux.shadoword-api.drvPath
+          nix eval .#packages.x86_64-linux.shadoword-api-cuda.drvPath
+          nix eval .#packages.x86_64-linux.shadoword-desktop-client.drvPath
+          nix eval .#packages.x86_64-linux.shadoword-api-source.drvPath
+          nix eval .#packages.x86_64-linux.shadoword-desktop-client-source.drvPath
+
+      - name: Build API package from source
+        run: nix build .#shadoword-api-source -L --show-trace
+
+      - name: Build remote desktop package from source
+        run: nix build .#shadoword-desktop-client-source -L --show-trace

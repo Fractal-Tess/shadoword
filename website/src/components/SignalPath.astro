@@ -1,0 +1,145 @@
+---
+import { signalPath } from '../data/site'
+
+/**
+ * The second fold, and the page's signature device: a large outlined display
+ * numeral beside a solid display label on a shared baseline, four across, with
+ * inset 1px dividers between them.
+ *
+ * The comp captioned step 03 "YOU APPROVE", which is false — a commit is a
+ * protocol event, not a confirmation dialog. The heading takes the true claim
+ * from the product's own wording instead, and it is the strongest sentence on
+ * the page, so it gets display size.
+ */
+---
+
+<section class="band-top bg-night" aria-labelledby="signal-path-heading">
+  <div
+    class="mx-auto grid max-w-[1536px] grid-cols-1 gap-y-12 px-5 py-14 sm:px-8 lg:py-16 xl:grid-cols-[27rem_1fr] xl:gap-x-14"
+  >
+    <div>
+      {
+        /*
+          The one scarlet kicker on the page, and it is here because it is the
+          only one doing work no heading can: it names the four numbered steps
+          beside it, which otherwise arrive unlabelled. Every other band had one
+          too, and six of them turned a comp device into a page template —
+          scarlet on every band is scarlet meaning nothing on any of them. The
+          rest were folded away because each merely restated the heading under
+          it.
+        */
+      }
+      <p class="mono-section">Signal path</p>
+      <h2 id="signal-path-heading" class="display-section text-ink mt-4">
+        <span class="block">Nothing is</span>
+        <span class="block">transcribed speculatively.</span>
+      </h2>
+    </div>
+
+    {
+      /*
+        Four columns at xl, two at sm, one below. Not four at lg: the heading
+        takes a 27rem column there, which leaves each of the four steps 118px —
+        narrow enough that "A commit is what triggers inference" sets three
+        words to a line. So the two-column split and the four-across steps arrive
+        together at xl, and at lg the heading sits above four steps' worth of
+        full band width instead.
+
+        The dividers are inset from the band rather than spanning it, which is
+        what keeps this reading as a printed panel and not a spreadsheet — so
+        they live on the columns, and the outer edges carry none.
+      */
+    }
+    <ol class="divide-inset grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4">
+      {
+        signalPath.map((step, i) => (
+          <li class:list={['step', i > 0 && 'sm:pl-7']}>
+            <div class="flex items-baseline gap-3">
+              <span class="numeral-outline" aria-hidden="true">
+                {step.n}
+              </span>
+              <h3 class="display-column text-ink">{step.label}</h3>
+              {/* One scarlet tick, on 03 and nowhere else, because Commit is the
+                  step the whole band exists to name: it is the only one of the
+                  four that is a decision rather than a consequence, and the
+                  heading beside it ("Nothing is transcribed speculatively") is
+                  true *because* of this step. The accent marks the fulcrum of
+                  the argument, which is the only work it is allowed to do. */}
+              {step.n === '03' && <span class="commit-tick" aria-hidden="true" />}
+            </div>
+            <p class="mono-caption text-ink-soft mt-4 max-w-[30ch]">{step.body}</p>
+          </li>
+        ))
+      }
+    </ol>
+  </div>
+</section>
+
+<style>
+  /* The dividers come from `.divide-inset`, which only draws between siblings —
+     but a one- or two-column stack has different siblings than a four-column
+     row, so the leading padding is what has to move, not the rule. */
+  .step {
+    padding-bottom: 2rem;
+  }
+
+  .step:last-child {
+    padding-bottom: 0;
+  }
+
+  /* A 5px square of pigment, not a dot: this world's painted marks are square,
+     and the mode strip's detent box is the same shape at the same weight. Riding
+     the label's baseline rather than centred on it, so it reads as a printed
+     stamp beside the word and not as a bullet belonging to it. */
+  .commit-tick {
+    width: 5px;
+    height: 5px;
+    flex: none;
+    background-color: var(--color-scarlet);
+    translate: 0 -0.15em;
+  }
+
+  /* Stacked, `.divide-inset`'s left rule would hang down the side of steps 02,
+     03 and 04 and indent them past 01 — four steps of a sequence, three of them
+     inset, which reads as nesting rather than as a series. The rule turns to run
+     across the top, where it separates the steps in the direction they are
+     actually read. */
+  @media (max-width: 639px) {
+    .step + .step {
+      border-left: 0;
+      border-top: 1px solid var(--color-rule);
+      padding-top: 2rem;
+    }
+  }
+
+  @media (min-width: 640px) {
+    .step,
+    .step:last-child {
+      padding-bottom: 0;
+    }
+
+    /* At two columns the third and fourth cells start a new row, so the third
+       cell is a row start and must lose the rule `.divide-inset` gave it. */
+    .step:nth-child(3) {
+      border-left: 0;
+      padding-left: 0;
+      padding-top: 2.5rem;
+    }
+
+    .step:nth-child(4) {
+      padding-top: 2.5rem;
+    }
+  }
+
+  @media (min-width: 1280px) {
+    .step:nth-child(3) {
+      border-left: 1px solid var(--color-rule);
+      padding-left: 1.75rem;
+      padding-top: 0;
+    }
+
+    .step:nth-child(4) {
+      padding-top: 0;
+    }
+  }
+</style>

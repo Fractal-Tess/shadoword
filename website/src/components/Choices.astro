@@ -1,0 +1,113 @@
+---
+import { modelCatalog, accelerators } from '../data/site'
+
+/**
+ * The hero's sub-legend claims "you choose the model and the silicon". This band
+ * is that claim's receipt: the real catalog entries with their real sizes, and
+ * the real build features with the real flag names. Two flat matte plates, no
+ * glow, crisp type — the rule that lets a spec table live in a neon world.
+ */
+---
+
+<section class="band-top bg-night" aria-labelledby="choices-heading">
+  <div class="mx-auto max-w-[1536px] px-5 py-14 sm:px-8 lg:py-16">
+    <h2 id="choices-heading" class="display-section text-ink">
+      You choose the model and the silicon
+    </h2>
+
+    <div class="mt-10 grid grid-cols-1 gap-6 lg:grid-cols-[1.35fr_1fr] lg:gap-8">
+      <div class="plate">
+        <h3 class="display-label text-ink border-rule border-b px-5 py-3.5">Model catalog</h3>
+        <table class="w-full border-collapse text-left">
+          <caption class="sr-only">
+            Whisper models the desktop client ships in its catalog, with download sizes
+          </caption>
+          <thead>
+            <tr class="mono-micro text-ink-soft uppercase">
+              <th class="border-rule border-b px-5 py-2.5 font-normal" scope="col">Model</th>
+              <th class="border-rule border-b px-5 py-2.5 font-normal" scope="col">Download flag</th
+              >
+              <th class="border-rule border-b px-5 py-2.5 text-right font-normal" scope="col"
+                >Size</th
+              >
+            </tr>
+          </thead>
+          <tbody>
+            {
+              modelCatalog.map((m, i) => (
+                <tr class:list={[i > 0 && 'border-rule border-t']}>
+                  <th class="mono-legend text-ink px-5 py-3 font-medium" scope="row">
+                    {m.name}
+                    {/* The recommended flag is the catalog's own, not an
+                        editorial pick: `recommended: true` sits on exactly one
+                        spec in model_download.rs. */}
+                    {m.recommended && (
+                      <span class="mono-micro text-scarlet-lamp ml-2">Default</span>
+                    )}
+                    <span class="mono-caption text-ink-soft mt-1 block normal-case">{m.note}</span>
+                  </th>
+                  {/* The id is the value `--download-model` takes, and the
+                      instruction band below prints that exact command — so the
+                      table is the argument list for it rather than a spec sheet
+                      the reader has to translate. */}
+                  {/* `whitespace-nowrap` on the value, not the cell's prose:
+                      at 390px the column is narrow enough to break `large-v3`
+                      after the hyphen, and a download argument that wraps
+                      mid-token is one a reader can copy wrongly. */}
+                  <td class="mono-legend text-ink px-5 py-3 align-top">
+                    <code class="whitespace-nowrap">{m.id}</code>
+                  </td>
+                  {/* Sizes are the one column read against each other rather
+                      than left to right, so they are the only cell set in
+                      tabular figures and aligned right. One base throughout:
+                      GiB is 2^30 and MiB is 2^20, both straight off
+                      `size_bytes`. */}
+                  <td class="mono-legend text-ink px-5 py-3 text-right align-top tabular-nums whitespace-nowrap">
+                    {m.size}
+                  </td>
+                </tr>
+              ))
+            }
+          </tbody>
+        </table>
+      </div>
+
+      {
+        /* `self-start`, so this plate ends after CUDA instead of stretching to
+          match a six-row table beside it. A stretched plate would keep the two
+          bottom edges aligned at the price of ~150px of empty bordered box, and
+          an empty box reads as a table that failed to load. */
+      }
+      <div class="plate lg:self-start">
+        <h3 class="display-label text-ink border-rule border-b px-5 py-3.5">Accelerator</h3>
+        <table class="w-full border-collapse text-left">
+          <caption class="sr-only">
+            Build-time accelerator backends and the cargo feature each one needs
+          </caption>
+          <thead>
+            <tr class="mono-micro text-ink-soft uppercase">
+              <th class="border-rule border-b px-5 py-2.5 font-normal" scope="col">Backend</th>
+              <th class="border-rule border-b px-5 py-2.5 font-normal" scope="col">Cargo feature</th
+              >
+            </tr>
+          </thead>
+          <tbody>
+            {
+              accelerators.map((a, i) => (
+                <tr class:list={[i > 0 && 'border-rule border-t']}>
+                  <th class="mono-legend text-ink px-5 py-3 font-medium" scope="row">
+                    {a.label}
+                  </th>
+                  <td class="mono-legend text-ink-soft px-5 py-3">
+                    <code class="text-ink">{a.feature}</code>
+                    <span class="mono-caption mt-1 block">{a.note}</span>
+                  </td>
+                </tr>
+              ))
+            }
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</section>

@@ -1,0 +1,393 @@
+{
+ "schemaVersion": 2,
+ "generatedAt": "2026-08-04T00:00:00.000Z",
+ "title": "Design System: Shadoword Website",
+ "extensions": {
+  "colorMeta": {
+   "night": {
+    "role": "neutral",
+    "displayName": "Rain Black",
+    "canonical": "#07090d",
+    "tonalRamp": ["#1b2232", "#2d3953", "#3e5074", "#566e9f", "#8194bb", "#acb9d2", "#d1d8e6", "#eef1f6"]
+   },
+   "night-plate": {
+    "role": "neutral",
+    "displayName": "Plate Night",
+    "canonical": "#0d1420",
+    "tonalRamp": ["#162236", "#25395b", "#344f7f", "#476dae", "#7593c7", "#a4b8da", "#ccd7ea", "#edf1f8"]
+   },
+   "scarlet": {
+    "role": "primary",
+    "displayName": "Signal Scarlet (pigment)",
+    "canonical": "#e6202c",
+    "tonalRamp": ["#45080b", "#730d13", "#a1121b", "#dc1925", "#eb515a", "#f28c93", "#f8bfc2", "#fce8e9"]
+   },
+   "scarlet-lamp": {
+    "role": "primary",
+    "displayName": "Scarlet Lamp (ink)",
+    "canonical": "#f04e55",
+    "tonalRamp": ["#470609", "#760a0f", "#a50e14", "#e2131c", "#f04c53", "#f5898e", "#f9bdc0", "#fde7e8"]
+   },
+   "scarlet-deep": {
+    "role": "primary",
+    "displayName": "Scarlet Deep (pressed fill)",
+    "canonical": "#b80e17",
+    "tonalRamp": ["#470509", "#76090f", "#a60d15", "#e3111c", "#f14b54", "#f6898e", "#fabdc0", "#fde7e8"]
+   },
+   "ink": {
+    "role": "neutral",
+    "displayName": "Ink",
+    "canonical": "#e8e6e1",
+    "tonalRamp": ["#2b2821", "#484337", "#655e4d", "#8b816a", "#aba491", "#c8c3b7", "#e0ddd7", "#f4f3f1"]
+   },
+   "ink-soft": {
+    "role": "neutral",
+    "displayName": "Ink Soft",
+    "canonical": "#7a8089",
+    "tonalRamp": ["#242629", "#3c3f44", "#54585f", "#737982", "#989da4", "#bbbec3", "#d9dbdd", "#f1f2f3"]
+   },
+   "on-scarlet": {
+    "role": "neutral",
+    "displayName": "On Scarlet (the only ink legal on a scarlet fill)",
+    "canonical": "#ffffff",
+    "tonalRamp": ["#272525", "#423e3e", "#5c5757", "#7e7777", "#a19b9b", "#c1bdbd", "#dcdada", "#f3f2f2"]
+   },
+   "rule": {
+    "role": "neutral",
+    "displayName": "Rule (decorative hairline)",
+    "canonical": "#252a33",
+    "tonalRamp": ["#20252c", "#363d4a", "#4b5567", "#67758e", "#8f9aae", "#b5bcc9", "#d6dae1", "#f0f2f4"]
+   },
+   "rule-strong": {
+    "role": "neutral",
+    "displayName": "Rule Strong (boundary-carrying line)",
+    "canonical": "#5a6371",
+    "tonalRamp": ["#22252b", "#393e47", "#4f5763", "#6d7788", "#939ca9", "#b8bec6", "#d7dadf", "#f1f2f4"]
+   },
+   "sign-magenta": {
+    "role": "secondary",
+    "displayName": "Sign Magenta (imagery only)",
+    "canonical": "#ff2f7f",
+    "tonalRamp": ["#4d001d", "#800031", "#b30045", "#f5005e", "#ff3d88", "#ff80b1", "#ffb8d3", "#ffe5ef"]
+   },
+   "sign-cyan": {
+    "role": "secondary",
+    "displayName": "Sign Cyan (imagery only)",
+    "canonical": "#26d4ec",
+    "tonalRamp": ["#063f46", "#0a6875", "#0e92a4", "#14c8e1", "#4ddcef", "#8ae8f5", "#bdf2f9", "#e8fafd"]
+   }
+  },
+  "typographyMeta": {
+   "display-hero": {
+    "displayName": "Display / Hero",
+    "purpose": "The page's one h1. Cap height is 10.5% of viewport height in the comp; size = cap / --cap-em (0.75). Compressed with --squeeze-display (0.703). Lines are authored, never wrapped."
+   },
+   "display-section": {
+    "displayName": "Headline / Section",
+    "purpose": "Every band's h2. Compressed with --squeeze-heading (0.78)."
+   },
+   "display-column": {
+    "displayName": "Title / Column",
+    "purpose": "The four signal-path step labels. Compressed with --squeeze-label (0.88)."
+   },
+   "display-label": {
+    "displayName": "Label",
+    "purpose": "The workhorse UI label: plate headings, mode labels, the heading of a notice inside a plate. Display, not mono."
+   },
+   "display-plate": {
+    "displayName": "Plate Glyph",
+    "purpose": "The F2 glyph on the shortcut plate. Same cap as a section heading but fixed rather than fluid, and uncompressed: a two-character legend has no width problem to solve."
+   },
+   "display-wordmark": {
+    "displayName": "Wordmark",
+    "purpose": "The lockup only, tracked out at 0.34em. Never compressed; tracking-out and compression are opposite operations and cannot share a word."
+   },
+   "numeral-outline": {
+    "displayName": "Outlined Numeral",
+    "purpose": "The signature device: a stroke-only display numeral in the boundary grey beside a solid label on a shared baseline. aria-hidden."
+   },
+   "mono-legend": {
+    "displayName": "Body / Legend",
+    "purpose": "Sub-legend, table values, route paths, band lead-ins. Measures capped in ch at a sentence boundary."
+   },
+   "mono-caption": {
+    "displayName": "Caption",
+    "purpose": "Detent copy, step bodies, notes, commands inside pre, footnotes."
+   },
+   "mono-micro": {
+    "displayName": "Micro",
+    "purpose": "Top-bar legends, table column heads, HTTP methods and frame directions, plate over/under labels. Uppercase at 0.04em."
+   }
+  },
+  "shadows": [
+   {
+    "name": "plate-lift",
+    "value": "0 18px 40px -12px rgb(0 0 0 / 0.9), inset 0 1px 0 rgb(255 255 255 / 0.07)",
+    "purpose": "The page's only shadow. Soft diffuse drop plus a 1px top-edge bevel, on .rivet-plate alone. Nothing printed gets it."
+   },
+   {
+    "name": "rivet-head",
+    "value": "radial-gradient(3.6px 3.6px at calc(50% - 0.7px) calc(50% - 0.9px), rgb(255 255 255 / 0.85) 0%, var(--color-rule-strong) 40%, rgb(0 0 0 / 0.55) 82%, transparent 100%)",
+    "purpose": "A domed fastener. Soft stops, not hard: at ~5px diameter a hard-stopped radial gradient aliases into a flat grey square. Offsets in px, not %, because the tile is a fraction of an unknown plate width."
+   },
+   {
+    "name": "rivet-seat",
+    "value": "radial-gradient(4.4px 4.4px at calc(50% + 0.5px) calc(50% + 1.1px), rgb(0 0 0 / 0.7) 0%, transparent 100%)",
+    "purpose": "The shadow the fastener casts into the plate, down-right of the head. One light source, up-left, for the whole object."
+   },
+   {
+    "name": "focus-ring-spacer",
+    "value": "0 0 0 2px var(--color-night)",
+    "purpose": "Floods the 2px outline-offset gap with page black so the off-white ring always has a dark edge beneath it — over a plate, over a scarlet slab, or over a hot bin in the imagery."
+   }
+  ],
+  "motion": [
+   {
+    "name": "press",
+    "value": "140ms linear",
+    "purpose": "CTA background and transform. Linear, because a button on a printed panel is a press, not an ease."
+   },
+   {
+    "name": "control",
+    "value": "120ms linear",
+    "purpose": "Mode strip detent box, label and marker state changes."
+   },
+   {
+    "name": "mark-hover",
+    "value": "150ms",
+    "purpose": "The wordmark's mark shifting from scarlet pigment to scarlet lamp."
+   },
+   {
+    "name": "lance-breathe",
+    "value": "6s ease-in-out infinite (opacity 0.55 to 1)",
+    "purpose": "The scarlet lance inside the void column, registered to left: 49.64% and height: 48.5%. Opacity only; a lance that lengthened or swept would be a screensaver, and one that swept would also be pretending to scan something."
+   },
+   {
+    "name": "sign-flicker",
+    "value": "steps(1, end) at 7s / 5.4s / 11s",
+    "purpose": "Three screen-blend flaring bins at 69.8%/8%, 85.5%/30% and 55%/26%, each over a local mean luminance of 47-82 out of 255. Deliberately uneven keyframes — hold, stumble, fast double blink, hold — on three periods that never align into a visible pulse. All three sit right of the void column and none touches it."
+   },
+   {
+    "name": "drift-scan",
+    "value": "0.75s and 1.9s linear infinite (translate3d 25% to -25%)",
+    "purpose": "Two lateral drift layers of vertical striation — 90deg repeating-linear-gradients at 9px/10px/22px in rgb(255 255 255 / 0.055) and 15px/16px/40px in rgb(255 255 255 / 0.03). Lateral rather than falling, because a spectrogram advances in time and nothing in this plate falls. Each layer is 200% wide and travels exactly 50% of its own width, so the loop has no seam."
+   },
+   {
+    "name": "reduced-motion",
+    "value": "drift removed; flaring bins pinned to opacity 0.2; lance held at full strength",
+    "purpose": "Reduced motion is a rendering, not a freeze. Neutralising durations alone would leave a static hatch of vertical lines ruled across the spectrum and the bins stuck on their first keyframe."
+   }
+  ],
+  "breakpoints": [
+   { "name": "sm", "value": "640px" },
+   { "name": "md", "value": "768px" },
+   { "name": "lg", "value": "1024px" },
+   { "name": "xl", "value": "1280px" },
+   { "name": "container", "value": "1536px" }
+  ]
+ },
+ "components": [
+  {
+   "name": "Primary CTA",
+   "kind": "button",
+   "refersTo": "cta-solid",
+   "description": "A solid scarlet square slab with a white mono label. The page's only job is to send a developer to the source, so this is the loudest thing on the page that is not the imagery.",
+   "html": "<a class=\"ds-cta-solid\" href=\"#\">Read the source</a>",
+   "css": ".ds-cta-solid { display: inline-flex; align-items: center; gap: 0.75rem; padding: 1rem 1.75rem; background-color: var(--color-scarlet, #e6202c); color: var(--color-on-scarlet, #fff); font-family: 'Azeret Mono Variable', ui-monospace, monospace; font-size: 0.875rem; font-weight: 500; letter-spacing: 0.08em; text-transform: uppercase; text-decoration: none; border-radius: 0; transition: background-color 140ms linear, transform 140ms linear; } .ds-cta-solid:hover { background-color: var(--color-scarlet-deep, #b80e17); } .ds-cta-solid:active { transform: translateY(1px); } .ds-cta-solid:focus-visible { outline: 2px solid var(--color-ink, #e8e6e1); outline-offset: 2px; box-shadow: 0 0 0 2px var(--color-night, #07090d); }"
+  },
+  {
+   "name": "Secondary CTA",
+   "kind": "button",
+   "refersTo": "cta-outline",
+   "description": "A 1px scarlet outline on transparent with a scarlet-lamp label, in the top bar. The outline may be pigment; the label may not.",
+   "html": "<a class=\"ds-cta-outline\" href=\"#\">Read the source</a>",
+   "css": ".ds-cta-outline { display: inline-flex; align-items: center; gap: 0.5rem; padding: 0.5rem 0.9375rem; border: 1px solid var(--color-scarlet, #e6202c); color: var(--color-scarlet-lamp, #f04e55); font-family: 'Azeret Mono Variable', ui-monospace, monospace; font-size: 0.71875rem; letter-spacing: 0.1em; text-transform: uppercase; text-decoration: none; border-radius: 0; transition: background-color 140ms linear, color 140ms linear; } .ds-cta-outline:hover { background-color: var(--color-scarlet, #e6202c); color: var(--color-on-scarlet, #fff); } .ds-cta-outline:focus-visible { outline: 2px solid var(--color-ink, #e8e6e1); outline-offset: 2px; box-shadow: 0 0 0 2px var(--color-night, #07090d); }"
+  },
+  {
+   "name": "Data Plate",
+   "kind": "card",
+   "refersTo": "plate",
+   "description": "The system's only container. Flat, matte, square, 1px grey edge, no shadow and no hover lift — this is the rule that lets a spec table exist in a neon world. A display label heading on a hairline, then mono rows.",
+   "html": "<div class=\"ds-plate\"><h3 class=\"ds-plate-head\">Accelerator</h3><div class=\"ds-plate-row\"><span>CPU</span><code>default</code></div><div class=\"ds-plate-row\"><span>Vulkan</span><code>whisper-vulkan</code></div></div>",
+   "css": ".ds-plate { background-color: var(--color-night-plate, #0d1420); border: 1px solid var(--color-rule, #252a33); border-radius: 0; color: var(--color-ink, #e8e6e1); } .ds-plate-head { margin: 0; padding: 0.875rem 1.25rem; border-bottom: 1px solid var(--color-rule, #252a33); font-family: 'League Gothic', 'Oswald', sans-serif; font-weight: 400; font-size: 1.375rem; line-height: 1; letter-spacing: 0.01em; text-transform: uppercase; transform: scaleX(0.88); transform-origin: left center; } .ds-plate-row { display: flex; justify-content: space-between; gap: 2rem; padding: 0.75rem 1.25rem; font-family: 'Azeret Mono Variable', ui-monospace, monospace; font-size: 0.875rem; line-height: 1.55; } .ds-plate-row + .ds-plate-row { border-top: 1px solid var(--color-rule, #252a33); } .ds-plate-row code { color: var(--color-ink, #e8e6e1); }"
+  },
+  {
+   "name": "Mode Cell (radio detent)",
+   "kind": "input",
+   "refersTo": "mode-box",
+   "description": "The page's one real control, as a native radio group. A square detent box fills with scarlet pigment when selected and the label brightens to primary ink; the label itself never turns scarlet. The selected marker is the page's only 2px rule.",
+   "html": "<label class=\"ds-mode-cell\"><input class=\"ds-mode-input\" type=\"radio\" name=\"ds-mode\" checked /><span class=\"ds-mode-head\"><span class=\"ds-mode-box\"></span><span class=\"ds-mode-label\">Local</span></span><span class=\"ds-mode-detent\">Whisper runs on this machine. Audio reaches the model over a function call, never a socket.</span><span class=\"ds-mode-rule\"></span></label>",
+   "css": ".ds-mode-cell { position: relative; display: flex; flex-direction: column; align-items: flex-start; justify-content: center; gap: 0.5rem; padding: 1.5rem 1.5rem 1.75rem; cursor: pointer; background-color: var(--color-night, #07090d); } .ds-mode-input { position: absolute; width: 1px; height: 1px; opacity: 0; } .ds-mode-head { display: flex; align-items: center; gap: 0.75rem; } .ds-mode-box { width: 0.875rem; height: 0.875rem; flex: none; border: 1px solid var(--color-rule-strong, #5a6371); transition: background-color 120ms linear, border-color 120ms linear; } .ds-mode-label { font-family: 'League Gothic', 'Oswald', sans-serif; font-size: 1.375rem; line-height: 1; letter-spacing: 0.01em; text-transform: uppercase; color: var(--color-ink-soft, #7a8089); transform: scaleX(0.88); transform-origin: left center; transition: color 120ms linear; } .ds-mode-detent { max-width: 34ch; font-family: 'Azeret Mono Variable', ui-monospace, monospace; font-size: 0.75rem; line-height: 1.5; color: var(--color-ink-soft, #7a8089); } .ds-mode-rule { position: absolute; left: 1.5rem; bottom: -1px; width: 45%; height: 2px; background-color: transparent; transition: background-color 120ms linear; } .ds-mode-input:checked ~ .ds-mode-head .ds-mode-box { background-color: var(--color-scarlet, #e6202c); border-color: var(--color-scarlet, #e6202c); } .ds-mode-input:checked ~ .ds-mode-head .ds-mode-label { color: var(--color-ink, #e8e6e1); } .ds-mode-input:checked ~ .ds-mode-rule { background-color: var(--color-scarlet, #e6202c); } .ds-mode-cell:hover .ds-mode-box { border-color: var(--color-ink, #e8e6e1); } .ds-mode-input:focus-visible ~ .ds-mode-head { outline: 2px solid var(--color-ink, #e8e6e1); outline-offset: 4px; }"
+  },
+  {
+   "name": "Top Bar",
+   "kind": "nav",
+   "refersTo": null,
+   "description": "A 3rem bar bounded below by the scarlet hairline that bounds every band. Not sticky: the page's one action is duplicated at full size directly beneath it. The mark is the product's real waveform-S, in scarlet pigment, brightening to lamp on hover. The SVG below is a schematic stand-in for the panel; the shipped mark is the traced two-path form in src/components/Wordmark.astro and is the only mark the site may use.",
+   "html": "<header class=\"ds-topbar\"><a class=\"ds-wordmark\" href=\"#\"><svg viewBox=\"0 0 640 414\" width=\"28\" height=\"18\" aria-hidden=\"true\"><g fill=\"currentColor\"><rect x=\"30\" y=\"150\" width=\"36\" height=\"114\"/><rect x=\"110\" y=\"80\" width=\"36\" height=\"254\"/><rect x=\"190\" y=\"20\" width=\"36\" height=\"374\"/><rect x=\"270\" y=\"110\" width=\"36\" height=\"194\"/><rect x=\"350\" y=\"20\" width=\"36\" height=\"374\"/><rect x=\"430\" y=\"80\" width=\"36\" height=\"254\"/><rect x=\"510\" y=\"150\" width=\"36\" height=\"114\"/></g></svg><span class=\"ds-wordmark-text\">Shadoword</span></a><div class=\"ds-topbar-right\"><p class=\"ds-micro\">Linux first</p><p class=\"ds-micro\">Offline by default</p><a class=\"ds-cta-outline-nav\" href=\"#\">Read the source</a></div></header>",
+   "css": ".ds-topbar { display: flex; align-items: center; justify-content: space-between; height: 3rem; padding: 0 1.25rem; background-color: var(--color-night, #07090d); border-bottom: 1px solid var(--color-scarlet, #e6202c); } .ds-wordmark { display: inline-flex; align-items: center; gap: 0.875rem; text-decoration: none; color: var(--color-scarlet, #e6202c); transition: color 150ms linear; } .ds-wordmark:hover { color: var(--color-scarlet-lamp, #f04e55); } .ds-wordmark-text { font-family: 'League Gothic', 'Oswald', sans-serif; font-size: 1.0625rem; line-height: 1; letter-spacing: 0.34em; text-transform: uppercase; color: var(--color-ink, #e8e6e1); } .ds-topbar-right { display: flex; align-items: center; gap: 2rem; } .ds-micro { margin: 0; font-family: 'Azeret Mono Variable', ui-monospace, monospace; font-size: 0.71875rem; line-height: 1.4; letter-spacing: 0.04em; text-transform: uppercase; color: var(--color-ink-soft, #7a8089); } .ds-cta-outline-nav { padding: 0.5rem 0.9375rem; border: 1px solid var(--color-scarlet, #e6202c); color: var(--color-scarlet-lamp, #f04e55); font-family: 'Azeret Mono Variable', ui-monospace, monospace; font-size: 0.71875rem; letter-spacing: 0.1em; text-transform: uppercase; text-decoration: none; } .ds-cta-outline-nav:hover { background-color: var(--color-scarlet, #e6202c); color: var(--color-on-scarlet, #fff); }"
+  },
+  {
+   "name": "Physical Riveted Plate",
+   "kind": "custom",
+   "refersTo": "rivet-plate",
+   "description": "The world's one material and its only shadow: 10px radius, a bevel, a soft drop and domed rivets. There are exactly two on the page — the shortcut plate at the head, which says what the machine does, and the status plate at the foot, which says what it is. A third would make the material a texture.",
+   "html": "<div class=\"ds-rivet-plate\"><div class=\"ds-chevron-strip\"></div><p class=\"ds-plate-over ds-plate-first\">Push to talk</p><p class=\"ds-plate-key\">F2</p><p class=\"ds-plate-over\">Hold to capture</p><p class=\"ds-plate-note\">Default shortcut. Rebindable, and the hold can be switched to a toggle.</p></div>",
+   "css": ".ds-rivet-plate { position: relative; width: 15.5rem; text-align: center; border-radius: 10px; background-color: var(--color-night-plate, #0d1420); border: 1px solid var(--color-rule-strong, #5a6371); box-shadow: 0 18px 40px -12px rgb(0 0 0 / 0.9), inset 0 1px 0 rgb(255 255 255 / 0.07); --ds-rivet-pitch: 25%; } .ds-rivet-plate::before, .ds-rivet-plate::after { content: ''; position: absolute; left: 0.75rem; right: 0.75rem; height: 9px; background-image: radial-gradient(3.6px 3.6px at calc(50% - 0.7px) calc(50% - 0.9px), rgb(255 255 255 / 0.85) 0%, var(--color-rule-strong, #5a6371) 40%, rgb(0 0 0 / 0.55) 82%, transparent 100%), radial-gradient(4.4px 4.4px at calc(50% + 0.5px) calc(50% + 1.1px), rgb(0 0 0 / 0.7) 0%, transparent 100%); background-size: var(--ds-rivet-pitch) 9px; background-repeat: repeat-x; pointer-events: none; } .ds-rivet-plate::before { top: 0.875rem; } .ds-rivet-plate::after { bottom: 0.45rem; } .ds-chevron-strip { position: absolute; inset: 0 0 auto; height: 6px; border-radius: 9px 9px 0 0; background-image: repeating-linear-gradient(-45deg, var(--color-ink, #e8e6e1) 0 8px, var(--color-night, #07090d) 8px 16px); } .ds-plate-over { margin: 0; font-family: 'Azeret Mono Variable', ui-monospace, monospace; font-size: 0.71875rem; line-height: 1.4; letter-spacing: 0.04em; text-transform: uppercase; color: var(--color-ink-soft, #7a8089); } .ds-plate-first { margin-top: 1.5rem; } .ds-plate-key { margin: 0.25rem 0; font-family: 'League Gothic', 'Oswald', sans-serif; font-size: 3.375rem; line-height: 0.9; letter-spacing: 0.02em; color: var(--color-scarlet-lamp, #f04e55); } .ds-plate-note { margin: 0.75rem 1rem 1.75rem; padding-top: 0.625rem; border-top: 1px solid var(--color-rule, #252a33); font-family: 'Azeret Mono Variable', ui-monospace, monospace; font-size: 0.75rem; line-height: 1.5; color: var(--color-ink-soft, #7a8089); }"
+  },
+  {
+   "name": "Signal Path Step",
+   "kind": "custom",
+   "refersTo": null,
+   "description": "The signature device: a large outlined display numeral beside a solid display label on a shared baseline, with an inset 1px divider. The stroke is the boundary grey so it survives at 1px. The scarlet square tick appears on one step only, marking the fulcrum of the band's argument.",
+   "html": "<ol class=\"ds-steps\"><li class=\"ds-step\"><div class=\"ds-step-head\"><span class=\"ds-numeral\">02</span><h3 class=\"ds-step-label\">Capture</h3></div><p class=\"ds-step-body\">Audio is held while the key is down.</p></li><li class=\"ds-step\"><div class=\"ds-step-head\"><span class=\"ds-numeral\">03</span><h3 class=\"ds-step-label\">Commit</h3><span class=\"ds-tick\"></span></div><p class=\"ds-step-body\">A commit is what triggers inference.</p></li></ol>",
+   "css": ".ds-steps { display: grid; grid-template-columns: 1fr 1fr; margin: 0; padding: 0; list-style: none; background-color: var(--color-night, #07090d); } .ds-step + .ds-step { border-left: 1px solid var(--color-rule, #252a33); padding-left: 1.75rem; } .ds-step-head { display: flex; align-items: baseline; gap: 0.75rem; } .ds-numeral { font-family: 'League Gothic', 'Oswald', sans-serif; font-size: 2.75rem; line-height: 1; color: transparent; -webkit-text-stroke: 1px var(--color-rule-strong, #5a6371); transform: scaleX(0.88); transform-origin: left center; } .ds-step-label { margin: 0; font-family: 'League Gothic', 'Oswald', sans-serif; font-weight: 400; font-size: 1.875rem; line-height: 1; letter-spacing: -0.01em; text-transform: uppercase; color: var(--color-ink, #e8e6e1); transform: scaleX(0.88); transform-origin: left center; } .ds-tick { width: 5px; height: 5px; flex: none; background-color: var(--color-scarlet, #e6202c); translate: 0 -0.15em; } .ds-step-body { margin: 1rem 0 0; max-width: 30ch; font-family: 'Azeret Mono Variable', ui-monospace, monospace; font-size: 0.75rem; line-height: 1.5; color: var(--color-ink-soft, #7a8089); }"
+  },
+  {
+   "name": "Hazard-Edged Notice",
+   "kind": "custom",
+   "refersTo": "plate",
+   "description": "A flat plate capped with the off-white hazard chevron strip, used for the one notice that must be read differently — the unmeasured-latency hole. The chevron edge is the mark that changes the reading, so the heading stays an off-white display label rather than becoming a coloured tag.",
+   "html": "<div class=\"ds-notice\"><div class=\"ds-notice-strip\"></div><div class=\"ds-notice-body\"><h3 class=\"ds-notice-head\">Not yet measured</h3><p class=\"ds-notice-text\">There is no published latency figure, because no run of the bench corpus has been recorded. When there is one it will name the hardware it ran on.</p></div></div>",
+   "css": ".ds-notice { background-color: var(--color-night-plate, #0d1420); border: 1px solid var(--color-rule, #252a33); border-radius: 0; } .ds-notice-strip { height: 6px; width: 100%; background-image: repeating-linear-gradient(-45deg, var(--color-ink, #e8e6e1) 0 8px, var(--color-night, #07090d) 8px 16px); } .ds-notice-body { padding: 1rem 1.25rem 1.25rem; } .ds-notice-head { margin: 0; font-family: 'League Gothic', 'Oswald', sans-serif; font-weight: 400; font-size: 1.375rem; line-height: 1; letter-spacing: 0.01em; text-transform: uppercase; color: var(--color-ink, #e8e6e1); transform: scaleX(0.88); transform-origin: left center; } .ds-notice-text { margin: 0.625rem 0 0; max-width: 80ch; font-family: 'Azeret Mono Variable', ui-monospace, monospace; font-size: 0.875rem; line-height: 1.55; color: var(--color-ink, #e8e6e1); }"
+  }
+ ],
+ "narrative": {
+  "northStar": "Neo-Tokyo Neon Night — the Silent Channel",
+  "overview": "The world is Neo-Tokyo Neon Night, abstracted from cityscape to spectrum: an abstract spectrogram burning in magenta and cyan, densest at the right and dissolving to black at the left, with one perfectly black column standing at its centre. Everything around that column is energised and broadcasting; the column carries no signal at all, and it is the reader's machine. The argument of the product — audio never leaves your hardware — is made as an image before a word is read.\n\nThe imagery is not photographic and does not depict anything. The composition descends from comp A, Sealed Tower (.impeccable/mocks/comp-a-sealed-tower.webp): the argument of that comp — a whole field lit, and one slab in it that is not — survives intact, while its cityscape does not. The direction was taken as a dealt challenger over an assigned RED/BLACK direction (seed 322d3899, assigned index 3/7), and the authoritative statement of intent is the direction contract recorded as an HTML comment at the top of <body> in src/layouts/BaseLayout.astro, which survives into the production build.\n\nThe world holds together on one split, and it is the single most important rule in this system: neon and glow live only inside the imagery. Every region that carries data is a flat, matte, near-black plate with crisp type on it and at most a scarlet hairline. There is no bloom behind any text anywhere on the page. That split is what lets a six-row spec table and a verbatim route list exist inside a neon world instead of collapsing into the near-black-plus-glow rut that every dark developer page occupies. It is also the product's argument restated as a material: a privacy tool whose numbers glow is a privacy tool asking to be taken on vibes.\n\nThe register is printed industrial signage, not UI chrome. Grounds are cold (hue ~215-220) so the page reads as the unlit ground a spectrum burns out of rather than as a warm dark mode. Density is high and left-aligned: every heading, cell and legend starts on a left margin, and cells are allowed to leave their right half empty, which is the panel-legend proportion the comp uses. Corners are square because printed things are square, and radius is reserved to mean \"this is a physical object\" — a rule that costs the page nothing and buys it two moments of real material. Motion is atmosphere only: light, lateral drift and bin flicker, all of it inside the imagery, none of it reporting a value. Nothing animates on scroll.",
+  "keyCharacteristics": [
+   "Lit abstract imagery against flat matte data plates; no glow behind type, ever.",
+   "One accent (scarlet) rationed by meaning, split into a fill cut and an ink cut.",
+   "Two self-hosted faces: a synthetically compressed condensed display grotesque against a monospace that carries every value, caption and legend.",
+   "Square by default; radius, bevel, shadow and rivets belong to exactly two physical objects — one at the page's head, one at its foot.",
+   "1px lines throughout, and a scarlet hairline is the page's only structural device.",
+   "Real controls and real text: zero client JavaScript ships, and nothing readable is baked into a raster."
+  ],
+  "rules": [
+   {
+    "name": "The Lit-Imagery Rule",
+    "body": "Neon, bloom, gradient light and saturated hue live inside the imagery and nowhere else. Any region that carries data — a table, a route list, a notice, a control, a command — is a flat matte plate with crisp type and at most a scarlet hairline. There is no glow behind any text on this page. Breaking this anywhere collapses the direction.",
+    "section": "colors"
+   },
+   {
+    "name": "The Pigment-and-Ink Rule",
+    "body": "Scarlet is two tokens because it is two jobs. scarlet is pigment: fills, hairlines, rules, 2px markers, square ticks. scarlet-lamp is ink: any scarlet word on a dark ground. Shipping one value for both is how an accent colour quietly makes its own labels unreadable. White is the only ink legal on a scarlet fill.",
+    "section": "colors"
+   },
+   {
+    "name": "The Rationed-Accent Rule",
+    "body": "Scarlet does scanning work, never decoration, and it is rationed by meaning rather than by quantity. Its authorised jobs are: the band hairlines, the selected mode, mutating routes and received frames, the tick that marks the fulcrum of the signal-path argument, and the primary action. If a new scarlet mark cannot name which of those jobs it is doing, it is decoration and the answer is off-white. Six repeated scarlet band labels were removed for exactly this reason: scarlet on every band is scarlet meaning nothing on any of them.",
+    "section": "colors"
+   },
+   {
+    "name": "The Sign-Hue Quarantine Rule",
+    "body": "--sign-magenta and --sign-cyan stay out of @theme. They may only be used in screen-blend overlays registered to bright bins already present in the raster. They may never reach a word, a control, a border or a plate.",
+    "section": "colors"
+   },
+   {
+    "name": "The Token-Not-Opacity Rule",
+    "body": "Secondary ink is --color-ink-soft. An /50 or /60 of the primary off-white lands near 4:1, which is how running prose quietly stops being readable. There is no text-ink/60 anywhere on this page and there should not be one — and that is now verifiable against the built stylesheet, because global.css scopes source detection to src/ (source(none) plus @source '..'). Under Tailwind's default whole-project scan this sentence was itself a class-name candidate, so the rule minted the utility it bans.",
+    "section": "colors"
+   },
+   {
+    "name": "The Two-Greys Rule",
+    "body": "rule is decorative and may be near-invisible; rule-strong is for any line that is the sole carrier of a boundary or a state, and it clears WCAG 1.4.11 at 3.28:1. Picking the decorative grey for a functional line is the failure this split exists to prevent.",
+    "section": "colors"
+   },
+   {
+    "name": "The Ring-Is-Not-The-Accent Rule",
+    "body": "The focus ring is off-white with page black flooded into the offset gap by a box-shadow. It is deliberately not scarlet: scarlet is the primary CTA's own fill and the nav CTA's own border, so a scarlet ring on either read as the slab quietly growing 2px rather than as focus. Off-white is the one value nothing on this page is filled with, and the black spacer guarantees the ring has a dark edge beneath it on any ground.",
+    "section": "colors"
+   },
+   {
+    "name": "The Cap-Height Rule",
+    "body": "Every display size in this world is derived as a cap height divided by --cap-em (0.75). If a new display size is needed, measure the cap you want and divide; do not pick a font-size.",
+    "section": "typography"
+   },
+   {
+    "name": "The Recorded-Squeeze Rule",
+    "body": "Horizontal compression is one of three tokens, it is applied with transform-origin: left so ink stays registered to the left margin, and it stops entirely below ~18px. A squeezed 11px legend is just a damaged 11px legend.",
+    "section": "typography"
+   },
+   {
+    "name": "The Authored-Break Rule",
+    "body": "Compressed display lines never wrap. Each headline line is its own nowrap block, so a reflow cannot change the ink width of every line at once. The breaks are authored, exactly as they are in the comp.",
+    "section": "typography"
+   },
+   {
+    "name": "The Mono-Carries-The-Facts Rule",
+    "body": "Every value the product asserts — a size, a flag, a route, a frame, a command — is set in the monospace, and a value the reader may copy is whitespace-nowrap so it cannot break mid-token. The display face carries claims and labels; it never carries a number.",
+    "section": "typography"
+   },
+   {
+    "name": "The Hairline-Is-The-Structure Rule",
+    "body": "A 1px scarlet rule between bands is the page's only structural device. There are no section cards, no container borders around bands, and no background alternation between them. A new band gets .band-top and nothing else.",
+    "section": "layout"
+   },
+   {
+    "name": "The Inset-Divider Rule",
+    "body": "Column and cell dividers are inset from the band's edges rather than spanning it, and the outer edges of a group carry none. This is what keeps a table reading as a printed panel instead of a spreadsheet. Where two internal columns hold unequal row counts, the divider is painted on the container rather than on the items, so it cannot stop a row short and leave a rule hanging in mid-plate.",
+    "section": "layout"
+   },
+   {
+    "name": "The Divider-Follows-The-Stacking-Axis Rule",
+    "body": "A left-border divider draws nothing when its cells stack. Every divided group re-points its rule across the top when it stacks, and any marker that sits under a cell three-across moves to the cell's left edge when stacked — an underline there would land on the divider it shares with the next cell.",
+    "section": "layout"
+   },
+   {
+    "name": "The Floor-Not-Height Rule",
+    "body": "Bands that carry absolutely positioned composition use min-height on a flex column, never a fixed height. With a fixed height and justify-content: flex-end, content that outgrows the band is pushed off its top inside overflow: hidden, which decapitates the headline at 390px.",
+    "section": "layout"
+   },
+   {
+    "name": "The Flat-Data Rule",
+    "body": "No shadow, gradient, blur or glow may appear on a region that carries data. Elevation on this page is a material claim, and data is printed, not lifted.",
+    "section": "elevation"
+   },
+   {
+    "name": "The One-Light-Source Rule",
+    "body": "Light comes from up-left, once, for the whole object: the plate's bevel is a top-edge inset highlight, the rivet highlight sits up-left of centre, and the seat shadow falls down-right. Any new modelled detail takes the same light.",
+    "section": "elevation"
+   },
+   {
+    "name": "The Radius-Means-Object Rule",
+    "body": "Radius, bevel, shadow and rivets are one indivisible set and they belong only to elements claiming to be physical things. A rounded button or a chamfered table is wrong in both directions.",
+    "section": "shapes"
+   },
+   {
+    "name": "The Two-Plates Rule",
+    "body": "There are exactly two physical objects on this page: the shortcut plate at the page's head, which says what the machine does, and the status plate at its foot, which says what the machine is. That is where a real machine carries its plates. A third would make the material a texture instead of a material.",
+    "section": "shapes"
+   }
+  ],
+  "dos": [
+   "Do give a new band .band-top, a max-w-[1536px] container and px-5 sm:px-8 py-14 lg:py-16, and put its data in .plate. That is the whole band recipe.",
+   "Do keep every data-bearing region flat and matte, with crisp type and at most a scarlet hairline. If a new region needs light on it, the light belongs in the imagery.",
+   "Do pick the scarlet cut by use: scarlet for a fill, hairline, rule or square mark; scarlet-lamp for a word; on-scarlet (white) for ink on a scarlet fill.",
+   "Do name the job a new scarlet mark is doing. If it is not marking the band boundary, the selected mode, a mutating route or received frame, the fulcrum of an argument, or the primary action, set it off-white.",
+   "Do use --color-ink-soft for secondary text, and --color-rule-strong for any line that is the only thing conveying a boundary or a state.",
+   "Do derive a new display size as a cap height / --cap-em, and take the matching --squeeze-* step for that size.",
+   "Do author display line breaks as separate nowrap blocks.",
+   "Do re-point a divider across the top when its cells stack, and move any cell marker to the left edge there.",
+   "Do let content measure decide column counts — cap measures in ch at a sentence boundary, and drop a column rather than clip a command.",
+   "Do keep interactive things real: native controls, live text, and no value baked into a raster.",
+   "Do give prefers-reduced-motion a still rendering — remove what only reads as motion, pin what reads as light."
+  ],
+  "donts": [
+   "Don't put glow, bloom, blur, a lit gradient or a screen-blend behind type, a control or a table. The world's light lives in the imagery, and nowhere else.",
+   "Don't let --sign-magenta or --sign-cyan out of the imagery, and don't move them into @theme, where Tailwind would generate text- and bg- utilities from them.",
+   "Don't set type in --color-scarlet, and don't put the off-white ink on a scarlet fill (3.65:1).",
+   "Don't express secondary text as an opacity of the primary ink.",
+   "Don't make the focus ring scarlet, or drop the page-black spacer that gives it an edge over a scarlet slab or a hot bin in the imagery.",
+   "Don't add a scarlet label above a heading. Six of them turned a comp device into a page template and were removed; the one surviving instance in the signal path is a carried exception, not a slot for a new band to fill. A band's heading is its label.",
+   "Don't round a corner, add a shadow, or add a bevel to anything printed — and don't add a third riveted plate.",
+   "Don't use a round dot or a bullet as a mark; painted marks in this world are square.",
+   "Don't add a second 2px rule; that weight belongs to the selected mode alone.",
+   "Don't span a divider across a band's full width, or hang one on the outer edge of a group.",
+   "Don't compress type below ~18px, and don't apply tracking-out and compression to the same word.",
+   "Don't give a band a fixed height when it carries absolutely positioned composition, and don't let a plate stretch to match a taller neighbour.",
+   "Don't animate on scroll, and don't let motion report a value, carry data or make a claim. Atmosphere only.",
+   "Don't rasterize text, a command, a route or a control into an image."
+  ]
+ }
+}

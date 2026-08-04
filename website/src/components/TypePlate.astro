@@ -1,0 +1,91 @@
+---
+import Wordmark from './Wordmark.astro'
+import { typePlate, repoUrl } from '../data/site'
+
+/**
+ * The last thing on the page is the honest status, set as a type plate: the
+ * riveted metal label bolted to the back of a machine that tells you what it
+ * actually is. Pre-launch, no packages, a port in progress. None of it is
+ * softened, because a page whose whole argument is "verify this yourself" cannot
+ * be caught overstating its own readiness in the footer.
+ *
+ * And then the CTA one last time, because the page's single job is to get a
+ * developer to the source and this is the last chance it gets.
+ */
+---
+
+<footer class="band-top bg-night" aria-labelledby="project-status-heading">
+  <div
+    class="mx-auto grid max-w-[1536px] grid-cols-1 gap-y-10 px-5 py-14 sm:px-8 lg:grid-cols-[1fr_auto] lg:items-start lg:gap-x-16"
+  >
+    {
+      /*
+        "Type plate" was the *design's* name for this band — the riveted metal
+        label idiom it borrows — and it had ended up as the visible heading and
+        therefore as the footer's accessible name, so a screen reader announced a
+        region called "type plate". The reader is owed the band's subject
+        instead.
+
+        The metal-label idea survives where it belongs: in the treatment. This is
+        the page's second and last physical object, and the reason it earns the
+        material is that it is doing literally what a type plate does — the rating
+        label bolted to the back of a machine, stating what it is and refusing to
+        flatter it. The one at the top of the page says what the machine does.
+      */
+    }
+    <div class="status-plate rivet-plate">
+      <h2 id="project-status-heading" class="display-label text-ink">Project status</h2>
+      <dl class="mt-5 grid grid-cols-1 sm:grid-cols-[10rem_1fr]">
+        {
+          typePlate.map((row, i) => (
+            <Fragment>
+              <dt
+                class:list={[
+                  'mono-micro text-ink-soft border-rule pt-3 uppercase sm:pb-3',
+                  i > 0 && 'border-t',
+                ]}
+              >
+                {row.k}
+              </dt>
+              <dd
+                class:list={[
+                  'mono-legend text-ink border-rule pb-3 sm:pt-3',
+                  i > 0 && 'sm:border-t',
+                ]}
+              >
+                {row.v}
+              </dd>
+            </Fragment>
+          ))
+        }
+      </dl>
+    </div>
+
+    <div class="lg:text-right">
+      <Wordmark class="lg:justify-end" />
+      <p class="mono-caption text-ink-soft mt-4 max-w-[34ch] lg:ml-auto">
+        Offline speech to text for Linux. Read it, build it, and check the claim yourself.
+      </p>
+      <a class="cta-solid mt-6" href={repoUrl} rel="noopener">Read the source</a>
+    </div>
+  </div>
+</footer>
+
+<style>
+  /* Padding, not utilities, because the rivets are absolutely positioned inside
+     the plate and the copy has to clear them: 9px of fastener inset 0.45rem from
+     each long edge needs about 2rem above the heading and below the last row. */
+  .status-plate {
+    padding: 2.25rem 1.75rem 2.5rem;
+    /* Eight per edge here rather than four. This plate is up to ~900px wide
+       against the shortcut plate's 248px, and the pitch is what keeps both
+       reading as the same fixing at two sizes. */
+    --rivet-pitch: 12.5%;
+  }
+
+  @media (min-width: 640px) {
+    .status-plate {
+      padding: 2.5rem 2.25rem 2.75rem;
+    }
+  }
+</style>

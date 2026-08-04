@@ -1,0 +1,97 @@
+---
+import '../styles/global.css'
+/**
+ * The display face is preloaded, and it is the only asset on the page that is.
+ *
+ * The hero headline is the LCP element and it is set in League Gothic squeezed
+ * to `scaleX(0.703)` — a factor calibrated to that face's advance widths and to
+ * no other. Discovered the ordinary way, the woff2 is a third-generation request
+ * (HTML, then the CSS bundle, then the font), so the opening frame paints the
+ * headline in the fallback *with the League Gothic squeeze still applied*, and
+ * then reflows. A wrong-width face crushed by 30% is worse than either honest
+ * state. Preloading collapses that to a first-generation request.
+ *
+ * Imported through Vite rather than written as a literal path, so the href is
+ * the same hashed asset the `@fontsource` CSS resolves to and the preload can
+ * never point at a stale filename. Only the `latin` subset: the page has no
+ * latin-ext or Vietnamese text in a display face.
+ */
+import displayFace from '@fontsource/league-gothic/files/league-gothic-latin-400-normal.woff2?url'
+
+const { title, description } = Astro.props as {
+  title?: string
+  description?: string
+}
+
+const pageTitle = title ?? 'Shadoword — offline speech to text, Linux first'
+const pageDescription =
+  description ??
+  'Shadoword turns speech into text entirely on your own machine. Local Whisper inference by default, an optional self-hosted daemon, and explicit control over model and accelerator. Linux first.'
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>{pageTitle}</title>
+    <meta name="description" content={pageDescription} />
+    <meta name="theme-color" content="#07090d" />
+    <link rel="preload" href={displayFace} as="font" type="font/woff2" crossorigin />
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content={pageTitle} />
+    <meta property="og:description" content={pageDescription} />
+    <!-- Not a rendered composite and not the square mark: this is the shipped
+         hero, screenshotted at 1200 wide. `summary_large_image` centre-crops or
+         letterboxes a square, and on a page whose only action is "go to the
+         source" the card is the first viewport for most of the traffic that ever
+         sees this — so it had better be the same first viewport the site has.
+         Shooting the page also means the card cannot drift from it.
+
+         JPEG, not PNG: the hero is a continuous-tone raster with thousands of
+         fine bright strokes in it, which is the case PNG is worst at — the same
+         crop is far larger lossless, at no visible gain over 145 KB here. -->
+    <meta property="og:image" content={new URL('/images/shadoword-og.jpg', Astro.site)} />
+    <!-- 1200x532, not 1200x630. The crop's bottom edge *is* the scarlet band
+         hairline under the hero — row 531 of the shot, the last row of the band —
+         because on a page whose only structural device is that hairline, ending
+         the card on one is composing it. Reaching the nominal 1.91:1 would mean
+         slicing 100px into the mode strip below, which is 11px type that no feed
+         renders legibly anyway. 2.26:1 is inside every consumer's tolerance. -->
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="532" />
+    <meta
+      property="og:image:alt"
+      content="The Shadoword site's hero: the headline 'Speech to text that never leaves your machine' set in heavy condensed off-white type over an abstract spectrogram burning in magenta and cyan, with one perfectly black column at the centre carrying no signal, and a riveted metal plate at the right reading 'Push to talk — F2 — hold to capture'."
+    />
+    <meta property="og:url" content={new URL(Astro.url.pathname, Astro.site)} />
+    <meta name="twitter:card" content="summary_large_image" />
+    <link rel="icon" href="/favicon/favicon-32.png" />
+    <link rel="apple-touch-icon" href="/favicon/favicon-128.png" />
+  </head>
+  <body class="min-h-screen antialiased">
+    <!--
+      IMPECCABLE DIRECTION CONTRACT
+      THESIS: A blazing spectrum with one silent channel in it. Refuses the
+        near-black dev-tool page with its terminal card and feature grid, refuses
+        photographic realism, and refuses any instrument faking data.
+      OWN-WORLD: Night-black grounds. Scarlet #E6202C is the only interface
+        accent; magenta and cyan live in the imagery only, never on type or
+        controls. Heavy condensed grotesque against a monospace. Square buttons,
+        rounded riveted plates. 1px hairlines, no glow behind text.
+      STORY: A Linux developer sees one channel that never lights up, understands
+        audio never leaves the machine, reads real endpoints and frames, then goes
+        to the source.
+      FIRST VIEWPORT: Full-bleed abstract spectrogram, densest at the right and
+        dissolving to black at the left. One perfectly black column at the centre
+        carries a scarlet lance down its length and stops where the spectrum
+        closes over it. Condensed three-line headline over the left third, scarlet
+        CTA below, riveted F2 plate lower right. A flat mode strip cuts it off.
+      FORM: Neo-Tokyo Neon Night, abstracted from cityscape to spectrum —
+        challenger over assigned RED/BLACK, index 3/7; seed 322d3899.
+      FINISH: unreviewed and undocumented is unfinished; this build ends with
+        the finish review, the verdict, and DESIGN.md
+    -->
+    <slot />
+  </body>
+</html>

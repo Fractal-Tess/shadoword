@@ -1,0 +1,182 @@
+---
+import { modes } from '../data/site'
+
+/**
+ * A real three-position control, not a picture of one. The comp drew it as a
+ * decorative strip with invented sub-copy — one line of which ("REMOTE —
+ * DISABLED BY DEFAULT") is simply false, since remote is a working mode pointing
+ * at a daemon the user hosts. So the strip keeps the comp's geometry and takes
+ * the product's own detent strings, which run longer than the mock's.
+ *
+ * Radio semantics, because the three modes are mutually exclusive and this is
+ * exactly what a radio group is. Arrow keys work, the label is the click target,
+ * and the selected detent is the only 2px rule on the page.
+ *
+ * What the detent means is the one thing this band has to get right. It is the
+ * reader's cursor through three descriptions, *not* a claim about a running
+ * machine — a static page cannot have one, and the THESIS refuses any instrument
+ * faking data. The detent copy is present tense, so if the scarlet mark were the
+ * only thing distinguishing Local, a reader who clicked `Off` would leave the
+ * band reading "the microphone is released" as the product's live state. So the
+ * product fact gets its own immovable mark: `Local` carries a `Default` flag in
+ * the same scarlet-ink micro label the model catalog uses for its own default,
+ * and no selection can move it.
+ */
+---
+
+<section class="band-top bg-night" aria-labelledby="mode-strip-heading">
+  <h2 id="mode-strip-heading" class="sr-only">Runtime modes</h2>
+  <fieldset class="mx-auto max-w-[1536px]">
+    {
+      /* The legend says what selecting does, because "Where transcription runs"
+        alone invited a screen-reader user to hear the group as the machine's
+        current setting. */
+    }
+    <legend class="sr-only">Where transcription runs — select a mode to read what it does</legend>
+    <div class="grid grid-cols-1 sm:grid-cols-3">
+      {
+        modes.map((mode) => (
+          <label class="mode-cell" for={`mode-${mode.id}`}>
+            <input
+              class="peer sr-only"
+              type="radio"
+              name="mode"
+              id={`mode-${mode.id}`}
+              value={mode.id}
+              checked={mode.id === 'local'}
+            />
+            <span class="mode-head">
+              {/* The detent box: an empty square that fills with scarlet pigment
+                  when selected. Pigment on a fill is legal; the label beside it
+                  stays off-white either way, because a scarlet word would be the
+                  accent colour reaching type. */}
+              <span class="mode-box" aria-hidden="true" />
+              <span class="display-label mode-label">{mode.label}</span>
+              {mode.isDefault && <span class="mono-micro text-scarlet-lamp">Default</span>}
+            </span>
+            <span class="mono-caption text-ink-soft mode-detent">{mode.detent}</span>
+            <span class="mode-rule" aria-hidden="true" />
+          </label>
+        ))
+      }
+    </div>
+  </fieldset>
+</section>
+
+<style>
+  /* Left-aligned in every cell at every width, with the cell's right half left
+     empty — which is what the comp draws, and what the rest of the page does.
+     An earlier pass centred these at `sm` and up and claimed the comp did too;
+     it does not, and the result was the one centred block on a page whose every
+     other heading, table cell and legend starts on a left margin. The empty
+     right half is not waste, it is the panel-legend proportion the comp uses to
+     keep three long detents from reading as three columns of prose. */
+  .mode-cell {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    justify-content: center;
+    gap: 0.5rem;
+    padding: 1.5rem 1.5rem 1.75rem;
+    cursor: pointer;
+  }
+
+  .mode-head {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+  }
+
+  /* The shared `divide-inset` draws a left border only, which is correct for the
+     three-across row and draws nothing at all when the cells stack — the three
+     modes ran together as one block of prose at 390px. The divider follows the
+     stacking axis instead. */
+  .mode-cell + .mode-cell {
+    border-top: 1px solid var(--color-rule);
+  }
+
+  @media (min-width: 640px) {
+    .mode-cell + .mode-cell {
+      border-top: 0;
+      border-left: 1px solid var(--color-rule);
+    }
+  }
+
+  .mode-box {
+    width: 0.875rem;
+    height: 0.875rem;
+    flex: none;
+    border: 1px solid var(--color-rule-strong);
+    transition:
+      background-color 120ms linear,
+      border-color 120ms linear;
+  }
+
+  .mode-label {
+    color: var(--color-ink-soft);
+    transition: color 120ms linear;
+  }
+
+  .peer:checked ~ .mode-head .mode-box {
+    background-color: var(--color-scarlet);
+    border-color: var(--color-scarlet);
+  }
+
+  .peer:checked ~ .mode-head .mode-label {
+    color: var(--color-ink);
+  }
+
+  .mode-detent {
+    max-width: 34ch;
+  }
+
+  /* The selected detent's marker: the page's only 2px rule. Present but
+     transparent when unselected, so selecting a mode does not shift the row.
+
+     Stacked, it runs down the cell's left edge rather than under its foot. An
+     underline there would sit directly on the divider it shares with the next
+     cell, so the one mark that says "this is the live mode" would be reading as
+     a heavier border between two others. Down the edge it is unambiguous, and it
+     is the idiom a stacked list of options uses anyway. */
+  .mode-rule {
+    position: absolute;
+    top: 1.5rem;
+    bottom: 1.5rem;
+    left: 0;
+    width: 2px;
+    background-color: transparent;
+    transition: background-color 120ms linear;
+  }
+
+  /* Three across, it is the comp's underline: 45% of the cell, on its foot,
+     starting on the same left margin as the label above it rather than centred
+     under it. A centred underline beneath left-aligned type is a mark that
+     belongs to no edge. */
+  @media (min-width: 640px) {
+    .mode-rule {
+      top: auto;
+      bottom: -1px;
+      left: 1.5rem;
+      width: 45%;
+      height: 2px;
+    }
+  }
+
+  .peer:checked ~ .mode-rule {
+    background-color: var(--color-scarlet);
+  }
+
+  .mode-cell:hover .mode-box {
+    border-color: var(--color-ink);
+  }
+
+  /* The input is visually hidden, so its focus ring has to be drawn on the thing
+     it labels or keyboard users get no ring at all. Off-white for the same
+     reason as the page-wide ring: the selected mode's own box is filled scarlet,
+     so a scarlet ring here would be the accent marking two different states. */
+  .peer:focus-visible ~ .mode-head {
+    outline: 2px solid var(--color-ink);
+    outline-offset: 4px;
+  }
+</style>

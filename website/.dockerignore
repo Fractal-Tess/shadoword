@@ -1,0 +1,8 @@
+.DS_Store
+node_modules
+dist
+
+# Note: bun.lock is deliberately absent from this list. The build stage copies it
+# and installs with --frozen-lockfile, so ignoring it breaks the build.
+.git
+.astro

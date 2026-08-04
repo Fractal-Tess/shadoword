@@ -1,0 +1,501 @@
+{
+  description = "Shadoword - Tauri desktop client and Whisper daemon";
+
+  inputs = {
+    nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
+  };
+
+  outputs =
+    { self, nixpkgs }:
+    let
+      supportedSystems = [
+        "x86_64-linux"
+        "aarch64-linux"
+      ];
+
+      forAllSystems = nixpkgs.lib.genAttrs supportedSystems;
+
+      workspaceToml = builtins.fromTOML (builtins.readFile ./Cargo.toml);
+      version = workspaceToml.workspace.package.version;
+      releaseArtifacts = builtins.fromJSON (builtins.readFile ./nix/release-artifacts.json);
+
+      artifactFor =
+        system: packageName:
+        if releaseArtifacts.version == version then
+          releaseArtifacts.systems.${system}.${packageName} or null
+        else
+          null;
+
+      mkPkgs =
+        system:
+        import nixpkgs {
+          inherit system;
+          config.allowUnfree = true;
+        };
+
+      commonBuildDeps =
+        pkgs: with pkgs; [
+          cmake
+          glslang
+          gtk3
+          libappindicator-gtk3
+          llvmPackages.libclang
+          makeWrapper
+          pkg-config
+          shaderc
+          vulkan-headers
+          vulkan-loader
+          vulkan-tools
+        ];
+
+      daemonRuntimeDeps =
+        pkgs: with pkgs; [
+          stdenv.cc.cc.lib
+          libglvnd
+          libopus
+          openssl
+          vulkan-loader
+        ];
+
+      desktopRuntimeDeps =
+        pkgs:
+        daemonRuntimeDeps pkgs
+        ++ (with pkgs; [
+          alsa-lib
+          fontconfig
+          gtk3
+          libappindicator-gtk3
+          libevdev
+          libopus
+          libx11
+          libxi
+          libxtst
+          libxcb
+          libxkbcommon
+          wayland
+          xdotool
+        ]);
+
+      clientRuntimeDeps =
+        pkgs: with pkgs; [
+          stdenv.cc.cc.lib
+          libglvnd
+          vulkan-loader
+          alsa-lib
+          fontconfig
+          glib-networking
+          gtk3
+          libappindicator-gtk3
+          libevdev
+          libopus
+          libsoup_3
+          libx11
+          libxi
+          libxtst
+          libxcb
+          libxkbcommon
+          wayland
+          webkitgtk_4_1
+          xdotool
+        ];
+
+      minimalDesktopBuildDeps =
+        pkgs: with pkgs; [
+          cmake
+          gtk3
+          libappindicator-gtk3
+          makeWrapper
+          pkg-config
+        ];
+
+      tauriDesktopBuildDeps =
+        pkgs: with pkgs; [
+          bun
+          libsoup_3
+          webkitgtk_4_1
+        ];
+
+      commonEnv = pkgs: {
+        LIBCLANG_PATH = "${pkgs.llvmPackages.libclang.lib}/lib";
+        BINDGEN_EXTRA_CLANG_ARGS = "-isystem ${pkgs.llvmPackages.libclang.lib}/lib/clang/${pkgs.lib.getVersion pkgs.llvmPackages.libclang}/include -isystem ${pkgs.glibc.dev}/include";
+        VULKAN_SDK = "${pkgs.vulkan-headers}";
+      };
+
+      cudaDeps =
+        pkgs: with pkgs.cudaPackages; [
+          cuda_cccl
+          cuda_cudart
+          cuda_nvcc
+          libcublas
+        ];
+
+      cudaRuntimeDeps =
+        pkgs:
+        with pkgs.cudaPackages;
+        map pkgs.lib.getLib [
+          cuda_cudart
+          libcublas
+        ];
+
+      cudaEnv =
+        pkgs:
+        let
+          deps = cudaDeps pkgs;
+          includePath = pkgs.lib.concatStringsSep ":" (map (pkg: "${pkg}/include") deps);
+          libraryPath = pkgs.lib.makeLibraryPath deps;
+        in
+        commonEnv pkgs
+        // {
+          CUDA_HOME = "${pkgs.cudaPackages.cuda_nvcc}";
+          CUDA_PATH = "${pkgs.cudaPackages.cuda_nvcc}";
+          CUDACXX = "${pkgs.cudaPackages.cuda_nvcc}/bin/nvcc";
+          CMAKE_CUDA_COMPILER = "${pkgs.cudaPackages.cuda_nvcc}/bin/nvcc";
+          CUDAHOSTCXX = "${pkgs.gcc14}/bin/g++";
+          CMAKE_CUDA_HOST_COMPILER = "${pkgs.gcc14}/bin/g++";
+          CUDAARCHS = "86";
+          CMAKE_CUDA_ARCHITECTURES = "86";
+          CUDAToolkit_ROOT = "${pkgs.cudaPackages.cuda_nvcc}";
+          CMAKE_PREFIX_PATH = "${pkgs.cudaPackages.cuda_nvcc}";
+          CPATH = includePath;
+          CPLUS_INCLUDE_PATH = includePath;
+          LIBRARY_PATH = "${libraryPath}:${pkgs.cudaPackages.cuda_cudart}/lib/stubs";
+        };
+
+      runtimeLibraryPath =
+        pkgs: runtimeDeps: "/run/opengl-driver/lib:${pkgs.lib.makeLibraryPath runtimeDeps}";
+
+      mkRustPackage =
+        {
+          pkgs,
+          system,
+          pname,
+          cargoPackage,
+          runtimeDeps,
+          cargoFeatures ? [ ],
+          cudaSupport ? false,
+          noDefaultFeatures ? false,
+          minimalBuildDeps ? false,
+          frontendNodeModules ? null,
+        }:
+        let
+          packageRuntimeDeps = runtimeDeps ++ pkgs.lib.optionals cudaSupport (cudaRuntimeDeps pkgs);
+          packageBuildDeps = packageRuntimeDeps ++ pkgs.lib.optionals cudaSupport (cudaDeps pkgs);
+        in
+        pkgs.rustPlatform.buildRustPackage {
+          inherit pname version;
+          src = self;
+
+          cargoLock.lockFile = ./Cargo.lock;
+
+          cargoBuildFlags = [
+            "-p"
+            cargoPackage
+          ];
+          buildFeatures = cargoFeatures;
+          checkFeatures = cargoFeatures;
+          buildNoDefaultFeatures = noDefaultFeatures;
+          checkNoDefaultFeatures = noDefaultFeatures;
+
+          nativeBuildInputs =
+            (if minimalBuildDeps then minimalDesktopBuildDeps pkgs else commonBuildDeps pkgs)
+            ++ pkgs.lib.optionals cudaSupport [ pkgs.gcc14 ]
+            ++ pkgs.lib.optionals (frontendNodeModules != null) [
+              pkgs.bun
+              pkgs.nodejs
+            ];
+          buildInputs = packageBuildDeps;
+
+          env =
+            if cudaSupport then
+              cudaEnv pkgs
+            else if minimalBuildDeps then
+              { }
+            else
+              commonEnv pkgs;
+          preBuild = pkgs.lib.optionalString (frontendNodeModules != null) ''
+            unset LIBOPUS_STATIC OPUS_STATIC
+            cp -R ${frontendNodeModules} crates/shadoword-desktop/node_modules
+            chmod -R u+w crates/shadoword-desktop/node_modules
+            patchShebangs crates/shadoword-desktop/node_modules
+            (cd crates/shadoword-desktop && bun run build)
+          '';
+
+          doCheck = true;
+          cargoTestFlags = [
+            "-p"
+            cargoPackage
+          ];
+
+          postInstall = ''
+            strip --strip-unneeded "$out/bin/${cargoPackage}"
+            wrapProgram "$out/bin/${cargoPackage}" \
+              --prefix LD_LIBRARY_PATH : "${runtimeLibraryPath pkgs packageRuntimeDeps}"
+          '';
+
+          meta = {
+            description = "Offline speech-to-text workspace with a Tauri desktop UI and Whisper daemon";
+            homepage = "https://github.com/Fractal-Tess/shadoword";
+            license = pkgs.lib.licenses.mit;
+            platforms = supportedSystems;
+          };
+        };
+    in
+    {
+      packages = forAllSystems (
+        system:
+        let
+          pkgs = mkPkgs system;
+          desktopNodeModules = pkgs.stdenvNoCC.mkDerivation {
+            pname = "shadoword-desktop-node-modules";
+            inherit version;
+            src = self;
+
+            impureEnvVars = pkgs.lib.fetchers.proxyImpureEnvVars ++ [
+              "GIT_PROXY_COMMAND"
+              "SOCKS_SERVER"
+            ];
+            nativeBuildInputs = [
+              pkgs.bun
+              pkgs.writableTmpDirAsHomeHook
+            ];
+            dontUnpack = true;
+            dontConfigure = true;
+            dontFixup = true;
+
+            buildPhase = ''
+              runHook preBuild
+              cp -R "$src/crates/shadoword-desktop" desktop
+              chmod -R u+w desktop
+              cd desktop
+              export BUN_INSTALL_CACHE_DIR=$(mktemp -d)
+              bun install --frozen-lockfile --ignore-scripts --no-progress
+              runHook postBuild
+            '';
+
+            installPhase = ''
+              runHook preInstall
+              cp -R node_modules "$out"
+              runHook postInstall
+            '';
+
+            outputHash = "sha256-BYEaXXkQu2bpLZJT32oRnpnjfnpAb5MoWq+k59vvsmk=";
+            outputHashAlgo = "sha256";
+            outputHashMode = "recursive";
+          };
+          sourcePackages = {
+            shadoword-api = mkRustPackage {
+              inherit pkgs system;
+              pname = "shadoword-api";
+              cargoPackage = "shadoword-api";
+              runtimeDeps = daemonRuntimeDeps pkgs;
+            };
+
+            shadoword-api-cuda = mkRustPackage {
+              inherit pkgs system;
+              pname = "shadoword-api-cuda";
+              cargoPackage = "shadoword-api";
+              runtimeDeps = daemonRuntimeDeps pkgs;
+              cargoFeatures = [ "whisper-cuda" ];
+              cudaSupport = true;
+            };
+
+            shadoword-api-vulkan = mkRustPackage {
+              inherit pkgs system;
+              pname = "shadoword-api-vulkan";
+              cargoPackage = "shadoword-api";
+              runtimeDeps = daemonRuntimeDeps pkgs;
+              cargoFeatures = [ "whisper-vulkan" ];
+            };
+
+            shadoword-desktop-client = mkRustPackage {
+              inherit pkgs system;
+              pname = "shadoword-desktop-client";
+              cargoPackage = "shadoword-desktop";
+              runtimeDeps = clientRuntimeDeps pkgs;
+              cargoFeatures = [
+                "remote-client"
+                "custom-protocol"
+              ];
+              noDefaultFeatures = true;
+              minimalBuildDeps = true;
+              frontendNodeModules = desktopNodeModules;
+            };
+          };
+          packageFor =
+            packageName:
+            {
+              executable,
+              runtimeDeps,
+              extraLibraryPath ? "",
+            }:
+            let
+              artifact = artifactFor system packageName;
+            in
+            if artifact == null then
+              sourcePackages.${packageName}
+            else
+              pkgs.callPackage ./nix/prebuilt-package.nix {
+                inherit
+                  artifact
+                  executable
+                  extraLibraryPath
+                  runtimeDeps
+                  version
+                  ;
+                pname = packageName;
+              };
+        in
+        rec {
+          default = shadoword-api;
+
+          shadoword-api = packageFor "shadoword-api" {
+            executable = "shadoword-api";
+            runtimeDeps = daemonRuntimeDeps pkgs;
+          };
+          shadoword-api-cuda = packageFor "shadoword-api-cuda" {
+            executable = "shadoword-api";
+            runtimeDeps = daemonRuntimeDeps pkgs ++ cudaRuntimeDeps pkgs;
+            extraLibraryPath = "/run/opengl-driver/lib";
+          };
+          shadoword-api-vulkan = packageFor "shadoword-api-vulkan" {
+            executable = "shadoword-api";
+            runtimeDeps = daemonRuntimeDeps pkgs;
+            extraLibraryPath = "/run/opengl-driver/lib";
+          };
+          shadoword-desktop-client = packageFor "shadoword-desktop-client" {
+            executable = "shadoword-desktop";
+            runtimeDeps = clientRuntimeDeps pkgs;
+            extraLibraryPath = "/run/opengl-driver/lib";
+          };
+
+          shadoword-api-source = sourcePackages.shadoword-api;
+          shadoword-api-cuda-source = sourcePackages.shadoword-api-cuda;
+          shadoword-api-vulkan-source = sourcePackages.shadoword-api-vulkan;
+          shadoword-desktop-client-source = sourcePackages.shadoword-desktop-client;
+        }
+      );
+
+      checks = forAllSystems (system: {
+        shadoword-api = self.packages.${system}.shadoword-api-source;
+      });
+
+      devShells = forAllSystems (
+        system:
+        let
+          pkgs = mkPkgs system;
+          runtimeDeps = desktopRuntimeDeps pkgs;
+          cudaPkgs = cudaDeps pkgs;
+          cudaIncludePath = pkgs.lib.concatStringsSep ":" (map (pkg: "${pkg}/include") cudaPkgs);
+        in
+        {
+          default = pkgs.mkShell {
+            buildInputs =
+              commonBuildDeps pkgs
+              ++ runtimeDeps
+              ++ tauriDesktopBuildDeps pkgs
+              ++ (with pkgs; [
+                cargo
+                clippy
+                rust-analyzer
+                rustc
+                rustfmt
+              ]);
+
+            inherit (commonEnv pkgs)
+              LIBCLANG_PATH
+              BINDGEN_EXTRA_CLANG_ARGS
+              VULKAN_SDK
+              ;
+
+            LD_LIBRARY_PATH = runtimeLibraryPath pkgs runtimeDeps;
+
+            shellHook = ''
+              export VK_DRIVER_FILES=/run/opengl-driver/share/vulkan/icd.d/nvidia_icd.json
+              export VK_ICD_FILENAMES=/run/opengl-driver/share/vulkan/icd.d/nvidia_icd.json
+              export VK_LAYER_PATH=/run/opengl-driver/share/vulkan/implicit_layer.d:/run/opengl-driver/share/vulkan/explicit_layer.d
+              if [ -n "''${XDG_DATA_DIRS:-}" ]; then
+                export XDG_DATA_DIRS=/run/opengl-driver/share:$XDG_DATA_DIRS
+              else
+                export XDG_DATA_DIRS=/run/opengl-driver/share
+              fi
+              echo "Shadoword Whisper development environment"
+              echo "Run 'cd crates/shadoword-desktop && bun run tauri dev -- --features whisper-vulkan' for the desktop"
+              echo "For CUDA, enter 'nix develop .#cuda' then run 'cd crates/shadoword-desktop && bun run tauri dev -- --features whisper-cuda'"
+              echo "Run 'cargo run -p shadoword-api --features whisper-vulkan' for daemon Vulkan"
+            '';
+          };
+
+          cuda = pkgs.mkShell {
+            buildInputs =
+              commonBuildDeps pkgs
+              ++ runtimeDeps
+              ++ tauriDesktopBuildDeps pkgs
+              ++ (with pkgs; [
+                cargo
+                clippy
+                rust-analyzer
+                rustc
+                rustfmt
+              ])
+              ++ cudaPkgs;
+
+            inherit (commonEnv pkgs)
+              LIBCLANG_PATH
+              BINDGEN_EXTRA_CLANG_ARGS
+              VULKAN_SDK
+              ;
+
+            LD_LIBRARY_PATH = runtimeLibraryPath pkgs runtimeDeps;
+
+            CUDA_PATH = "${pkgs.cudaPackages.cuda_nvcc}";
+
+            shellHook = ''
+              export VK_DRIVER_FILES=/run/opengl-driver/share/vulkan/icd.d/nvidia_icd.json
+              export VK_ICD_FILENAMES=/run/opengl-driver/share/vulkan/icd.d/nvidia_icd.json
+              export VK_LAYER_PATH=/run/opengl-driver/share/vulkan/implicit_layer.d:/run/opengl-driver/share/vulkan/explicit_layer.d
+              if [ -n "''${XDG_DATA_DIRS:-}" ]; then
+                export XDG_DATA_DIRS=/run/opengl-driver/share:$XDG_DATA_DIRS
+              else
+                export XDG_DATA_DIRS=/run/opengl-driver/share
+              fi
+
+              # Use a single CUDA toolchain from nixpkgs for compile/link/runtime.
+              # Avoid mixing with ~/.local/cuda-toolkit wrappers, which causes
+              # inconsistent header/lib discovery in CMake + whisper-rs-sys.
+              export CUDA_HOME="${pkgs.cudaPackages.cuda_nvcc}"
+              export CUDA_PATH="$CUDA_HOME"
+              export PATH="$CUDA_HOME/bin:$PATH"
+              export CUDACXX="$CUDA_HOME/bin/nvcc"
+              export CMAKE_CUDA_COMPILER="$CUDACXX"
+
+              # CUDA 12.9 supports GCC 14 but not the current nixpkgs GCC 15.
+              # CMake's CUDA compiler-id test otherwise fails before Rust builds.
+              export CUDAHOSTCXX="${pkgs.gcc14}/bin/g++"
+              export CMAKE_CUDA_HOST_COMPILER="$CUDAHOSTCXX"
+              export CUDAARCHS="86"
+              export CMAKE_CUDA_ARCHITECTURES="86"
+
+              # Extra hints for CMake projects that use CUDAToolkit_ROOT.
+              export CUDAToolkit_ROOT="$CUDA_HOME"
+              export CMAKE_PREFIX_PATH="$CUDA_HOME:''${CMAKE_PREFIX_PATH:-}"
+              export CPATH=${cudaIncludePath}:''${CPATH:-}
+              export CPLUS_INCLUDE_PATH=${cudaIncludePath}:''${CPLUS_INCLUDE_PATH:-}
+              unset CUDA_INC_PATH
+
+              # Make CUDA libs available for both linker-time and runtime.
+              export LIBRARY_PATH=/run/opengl-driver/lib:${pkgs.lib.makeLibraryPath cudaPkgs}:$LIBRARY_PATH
+              export LD_LIBRARY_PATH=/run/opengl-driver/lib:${pkgs.lib.makeLibraryPath cudaPkgs}:$LD_LIBRARY_PATH
+
+              echo "Shadoword development environment (CUDA)"
+              echo "CUDA toolkit: $CUDA_HOME"
+              echo "CUDA compiler: $CUDACXX"
+              echo "CUDA host compiler: $CUDAHOSTCXX"
+              echo "Run 'cd crates/shadoword-desktop && bun run tauri dev -- --features whisper-cuda' for the desktop"
+              echo "Run 'cargo run -p shadoword-api --features whisper-cuda' for daemon CUDA"
+              echo "Run with: cargo test --workspace"
+            '';
+          };
+        }
+      );
+    };
+}

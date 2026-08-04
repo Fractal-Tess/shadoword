@@ -1,0 +1,475 @@
+/* Source detection is scoped to `src/` instead of Tailwind's automatic
+   whole-project scan, because the automatic scan reads this project's own
+   documentation. `README.md`, `DESIGN.md` and `.impeccable/design.json` each
+   state the rule "there is no `text-ink/60` anywhere" — and Tailwind, scanning
+   them, found `text-ink/60` and generated it. The prohibition was minting the
+   very utility it forbids, which also means the ban could never be verified
+   against the built stylesheet. Markup is the only thing that gets to decide
+   what CSS exists. */
+@import 'tailwindcss' source(none);
+@source '..';
+
+/* Self-hosted faces. A privacy product's site does not phone a font CDN.
+   League Gothic carries display; Azeret Mono carries every value, caption and
+   legend. Two faces, no third. */
+@import '@fontsource/league-gothic/latin-400.css';
+@import '@fontsource-variable/azeret-mono/wght.css';
+
+@theme {
+  /* ---- Grounds ---------------------------------------------------------
+     Rain-black. Every ground is cold (hue ~215-220) so the page reads as wet
+     asphalt at night rather than as a warm dark-mode surface. `night` is the
+     page; `plate` is any region carrying data. Two grounds and no third: no
+     plate on this page is hoverable, so a hover ground would be a token the
+     world has no state for.
+
+     The whole world is a blazing spectrum with one silent column in it, and
+     these grounds are the silent column. Neon belongs to the imagery only. */
+  --color-night: #07090d;
+  --color-night-plate: #0d1420;
+
+  /* ---- Scarlet, split into pigment and ink -----------------------------
+     #E6202C is the identity red and it is 4.37:1 on the page ground, so it is
+     legal as a *fill, hairline or rule* and illegal as *type*. Shipping one
+     value for both is how an accent colour quietly makes its own labels
+     unreadable.
+
+     So: `scarlet` is pigment — CTA slabs, band hairlines, the selected mode's
+     underline. `scarlet-lamp` is ink — any scarlet word on a dark ground, at
+     5.62:1 on night and 5.21:1 on plate. `scarlet-deep` is the pressed state of
+     a scarlet fill. Magenta #FF2F7F and cyan #26D4EC exist in this world too
+     but only inside the imagery; they are deliberately absent from this file so
+     they cannot reach type or a control. */
+  --color-scarlet: #e6202c;
+  --color-scarlet-lamp: #f04e55;
+  --color-scarlet-deep: #b80e17;
+
+  /* ---- Inks ------------------------------------------------------------
+     Two inks on the dark ground and no third, and the secondary is a token
+     rather than an opacity of the primary — an `/50` of the off-white lands
+     near 4:1, which is how running prose stops being readable.
+
+     `on-scarlet` is pure white and it is the only ink permitted on a scarlet
+     fill: the off-white gives 3.65:1 there and fails, while white gives
+     4.56:1 and passes. The CTA is the most important element on the page, so
+     it does not get to be the one thing that fails. */
+  --color-ink: #e8e6e1;
+  --color-ink-soft: #7a8089;
+  --color-on-scarlet: #ffffff;
+
+  /* ---- Rules -----------------------------------------------------------
+     `rule` is decorative: inset cell dividers and band separators, where the
+     boundary is already carried by layout and by semantic HTML. It is 1.38:1
+     on purpose, matching the comp's near-invisible hairlines.
+     `rule-strong` is for any rule that is the only thing conveying a boundary,
+     and for the outlined numerals, at 3.28:1 to clear WCAG 1.4.11. */
+  --color-rule: #252a33;
+  --color-rule-strong: #5a6371;
+
+  --font-display: 'League Gothic', 'Oswald', ui-sans-serif, system-ui, sans-serif;
+  --font-mono: 'Azeret Mono Variable', ui-monospace, 'SFMono-Regular', monospace;
+
+  /* ---- Compression -----------------------------------------------------
+     The approved comp's headline runs at 0.266-0.278 advance per cap height,
+     agreeing across all three lines, which is 59% of Anton's width. No
+     obtainable face reaches that natively. League Gothic at -0.03em tracking
+     compressed to 0.703 reproduces it at IoU 0.740 and 51.1% ink against the
+     comp's 52% — the closest of five candidates rendered at matched cap
+     height, and a far gentler squeeze than Anton's required 0.517.
+
+     Compression is therefore a recorded token, not an ad-hoc transform, and it
+     eases off as size drops, the way a real family's text cut is wider than
+     its display cut. Nothing below ~18px is compressed at all: a squeezed 11px
+     legend is just a damaged 11px legend. */
+  --squeeze-display: 0.703;
+  --squeeze-heading: 0.78;
+  --squeeze-label: 0.88;
+
+  /* League Gothic's cap height is 0.75em. Every display size in this world is
+     specified as a cap height and divided by this, because the comp was
+     measured in cap heights and font-size is not a visible quantity. */
+  --cap-em: 0.75;
+}
+
+/* ---- The plate's two bin hues ------------------------------------------
+   Sampled off the delivered hero plate, and named here rather than repeated as
+   literals in the component that lights them.
+
+   Deliberately outside `@theme`: a value in the theme block becomes a `text-*`
+   and `bg-*` utility, and the whole discipline of this world is that neon lives
+   in the imagery and never in a word or a control. These two are for
+   `mix-blend-mode: screen` overlays registered to bins already burning in the
+   raster — nothing else may use them. */
+:root {
+  --sign-magenta: #ff2f7f;
+  --sign-cyan: #26d4ec;
+}
+
+@layer base {
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    background-color: var(--color-night);
+    color: var(--color-ink);
+    font-family: var(--font-mono);
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  ::selection {
+    background-color: var(--color-scarlet);
+    color: var(--color-on-scarlet);
+  }
+
+  /* One focus treatment for the whole page, and it is deliberately *not*
+     scarlet. Scarlet is the primary CTA's own fill and the nav CTA's own
+     border, so a scarlet ring around either read as the slab quietly growing
+     2px rather than as focus — the page's most important control was the one
+     place the ring did not announce itself.
+
+     Off-white ink is the one value nothing on this page is filled with. The
+     box-shadow floods the 2px offset gap with page black so the ring always
+     has a dark edge beneath it: light-on-dark over a plate, dark-on-light over
+     a scarlet slab or a burning bin in the imagery. */
+  :focus-visible {
+    outline: 2px solid var(--color-ink);
+    outline-offset: 2px;
+    box-shadow: 0 0 0 2px var(--color-night);
+  }
+
+  /* Painted things are square, and in this world that is load-bearing: radius
+     means "this is a physical object", so controls carry 0 and only the
+     riveted plate is allowed to round. */
+  a,
+  button,
+  input,
+  select {
+    border-radius: 0;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    html {
+      scroll-behavior: auto;
+    }
+
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+}
+
+/* ---- Display type ------------------------------------------------------
+   Each headline line is its own block with `nowrap`, so compression never
+   interacts with line breaking: the breaks are authored, exactly as they are
+   in the comp. `transform-origin: left` keeps the ink registered to the left
+   margin whatever the compression is set to, and because scaleX does not
+   change height, everything below the headline flows normally. */
+@utility hl-line {
+  display: block;
+  white-space: nowrap;
+  transform: scaleX(var(--squeeze-display));
+  transform-origin: left center;
+}
+
+@utility display-hero {
+  font-family: var(--font-display);
+  font-weight: 400;
+  text-transform: uppercase;
+  letter-spacing: -0.03em;
+  /* Measured off the comp: line top-to-top is 1.10 x cap height, and cap height
+     is 0.75em, so leading is 0.825em — not 1.1em. Set as a unitless 0.825 so it
+     tracks the clamped size. Tight enough that the three lines read as one
+     stacked block, which is the whole point of a condensed display cut. */
+  line-height: 0.825;
+  /* Cap height is 10.5% of viewport height in the comp, so font-size is that
+     over League Gothic's 0.75 cap/em ratio — 14vh. But a headline sized only
+     from height overflows a narrow viewport and shrinks to nothing on a short
+     wide one, so the width term is the same measurement taken off the comp's
+     width (8.75vw at 1536), and the two are floored and capped. */
+  font-size: clamp(4.25rem, min(14vh, 8.75vw), 9rem);
+}
+
+@utility display-section {
+  font-family: var(--font-display);
+  font-weight: 400;
+  text-transform: uppercase;
+  letter-spacing: -0.02em;
+  line-height: 0.94;
+  font-size: clamp(2rem, 4.4vw, 3.375rem);
+  transform: scaleX(var(--squeeze-heading));
+  transform-origin: left center;
+}
+
+/* The F2 glyph on the hazard plate. Same 54px cap as a section heading, because
+   in the comp it is the same size — but fixed rather than fluid, and not
+   compressed: a two-character legend has no width problem to solve. */
+@utility display-plate {
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: 3.375rem;
+  line-height: 0.9;
+  letter-spacing: 0.02em;
+}
+
+@utility display-column {
+  font-family: var(--font-display);
+  font-weight: 400;
+  text-transform: uppercase;
+  letter-spacing: -0.01em;
+  line-height: 1;
+  font-size: clamp(1.375rem, 2.1vw, 1.875rem);
+  transform: scaleX(var(--squeeze-label));
+  transform-origin: left center;
+}
+
+/* The wordmark lockup is its own ramp step, and it is not compressed: the
+   letters are tracked wide apart rather than squeezed, which is the opposite
+   operation, and the two cannot be applied to the same word. */
+@utility display-wordmark {
+  font-family: var(--font-display);
+  font-weight: 400;
+  text-transform: uppercase;
+  letter-spacing: 0.34em;
+  line-height: 1;
+  font-size: 1.0625rem;
+}
+
+@utility display-label {
+  font-family: var(--font-display);
+  font-weight: 400;
+  text-transform: uppercase;
+  letter-spacing: 0.01em;
+  line-height: 1;
+  font-size: 1.375rem;
+  transform: scaleX(var(--squeeze-label));
+  transform-origin: left center;
+}
+
+/* The signature device: a large outlined numeral beside a solid display label
+   on a shared baseline. Stroke-only, in the boundary grey rather than the
+   decorative one, so the outline survives at 1px. */
+@utility numeral-outline {
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: 2.75rem;
+  line-height: 1;
+  color: transparent;
+  -webkit-text-stroke: 1px var(--color-rule-strong);
+  transform: scaleX(var(--squeeze-label));
+  transform-origin: left center;
+}
+
+/* ---- Mono ramp --------------------------------------------------------- */
+@utility mono-legend {
+  font-family: var(--font-mono);
+  font-size: 0.875rem;
+  line-height: 1.55;
+}
+
+@utility mono-caption {
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  line-height: 1.5;
+}
+
+@utility mono-micro {
+  font-family: var(--font-mono);
+  font-size: 0.71875rem;
+  line-height: 1.4;
+  letter-spacing: 0.04em;
+}
+
+/* Scarlet section labels. Lamp, never pigment — this is type. */
+@utility mono-section {
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  font-weight: 500;
+  line-height: 1.3;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--color-scarlet-lamp);
+}
+
+@layer components {
+  /* A flat matte plate. Every region that carries data is one of these: no
+     glow, no gradient, no shadow, no glass. This single rule is what lets a
+     spec table exist in a neon world without collapsing back into the
+     near-black-plus-neon rut. */
+  .plate {
+    background-color: var(--color-night-plate);
+    border: 1px solid var(--color-rule);
+    border-radius: 0;
+  }
+
+  /* Major bands are bounded by a scarlet hairline. Pigment is legal: a 1px
+     rule is not type. */
+  .band-top {
+    border-top: 1px solid var(--color-scarlet);
+  }
+
+  .band-bottom {
+    border-bottom: 1px solid var(--color-scarlet);
+  }
+
+  /* Primary CTA: a solid scarlet square slab with a white mono label. The
+     page's only job is to send a developer to the source, so this is the one
+     element allowed to be the loudest thing that is not imagery. */
+  .cta-solid {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 1rem 1.75rem;
+    background-color: var(--color-scarlet);
+    color: var(--color-on-scarlet);
+    font-family: var(--font-mono);
+    font-size: 0.875rem;
+    font-weight: 500;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    text-decoration: none;
+    border-radius: 0;
+    transition:
+      background-color 140ms linear,
+      transform 140ms linear;
+  }
+
+  .cta-solid:hover {
+    background-color: var(--color-scarlet-deep);
+  }
+
+  .cta-solid:active {
+    transform: translateY(1px);
+  }
+
+  /* Secondary: 1px scarlet outline on transparent, scarlet lamp label. The
+     outline may be pigment; the label may not. */
+  .cta-outline {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 0.9375rem;
+    border: 1px solid var(--color-scarlet);
+    color: var(--color-scarlet-lamp);
+    font-family: var(--font-mono);
+    font-size: 0.71875rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    text-decoration: none;
+    border-radius: 0;
+    transition:
+      background-color 140ms linear,
+      color 140ms linear;
+  }
+
+  .cta-outline:hover {
+    background-color: var(--color-scarlet);
+    color: var(--color-on-scarlet);
+  }
+
+  /* The world's only *physical* object. Radius plus bevel plus shadow plus
+     rivets says "this is a metal plate bolted to a machine", which is why
+     nothing printed on this page — no table, no notice, no control — is allowed
+     any of the four.
+
+     There are exactly two, and their placement is the whole point: the shortcut
+     plate at the page's head, which says what the machine does, and the status
+     plate at its foot, which says what the machine is. That is where a real
+     machine carries its plates. A third would make this a texture instead of a
+     material. */
+  .rivet-plate {
+    position: relative;
+    /* Rivet pitch: one fastener per tile, so 25% is four per edge. A wide plate
+       overrides it — four screws holding a 900px panel is not a fixing, it is a
+       decoration that has forgotten what it is for. */
+    --rivet-pitch: 25%;
+    border-radius: 10px;
+    background-color: var(--color-night-plate);
+    border: 1px solid var(--color-rule-strong);
+    box-shadow:
+      0 18px 40px -12px rgb(0 0 0 / 0.9),
+      inset 0 1px 0 rgb(255 255 255 / 0.07);
+  }
+
+  /* Rivets along both long edges, drawn as a repeating radial gradient on two
+     pseudo-elements rather than one DOM node per fastener.
+
+     Two layers and, critically, *soft* colour stops. The first pass used hard
+     stops (`0 1.6px, 1.6px 2.4px`) and rendered as a flat grey square: at a
+     ~5px diameter a hard-stopped radial gradient has too few pixels for its own
+     circumference to survive, so it aliases into a block. A smooth ramp from a
+     highlight offset up-left of centre through the rim colour to a dark edge
+     both reads as round and reads as lit. The second layer is the seat shadow,
+     cast down-right of the head.
+
+     The offsets are in px rather than % because each background tile is a
+     fraction of an unknown plate width, so a percentage offset would slide with
+     the viewport and the highlight would leave the head. The gradients are sized
+     in px for the same reason.
+
+     Light comes from up-left here for one reason: the comp's plate is lit from
+     up-left, and the bevel on `.rivet-plate` above is an `inset 0 1px 0`
+     highlight on the top edge only. One light source for the whole object. */
+  .rivet-plate::before,
+  .rivet-plate::after {
+    content: '';
+    position: absolute;
+    left: 0.75rem;
+    right: 0.75rem;
+    height: 9px;
+    background-image:
+      radial-gradient(
+        3.6px 3.6px at calc(50% - 0.7px) calc(50% - 0.9px),
+        rgb(255 255 255 / 0.85) 0%,
+        var(--color-rule-strong) 40%,
+        rgb(0 0 0 / 0.55) 82%,
+        transparent 100%
+      ),
+      radial-gradient(
+        4.4px 4.4px at calc(50% + 0.5px) calc(50% + 1.1px),
+        rgb(0 0 0 / 0.7) 0%,
+        transparent 100%
+      );
+    background-size: var(--rivet-pitch) 9px;
+    background-repeat: repeat-x;
+    pointer-events: none;
+  }
+
+  .rivet-plate::before {
+    top: 0.45rem;
+  }
+
+  .rivet-plate::after {
+    bottom: 0.45rem;
+  }
+
+  /* Hazard chevrons, off-white on black. Flat shape system, so the gradient
+     carries geometry only and never depth.
+
+     Off-white, not scarlet, on the comp's own evidence and on this world's own
+     rule: scarlet does scanning work — it marks the one live band hairline, the
+     selected mode and the primary action. Two chevron strips of it, on a plate
+     edge and on a placeholder notice, is the accent spent on decoration, and it
+     costs the reader the ability to find the three places scarlet means
+     something. */
+  .chevron-strip {
+    background-image: repeating-linear-gradient(
+      -45deg,
+      var(--color-ink) 0 8px,
+      var(--color-night) 8px 16px
+    );
+  }
+
+  /* Cell and column dividers are inset from the band's edges rather than
+     spanning it, which is what keeps a table reading as a printed panel
+     instead of a spreadsheet. */
+  .divide-inset > * + * {
+    border-left: 1px solid var(--color-rule);
+  }
+}

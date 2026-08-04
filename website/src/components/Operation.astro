@@ -1,0 +1,104 @@
+---
+import { instructionPlates, latencyBench } from '../data/site'
+
+/**
+ * Build from source is the only distribution, so the commands are the product's
+ * install page and they are set as such: real commands, selectable, in the
+ * monospace, on flat matte plates.
+ *
+ * The latency strip is the page's one deliberate hole. No run of the bench
+ * corpus exists, so instead of a plausible millisecond figure it names the
+ * harness and the corpus and says so. A privacy tool that invents a number on
+ * its own landing page has already told you how much its other numbers are
+ * worth.
+ */
+---
+
+<section class="band-top bg-night" aria-labelledby="operation-heading">
+  <div class="mx-auto max-w-[1536px] px-5 py-14 sm:px-8 lg:py-16">
+    {
+      /*
+        No kicker. The one this band carried, "No packages yet", was a *fact*
+        dressed as a label, and the page already states it twice — under the hero
+        CTA where it changes what the reader expects from the click, and in the
+        footer's Packages row. A third setting of it in the accent colour is not
+        emphasis, it is an echo.
+      */
+    }
+    <h2 id="operation-heading" class="display-section text-ink">Build it and run it</h2>
+
+    {
+      /*
+        Two columns at most, never four. At four the longest real command —
+        `bun run tauri dev -- --features whisper-vulkan` — is clipped by its own
+        plate at 1536px wide, and a build instruction the reader cannot finish
+        reading is the worst thing this band could ship. The grid yields to the
+        content's actual measure.
+      */
+    }
+    <div class="mt-10 grid grid-cols-1 gap-6 md:grid-cols-2">
+      {
+        instructionPlates.map((p) => (
+          <div class="plate flex flex-col">
+            <h3 class="mono-micro text-ink-soft border-rule border-b px-5 py-3 uppercase">
+              {p.legend}
+            </h3>
+            {/* One `pre` per plate, so a reader can select the whole block and
+                paste it. Splitting each line into its own element would look
+                identical and paste as garbage.
+
+                `set:text` on a self-closing element rather than children,
+                because whitespace inside a `<pre>` is content: with a nested
+                `<code>` on its own line the formatter indents it, and every
+                command shipped with fourteen leading spaces baked into the thing
+                the reader is meant to copy. A childless element has no interior
+                for a formatter to reflow. */}
+            <pre
+              class="mono-caption text-ink overflow-x-auto px-5 py-4"
+              set:text={p.lines.join('\n')}
+            />
+          </div>
+        ))
+      }
+    </div>
+
+    {
+      /*
+        The hazard strip stays horizontal at every width. Rotated to a vertical
+        6px edge the -45deg chevrons stop touching each other and read as a
+        dashed line, which is a different sign entirely.
+      */
+    }
+    {
+      latencyBench.placeholder && (
+        <div class="plate mt-6">
+          <div class="chevron-strip h-1.5 w-full" aria-hidden="true" />
+          <div class="px-5 py-4 md:py-5">
+            {/* A plate heading, in the same off-white display label the model
+                catalog and accelerator plates use, not a scarlet kicker: this
+                titles a notice inside a plate rather than naming a band. The
+                chevron edge above it is already the mark that says "read this
+                one differently". */}
+            <h3 class="display-label text-ink">Not yet measured</h3>
+            <p class="mono-legend text-ink mt-2.5 max-w-[80ch]">
+              There is no published latency figure, because no run of the bench corpus has been
+              recorded. When there is one it will name the hardware it ran on.
+            </p>
+            <dl class="mono-caption text-ink-soft mt-3.5 grid gap-x-8 gap-y-1 sm:grid-cols-[auto_1fr]">
+              <dt class="uppercase">Harness</dt>
+              <dd class="text-ink">
+                <code>crates/shadoword-model-whisper/tests/whisper_integration.rs</code>
+              </dd>
+              <dt class="uppercase">Corpus</dt>
+              <dd class="text-ink">
+                <code>bench_corpus/clip_&#123;10,15,20,30&#125;s.wav</code>
+              </dd>
+              <dt class="uppercase">Model</dt>
+              <dd class="text-ink">{latencyBench.model}</dd>
+            </dl>
+          </div>
+        </div>
+      )
+    }
+  </div>
+</section>

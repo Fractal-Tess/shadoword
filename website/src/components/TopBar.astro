@@ -1,0 +1,25 @@
+---
+import Wordmark from './Wordmark.astro'
+import { repoUrl } from '../data/site'
+---
+
+{
+  /*
+    ~5% of the first viewport, bounded below by the scarlet hairline that bounds
+    every major band in this world. Not sticky: the page's one action is
+    duplicated at full size in the hero directly beneath it, and a bar that
+    follows the reader down would sit on top of the imagery for the whole
+    scroll.
+  */
+}
+<header class="band-bottom bg-night">
+  <div class="mx-auto flex h-12 max-w-[1536px] items-center justify-between px-5 sm:px-8">
+    <Wordmark />
+
+    <div class="flex items-center gap-5 sm:gap-8">
+      <p class="mono-micro text-ink-soft hidden uppercase md:block">Linux first</p>
+      <p class="mono-micro text-ink-soft hidden uppercase lg:block">Offline by default</p>
+      <a class="cta-outline" href={repoUrl} rel="noopener">Read the source</a>
+    </div>
+  </div>
+</header>

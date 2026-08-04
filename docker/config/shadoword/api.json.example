@@ -1,0 +1,11 @@
+{
+  "listen_addr": "0.0.0.0:47813",
+  "transcription": {
+    "model_path": "/data/shadoword/models/ggml-large-v3-turbo.bin",
+    "preload_on_startup": true,
+    "sample_rate": 16000,
+    "english_only": false,
+    "whisper_accelerator": "cpu"
+  },
+  "queue_capacity": 4
+}
