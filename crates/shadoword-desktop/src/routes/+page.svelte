@@ -12,22 +12,19 @@ OWN-WORLD: Rain-black grounds. Scarlet is the only accent, split into pigment
 STORY: The operator confirms which machine will do the work, holds one
   unmistakable control, watches the void column close or stay open, and takes the
   text.
-FIRST VIEWPORT: Command rail left, capture stage centre carrying the spectrum
-  raster and the void column, signal-path rail right. The low-frequency rail runs
-  along the window's bottom edge under everything.
+FIRST VIEWPORT: Command rail left, capture stage and transcript surface filling
+  the remaining window. The low-frequency rail stays inside the capture stage.
 FORM: Neo-Tokyo Neon Night, abstracted from cityscape to spectrum; seed 322d3899.
 -->
 <script lang="ts">
 	import { browser } from '$app/environment';
 	import { DesktopAppState } from '$lib/app-state.svelte';
 	import CommandRail from '$lib/components/CommandRail.svelte';
-	import ContextStrip from '$lib/components/ContextStrip.svelte';
 	import AboutView from '$lib/views/AboutView.svelte';
 	import HistoryView from '$lib/views/HistoryView.svelte';
 	import ModelsView from '$lib/views/ModelsView.svelte';
 	import SettingsView from '$lib/views/SettingsView.svelte';
 	import TranscribeView from '$lib/views/TranscribeView.svelte';
-	import WindowChrome from '$lib/components/WindowChrome.svelte';
 	import type { PageId } from '$lib/types';
 	import { inferencePoolSummary } from '$lib/inference-pool';
 	import { onMount } from 'svelte';
@@ -69,7 +66,6 @@ FORM: Neo-Tokyo Neon Night, abstracted from cityscape to spectrum; seed 322d3899
 		bins for no reason, and the mark that matters stopped being the only one. In
 		Operate mode the shell's job is to be a window, not a picture.
 	-->
-	<WindowChrome {activePage} />
 	<CommandRail {app} bind:activePage />
 	<main tabindex="-1">
 		<div class="work-surface">
@@ -86,26 +82,6 @@ FORM: Neo-Tokyo Neon Night, abstracted from cityscape to spectrum; seed 322d3899
 					</button>
 				</div>
 			{/if}
-			<!-- Below 1180px the right rail is gone, so the signal path collapses into
-			     one line. Same three stages, same order, same marking on the middle one. -->
-			<div class="compact-signal-summary mono-micro" aria-label="Current signal path">
-				<span>{app.settings?.input_device ?? 'System default'}</span>
-				<i aria-hidden="true"></i>
-				<!-- Only the machine name takes the accent. The pool counts rode it too in
-				     the first pass, which put four scarlet words in a row and made the one
-				     thing that matters — which machine is doing the work — impossible to pick
-				     out of its own highlight. -->
-				<strong>{mode === 'remote' ? 'Remote API' : 'This machine'}</strong>
-				<em>{poolSummary}</em>
-				<i aria-hidden="true"></i>
-				<span
-					>{app.settings?.paste_method === 'direct'
-						? 'Type directly'
-						: app.settings?.copy_to_clipboard
-							? 'Clipboard'
-							: 'Transcript surface'}</span
-				>
-			</div>
 			<div class="sr-only" aria-live="polite">
 				{activePage} view · {mode === 'remote' ? 'Remote API' : 'Local machine'} · {poolSummary}
 			</div>
@@ -124,23 +100,21 @@ FORM: Neo-Tokyo Neon Night, abstracted from cityscape to spectrum; seed 322d3899
 			{/if}
 		</div>
 	</main>
-	<ContextStrip {app} />
 </div>
 
 <style>
 	.app-shell {
 		display: grid;
-		grid-template-columns: 14rem minmax(0, 1fr) 14rem;
-		grid-template-rows: 2.75rem minmax(0, 1fr);
+		grid-template-columns: 14rem minmax(0, 1fr);
 		min-width: 0;
-		height: 100dvh;
+		width: 100%;
+		height: 100svh;
 		overflow: hidden;
 		background: var(--surface-0);
 	}
 
 	main {
 		grid-column: 2;
-		grid-row: 2;
 		min-width: 0;
 		overflow: auto;
 		background: var(--surface-0);
@@ -148,14 +122,18 @@ FORM: Neo-Tokyo Neon Night, abstracted from cityscape to spectrum; seed 322d3899
 	}
 
 	.work-surface {
+		display: flex;
 		width: min(100%, 72rem);
-		min-height: 100%;
+		height: 100%;
+		min-height: 0;
 		margin: 0 auto;
-		padding: clamp(1.4rem, 2.6vw, 2.25rem) clamp(1.4rem, 2.6vw, 2.25rem) 3.5rem;
+		padding: clamp(1.1rem, 2vw, 1.75rem);
+		flex-direction: column;
 	}
 
-	.compact-signal-summary {
-		display: none;
+	.work-surface :global(.transcribe-view) {
+		min-height: 0;
+		flex: 1;
 	}
 
 	.demo-banner,
@@ -211,64 +189,6 @@ FORM: Neo-Tokyo Neon Night, abstracted from cityscape to spectrum; seed 322d3899
 
 	:global(.command-rail) {
 		grid-column: 1;
-		grid-row: 2;
-	}
-
-	:global(.context-strip) {
-		grid-column: 3;
-		grid-row: 2;
-	}
-
-	@media (max-width: 1180px) {
-		.app-shell {
-			grid-template-columns: 14rem minmax(0, 1fr);
-		}
-
-		.compact-signal-summary {
-			display: flex;
-			align-items: center;
-			gap: 0.6rem;
-			margin: 0 0 1.15rem;
-			border: 1px solid var(--line);
-			padding: 0.5rem 0.7rem;
-			background: var(--surface-1);
-			color: var(--ink-muted);
-		}
-
-		.compact-signal-summary strong {
-			flex-shrink: 0;
-			color: var(--scarlet-lamp);
-			font-weight: 400;
-			white-space: nowrap;
-		}
-
-		.compact-signal-summary em {
-			min-width: 0;
-			overflow: hidden;
-			color: var(--ink-dim);
-			font-style: normal;
-			text-overflow: ellipsis;
-			white-space: nowrap;
-		}
-
-		/* The last stage is the first thing to go when the line runs out of room: the
-		   delivery target is also printed in the transcript surface's own footer, and
-		   the input device is not. */
-		.compact-signal-summary > span:last-of-type {
-			min-width: 0;
-			overflow: hidden;
-			text-overflow: ellipsis;
-			white-space: nowrap;
-		}
-
-		/* The joining line from the full rail, reduced to a 0.7rem segment between
-		   stages. Still one path, still drawn rather than punctuated with arrows. */
-		.compact-signal-summary i {
-			width: 0.7rem;
-			height: 1px;
-			flex-shrink: 0;
-			background: var(--line-strong);
-		}
 	}
 
 	@media (max-width: 900px) {

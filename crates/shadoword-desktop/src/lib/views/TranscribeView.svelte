@@ -307,14 +307,17 @@
 <style>
 	.transcribe-view {
 		display: grid;
+		grid-template-rows: auto minmax(18rem, 1fr) minmax(9.5rem, 0.56fr);
 		gap: 0.85rem;
+		height: 100%;
+		min-height: 0;
 	}
 
 	.capture-stage {
 		position: relative;
 		display: grid;
 		grid-template-rows: 1fr auto;
-		min-height: 21.5rem;
+		min-height: 0;
 		overflow: hidden;
 		border: 1px solid var(--line);
 		background: var(--surface-0);
@@ -693,6 +696,13 @@
 
 	/* ---- Transcript ------------------------------------------------------ */
 
+	.transcript-surface {
+		display: grid;
+		grid-template-rows: auto minmax(0, 1fr) auto;
+		min-height: 0;
+		overflow: hidden;
+	}
+
 	.transcript-surface header {
 		display: flex;
 		align-items: center;
@@ -712,8 +722,8 @@
 	}
 
 	.transcript-surface :global(.transcript-editor) {
-		min-height: 8.5rem;
-		resize: vertical;
+		min-height: 0;
+		resize: none;
 		border: 0;
 		border-radius: 0;
 		padding: 1.05rem 0.9rem;
