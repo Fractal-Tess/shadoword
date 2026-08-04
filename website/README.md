@@ -43,16 +43,21 @@ bun run preview
 ## Container (Astro + Nginx)
 
 Follows Astro's static/NGINX recipe — <https://docs.astro.build/en/recipes/docker/> —
-with the build stage on Bun, since this repo keeps no npm or pnpm lockfile. Nginx
-serves on **8080**, per the recipe.
+with the build stage on Bun, since this repo keeps no npm or pnpm lockfile.
 
 ```bash
 docker build -t shadoword-website ./website
-docker run --rm -p 8080:8080 shadoword-website
+docker run --rm -p 8080:80 shadoword-website
 # http://localhost:8080
 ```
 
-Two things worth knowing before you change the Dockerfile:
+Three things worth knowing before you change the Dockerfile:
+
+- **Nginx listens on 80, not the recipe's 8080.** 8080 is the rootless
+  convention and `nginx:alpine` runs as root, so it buys nothing here — and it
+  cost a live 502: Dokploy generates its Traefik service against the image's
+  port 80, so a container listening only on 8080 was healthy and unreachable at
+  the same time. Change this only together with the proxy that fronts it.
 
 - The build stage pins `oven/bun:1.3.10`. The floating `oven/bun:1.3` tag
   currently resolves to 1.3.14, which fails the build outright: it cannot extract

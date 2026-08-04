@@ -19,4 +19,5 @@ RUN bun run build
 FROM nginx:alpine AS runtime
 COPY ./nginx/nginx.conf /etc/nginx/nginx.conf
 COPY --from=build /app/dist /usr/share/nginx/html
-EXPOSE 8080
+# 80, not the recipe's 8080. See the note at the top of nginx/nginx.conf.
+EXPOSE 80
