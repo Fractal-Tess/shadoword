@@ -63,29 +63,24 @@ jobs:
           api_cpu=$(nix build .#shadoword-api-source --no-link --print-out-paths -L)
           api_cuda=$(nix build .#shadoword-api-cuda-source --no-link --print-out-paths -L)
           api_vulkan=$(nix build .#shadoword-api-vulkan-source --no-link --print-out-paths -L)
-          desktop_client=$(nix build .#shadoword-desktop-client-source --no-link --print-out-paths -L)
           desktop=$(nix build .#shadoword-desktop-source --no-link --print-out-paths -L)
 
-          mkdir -p dist/stage/api-cpu/bin dist/stage/api-cuda/bin dist/stage/api-vulkan/bin dist/stage/desktop-client/bin dist/stage/desktop/bin
+          mkdir -p dist/stage/api-cpu/bin dist/stage/api-cuda/bin dist/stage/api-vulkan/bin dist/stage/desktop/bin
           install -m755 "$api_cpu/bin/.shadoword-api-wrapped" dist/stage/api-cpu/bin/shadoword-api
           install -m755 "$api_cuda/bin/.shadoword-api-wrapped" dist/stage/api-cuda/bin/shadoword-api
           install -m755 "$api_vulkan/bin/.shadoword-api-wrapped" dist/stage/api-vulkan/bin/shadoword-api
-          install -m755 "$desktop_client/bin/.shadoword-desktop-wrapped" dist/stage/desktop-client/bin/shadoword-desktop
           install -m755 "$desktop/bin/.shadoword-desktop-wrapped" dist/stage/desktop/bin/shadoword-desktop
-          cp -R "$desktop_client/share" dist/stage/desktop-client/
           cp -R "$desktop/share" dist/stage/desktop/
 
           cp README.md CHANGELOG.md dist/stage/api-cpu/
           cp README.md CHANGELOG.md dist/stage/api-cuda/
           cp README.md CHANGELOG.md dist/stage/api-vulkan/
-          cp README.md CHANGELOG.md dist/stage/desktop-client/
           cp README.md CHANGELOG.md dist/stage/desktop/
 
           tar -C dist/stage/api-cpu -czf dist/shadoword-api-cpu-x86_64-linux.tar.gz .
           tar -C dist/stage/api-cuda -czf dist/shadoword-api-cuda-x86_64-linux.tar.gz .
           tar -C dist/stage/api-vulkan -czf dist/shadoword-api-vulkan-x86_64-linux.tar.gz .
-          tar -C dist/stage/desktop-client -czf dist/shadoword-desktop-client-x86_64-linux.tar.gz .
-          tar -C dist/stage/desktop -czf dist/shadoword-desktop-cpu-x86_64-linux.tar.gz .
+          tar -C dist/stage/desktop -czf dist/shadoword-desktop-x86_64-linux.tar.gz .
           (cd dist && sha256sum ./*.tar.gz > SHA256SUMS)
 
           version=${RELEASE_TAG#v}
@@ -99,8 +94,7 @@ jobs:
             --arg api_hash "$(sri_hash dist/shadoword-api-cpu-x86_64-linux.tar.gz)" \
             --arg cuda_hash "$(sri_hash dist/shadoword-api-cuda-x86_64-linux.tar.gz)" \
             --arg vulkan_hash "$(sri_hash dist/shadoword-api-vulkan-x86_64-linux.tar.gz)" \
-            --arg desktop_client_hash "$(sri_hash dist/shadoword-desktop-client-x86_64-linux.tar.gz)" \
-            --arg desktop_hash "$(sri_hash dist/shadoword-desktop-cpu-x86_64-linux.tar.gz)" \
+            --arg desktop_hash "$(sri_hash dist/shadoword-desktop-x86_64-linux.tar.gz)" \
             '{
               version: $version,
               systems: {
@@ -117,12 +111,8 @@ jobs:
                     url: ($release_base + "/shadoword-api-vulkan-x86_64-linux.tar.gz"),
                     hash: $vulkan_hash
                   },
-                  "shadoword-desktop-client": {
-                    url: ($release_base + "/shadoword-desktop-client-x86_64-linux.tar.gz"),
-                    hash: $desktop_client_hash
-                  },
                   "shadoword-desktop": {
-                    url: ($release_base + "/shadoword-desktop-cpu-x86_64-linux.tar.gz"),
+                    url: ($release_base + "/shadoword-desktop-x86_64-linux.tar.gz"),
                     hash: $desktop_hash
                   }
                 }
@@ -140,7 +130,6 @@ jobs:
             dist/shadoword-api-cpu-x86_64-linux.tar.gz
             dist/shadoword-api-cuda-x86_64-linux.tar.gz
             dist/shadoword-api-vulkan-x86_64-linux.tar.gz
-            dist/shadoword-desktop-client-x86_64-linux.tar.gz
-            dist/shadoword-desktop-cpu-x86_64-linux.tar.gz
+            dist/shadoword-desktop-x86_64-linux.tar.gz
             dist/SHA256SUMS
             dist/nix-release-artifacts.json

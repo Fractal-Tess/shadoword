@@ -33,21 +33,13 @@ bun run tauri dev -- --features whisper-vulkan
 bun run tauri dev -- --features whisper-cuda
 ```
 
-### Desktop client profile
+### Unified desktop runtime
 
-The desktop-only client profile keeps microphone capture, VAD streaming, direct
-OpenRouter transcription, history, hotkeys, tray behavior, and transcript delivery,
-but removes local Whisper inference and local model management from the build:
-
-```bash
-cd crates/shadoword-desktop
-bun run tauri dev -- --no-default-features --features remote-client
-```
-
-This profile can use either a configured Shadoword API or direct OpenRouter
-transcription and presents daemon runtime and model controls only in remote mode.
-The full desktop package embeds the portable CPU Whisper runtime in the same
-executable while retaining both remote options.
+Every desktop build includes the portable CPU Whisper runtime alongside Shadoword
+API and direct OpenRouter transcription. Local model management, microphone capture,
+VAD streaming, history, hotkeys, tray behavior, and transcript delivery therefore
+remain available from one executable. GPU feature flags add acceleration without
+removing any transcription target.
 
 ## Releases
 
@@ -57,11 +49,10 @@ x86_64 archives:
 - `shadoword-api-cpu-x86_64-linux.tar.gz`
 - `shadoword-api-cuda-x86_64-linux.tar.gz`
 - `shadoword-api-vulkan-x86_64-linux.tar.gz`
-- `shadoword-desktop-client-x86_64-linux.tar.gz` — desktop UI and native capture for remote/OpenRouter transcription
-- `shadoword-desktop-cpu-x86_64-linux.tar.gz` — desktop UI with the embedded CPU Whisper runtime
+- `shadoword-desktop-x86_64-linux.tar.gz` — unified desktop with Local CPU, Shadoword API, and OpenRouter transcription
 
-Together these cover API-only, desktop-only, and combined desktop/runtime
-installations. Each release also includes `SHA256SUMS`. The archives contain the stripped ELF
+Together these cover API-only and unified desktop installations. Each release also
+includes `SHA256SUMS`. The archives contain the stripped ELF
 executables used by the Nix packages, allowing NixOS deployments to download
 and patch the release binaries without compiling Rust, CUDA, or the desktop
 frontend locally.

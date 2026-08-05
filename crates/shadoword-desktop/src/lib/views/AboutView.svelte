@@ -19,7 +19,7 @@
 			<p>Run locally, connect to your own API, or opt into OpenRouter per recording.</p>
 		</div>
 		<div class="version-block">
-			<span>Linux desktop</span><strong>0.10.4</strong><Badge variant="outline">Production</Badge>
+			<span>Linux desktop</span><strong>0.10.5</strong><Badge variant="outline">Production</Badge>
 		</div>
 	</section>
 

@@ -11,8 +11,9 @@ description = "Tauri desktop shell for Shadoword"
 [features]
 default = ["local-runtime"]
 local-runtime = ["shadoword-core/local-whisper"]
-remote-client = []
-custom-protocol = ["tauri/custom-protocol"]
+# Compatibility profile: remote and OpenRouter support now always ships alongside local CPU inference.
+remote-client = ["local-runtime"]
+custom-protocol = ["tauri/custom-protocol", "local-runtime"]
 whisper-vulkan = ["local-runtime", "shadoword-core/whisper-vulkan"]
 whisper-cuda = ["local-runtime", "shadoword-core/whisper-cuda"]
 

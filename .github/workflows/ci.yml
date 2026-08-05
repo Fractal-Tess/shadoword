@@ -38,6 +38,14 @@ jobs:
           nix develop --command "$HOME/.cargo/bin/rustup" run 1.88.0 cargo check --workspace --all-targets --locked
           nix develop --command "$HOME/.cargo/bin/rustup" run 1.88.0 cargo check -p shadoword-desktop --locked --no-default-features --features remote-client
 
+      - name: Reject desktop builds without local CPU inference
+        run: |
+          if nix develop --command cargo check -p shadoword-desktop --locked --no-default-features > /tmp/no-local-runtime.log 2>&1; then
+            echo "desktop unexpectedly compiled without the local CPU runtime"
+            exit 1
+          fi
+          grep -Fq "Shadoword desktop builds must include the local CPU runtime" /tmp/no-local-runtime.log
+
       - name: Check formatting
         run: nix develop --command cargo fmt --all -- --check
 
@@ -47,7 +55,7 @@ jobs:
       - name: Test CPU workspace
         run: nix develop --command cargo test --workspace
 
-      - name: Test desktop-only client profile
+      - name: Test historical desktop-client feature alias
         run: nix develop --command cargo test -p shadoword-desktop --no-default-features --features remote-client
 
       - name: Lint Vulkan workspace
@@ -75,14 +83,18 @@ jobs:
           nix flake show
           nix eval .#packages.x86_64-linux.shadoword-api.drvPath
           nix eval .#packages.x86_64-linux.shadoword-api-cuda.drvPath
-          nix eval .#packages.x86_64-linux.shadoword-desktop-client.drvPath
-          nix eval .#packages.x86_64-linux.shadoword-desktop.drvPath
           nix eval .#packages.x86_64-linux.shadoword-api-source.drvPath
-          nix eval .#packages.x86_64-linux.shadoword-desktop-client-source.drvPath
-          nix eval .#packages.x86_64-linux.shadoword-desktop-source.drvPath
+          for system in x86_64-linux aarch64-linux; do
+            desktop=$(nix eval --raw ".#packages.$system.shadoword-desktop.drvPath")
+            desktop_alias=$(nix eval --raw ".#packages.$system.shadoword-desktop-client.drvPath")
+            desktop_source=$(nix eval --raw ".#packages.$system.shadoword-desktop-source.drvPath")
+            desktop_source_alias=$(nix eval --raw ".#packages.$system.shadoword-desktop-client-source.drvPath")
+            test "$desktop_alias" = "$desktop"
+            test "$desktop_source_alias" = "$desktop_source"
+          done
 
       - name: Build API package from source
         run: nix build .#shadoword-api-source -L --show-trace
 
-      - name: Build desktop packages from source
-        run: nix build .#shadoword-desktop-client-source .#shadoword-desktop-source -L --show-trace
+      - name: Build unified desktop package from source
+        run: nix build .#shadoword-desktop-source -L --show-trace

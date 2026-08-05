@@ -99,15 +99,6 @@
           xdotool
         ];
 
-      minimalDesktopBuildDeps =
-        pkgs: with pkgs; [
-          cmake
-          gtk3
-          libappindicator-gtk3
-          makeWrapper
-          pkg-config
-        ];
-
       tauriDesktopBuildDeps =
         pkgs: with pkgs; [
           bun
@@ -174,7 +165,6 @@
           cargoFeatures ? [ ],
           cudaSupport ? false,
           noDefaultFeatures ? false,
-          minimalBuildDeps ? false,
           frontendNodeModules ? null,
           extraEnv ? { },
           desktopIntegration ? false,
@@ -199,7 +189,7 @@
           checkNoDefaultFeatures = noDefaultFeatures;
 
           nativeBuildInputs =
-            (if minimalBuildDeps then minimalDesktopBuildDeps pkgs else commonBuildDeps pkgs)
+            commonBuildDeps pkgs
             ++ pkgs.lib.optionals cudaSupport [ pkgs.gcc14 ]
             ++ pkgs.lib.optionals (frontendNodeModules != null) [
               pkgs.bun
@@ -207,14 +197,7 @@
             ];
           buildInputs = packageBuildDeps;
 
-          env =
-            (if cudaSupport then
-              cudaEnv pkgs
-            else if minimalBuildDeps then
-              { }
-            else
-              commonEnv pkgs)
-            // extraEnv;
+          env = (if cudaSupport then cudaEnv pkgs else commonEnv pkgs) // extraEnv;
           preBuild = pkgs.lib.optionalString (frontendNodeModules != null) ''
             unset LIBOPUS_STATIC OPUS_STATIC
             cp -R ${frontendNodeModules} crates/shadoword-desktop/node_modules
@@ -290,7 +273,7 @@
             outputHashAlgo = "sha256";
             outputHashMode = "recursive";
           };
-          sourcePackages = {
+          sourcePackages = rec {
             shadoword-api = mkRustPackage {
               inherit pkgs system;
               pname = "shadoword-api";
@@ -315,21 +298,6 @@
               cargoFeatures = [ "whisper-vulkan" ];
             };
 
-            shadoword-desktop-client = mkRustPackage {
-              inherit pkgs system;
-              pname = "shadoword-desktop-client";
-              cargoPackage = "shadoword-desktop";
-              runtimeDeps = clientRuntimeDeps pkgs;
-              cargoFeatures = [
-                "remote-client"
-                "custom-protocol"
-              ];
-              noDefaultFeatures = true;
-              minimalBuildDeps = true;
-              frontendNodeModules = desktopNodeModules;
-              desktopIntegration = true;
-            };
-
             shadoword-desktop = mkRustPackage {
               inherit pkgs system;
               pname = "shadoword-desktop";
@@ -344,6 +312,9 @@
               extraEnv.GGML_NATIVE = "OFF";
               desktopIntegration = true;
             };
+
+            # Keep the historical package name as an alias to the unified desktop build.
+            shadoword-desktop-client = shadoword-desktop;
           };
           packageFor =
             packageName:
@@ -390,24 +361,20 @@
             runtimeDeps = daemonRuntimeDeps pkgs;
             extraLibraryPath = "/run/opengl-driver/lib";
           };
-          shadoword-desktop-client = packageFor "shadoword-desktop-client" {
-            executable = "shadoword-desktop";
-            runtimeDeps = clientRuntimeDeps pkgs;
-            extraLibraryPath = "/run/opengl-driver/lib";
-            desktopIntegration = true;
-          };
           shadoword-desktop = packageFor "shadoword-desktop" {
             executable = "shadoword-desktop";
             runtimeDeps = clientRuntimeDeps pkgs;
             extraLibraryPath = "/run/opengl-driver/lib";
             desktopIntegration = true;
           };
+          # Downstream configurations can keep using the old name without losing local inference.
+          shadoword-desktop-client = shadoword-desktop;
 
           shadoword-api-source = sourcePackages.shadoword-api;
           shadoword-api-cuda-source = sourcePackages.shadoword-api-cuda;
           shadoword-api-vulkan-source = sourcePackages.shadoword-api-vulkan;
-          shadoword-desktop-client-source = sourcePackages.shadoword-desktop-client;
           shadoword-desktop-source = sourcePackages.shadoword-desktop;
+          shadoword-desktop-client-source = shadoword-desktop-source;
         }
       );
 

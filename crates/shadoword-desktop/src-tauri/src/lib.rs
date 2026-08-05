@@ -1,3 +1,6 @@
+#[cfg(not(feature = "local-runtime"))]
+compile_error!("Shadoword desktop builds must include the local CPU runtime");
+
 mod commands;
 mod contracts;
 mod hotkeys;

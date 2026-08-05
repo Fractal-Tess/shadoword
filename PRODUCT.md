@@ -59,8 +59,9 @@ Four claims, in priority order. All four are load-bearing; none may be softened.
 - **Streaming protocol:** WebSocket at `/v1/stream`; `Start` frame, raw Opus
   packets, `CommitSegment` → `Partial`, `Finish` → `Done` exactly once.
 - **Batch:** `POST /v1/transcribe-wav`, raw WAV body, 64 MiB cap.
-- **Distribution:** GitHub Releases publishes Linux API, desktop-client, and
-  embedded CPU desktop archives; Nix source packages remain available.
+- **Distribution:** GitHub Releases publishes Linux API variants and one unified
+  desktop archive with Local CPU, Shadoword API, and OpenRouter support; Nix source
+  packages remain available.
 - **Toolchain:** Bun only for frontend dependencies and scripts. No npm or pnpm
   lockfiles.
 

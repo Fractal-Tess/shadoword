@@ -1,10 +1,10 @@
 # Shadoword desktop
 
-Tauri 2 + SvelteKit desktop client for Shadoword. It supports local Whisper inference and authenticated remote operation through the Shadoword API.
+Tauri 2 + SvelteKit desktop client for Shadoword. Every build supports local CPU Whisper inference, authenticated operation through the Shadoword API, and direct OpenRouter transcription.
 
 ## Runtime boundary
 
-The webview does not contact the Shadoword daemon or inference backend directly. Tauri commands own local Whisper, remote HTTP/WebSocket requests, bearer authentication, `desktop.json`, microphone capture, global shortcuts, tray behavior, and transcript delivery. This keeps credentials and native capabilities out of browser code.
+The webview does not contact the Shadoword daemon, OpenRouter, or an inference backend directly. Tauri commands own local Whisper, remote HTTP/WebSocket requests, bearer and OpenRouter authentication, `desktop.json`, microphone capture, global shortcuts, tray behavior, and transcript delivery. This keeps credentials and native capabilities out of browser code.
 
 Normal startup loads native state. The old design fixtures are only enabled explicitly with `?demo=1` during frontend design work; the UI labels that mode as simulated.
 
@@ -12,6 +12,7 @@ Implemented operations:
 
 - local model status, preload/reload, accelerator/GPU selection, verified downloads, custom paths, and batch or VAD-segmented streaming inference;
 - authenticated remote status, runtime configuration, catalog selection, model download polling, batch WAV transcription, and 48 kHz Opus WebSocket streaming;
+- direct batch-only OpenRouter transcription with native key validation and dynamic model discovery;
 - native microphone enumeration and capture shared by UI controls and push-to-talk/toggle global shortcuts;
 - tray show/hide/quit, close-to-tray, clipboard copy, direct typing, and configurable paste shortcuts;
 - private endpoint/token and desktop preference persistence plus in-memory session history.

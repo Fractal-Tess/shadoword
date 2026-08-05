@@ -6,6 +6,18 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## [Unreleased]
 
+## [0.10.5] - 2026-08-05
+
+### Changed
+
+- Collapsed the remote-only and CPU desktop packages into one unified desktop build that always includes Local CPU, Shadoword API, and OpenRouter transcription.
+- Kept the historical `shadoword-desktop-client` Nix outputs as aliases to the unified desktop package so existing configurations gain local inference without migration.
+- Replaced the two desktop release archives with `shadoword-desktop-x86_64-linux.tar.gz`.
+
+### Fixed
+
+- Restored the Local execution option for installations that previously selected the remote-only desktop-client package.
+
 ## [0.10.4] - 2026-08-05
 
 ### Added
@@ -114,7 +126,8 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 - Prevented duplicate model loads after eager-preload timeouts.
 - Added bounded remote connect, handshake, read, write, and finalization waits.
 
-[Unreleased]: https://github.com/Fractal-Tess/shadoword/compare/v0.10.4...HEAD
+[Unreleased]: https://github.com/Fractal-Tess/shadoword/compare/v0.10.5...HEAD
+[0.10.5]: https://github.com/Fractal-Tess/shadoword/compare/v0.10.4...v0.10.5
 [0.10.4]: https://github.com/Fractal-Tess/shadoword/compare/v0.10.3...v0.10.4
 [0.10.3]: https://github.com/Fractal-Tess/shadoword/compare/v0.10.2...v0.10.3
 [0.10.2]: https://github.com/Fractal-Tess/shadoword/compare/v0.10.1...v0.10.2
