@@ -29,7 +29,7 @@ Regenerate and format the checked-in artifact with Cargo and Bun only:
 bun run generate:bindings
 ```
 
-The export test fails on unsupported contract shapes. Large Rust counters are annotated as JavaScript `number` because API sizes and counters remain below JavaScript's exact-integer limit; JSON transport itself is unchanged.
+The export command fails on unsupported contract shapes. Large Rust counters are annotated as JavaScript `number` because API sizes and counters remain below JavaScript's exact-integer limit; JSON transport itself is unchanged.
 
 ## Tooling
 
@@ -41,7 +41,6 @@ bun run generate:bindings
 bun run format
 bun run check
 bun run lint
-bun run test
 bun run build
 bun run tauri dev
 ```

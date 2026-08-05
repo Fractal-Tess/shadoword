@@ -125,9 +125,8 @@ export const accelerators = [
 
 /**
  * Latency is a measured claim, so it is not written here until it is measured.
- * Fill `ms` from a real run of the bench corpus and delete `placeholder`.
- * Harness: crates/shadoword-model-whisper/tests/whisper_integration.rs
- * Corpus:  bench_corpus/clip_{10,15,20,30}s.wav
+ * Fill `ms` from a documented manual measurement and delete `placeholder`.
+ * Corpus: bench_corpus/clip_{10,15,20,30}s.wav
  */
 export const latencyBench = {
   placeholder: true,

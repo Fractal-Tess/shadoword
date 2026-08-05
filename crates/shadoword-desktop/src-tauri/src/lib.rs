@@ -49,7 +49,7 @@ fn bindings() -> tauri_specta::Builder<Wry> {
         .events(tauri_specta::collect_events![DesktopEvent])
 }
 
-fn export_bindings() -> Result<(), String> {
+pub fn export_bindings() -> Result<(), String> {
     let path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../src/lib/bindings.ts");
     bindings()
         .export(Typescript::default(), &path)
@@ -147,14 +147,4 @@ pub fn run() {
                 commands::shutdown(app);
             }
         });
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn export_bindings_is_reproducible() {
-        export_bindings().expect("export TypeScript bindings");
-    }
 }

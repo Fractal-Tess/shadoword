@@ -6,6 +6,24 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## [Unreleased]
 
+## [0.10.6] - 2026-08-05
+
+### Added
+
+- A global Local, Shadoword API, and OpenRouter selector above the command-rail navigation, with keyboard operation and mode-aware page routing.
+
+### Changed
+
+- Settings now show only controls that apply to the selected execution environment; OpenRouter is explicitly batch-only and remote PCM precision appears only for live Shadoword API streaming.
+- Local transcription now canonicalizes streaming audio to 32-bit float in both the desktop UI and native configuration boundary.
+- Large desktop views, state management, settings, execution-pool controls, and global styles were split into focused Svelte 5 context-backed modules under 300 lines each.
+- Removed the project's automated test suites and test jobs while retaining formatting, static analysis, lint, compile, and production-build validation.
+- Renamed the installed desktop command from `shadoword-desktop` to `shadoword`.
+
+### Fixed
+
+- Forced packaged WebKitGTK launches onto XWayland to avoid Wayland protocol errors under NVIDIA/Hyprland, including direct CLI launches outside the systemd user service.
+
 ## [0.10.5] - 2026-08-05
 
 ### Changed
@@ -126,7 +144,8 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 - Prevented duplicate model loads after eager-preload timeouts.
 - Added bounded remote connect, handshake, read, write, and finalization waits.
 
-[Unreleased]: https://github.com/Fractal-Tess/shadoword/compare/v0.10.5...HEAD
+[Unreleased]: https://github.com/Fractal-Tess/shadoword/compare/v0.10.6...HEAD
+[0.10.6]: https://github.com/Fractal-Tess/shadoword/compare/v0.10.5...v0.10.6
 [0.10.5]: https://github.com/Fractal-Tess/shadoword/compare/v0.10.4...v0.10.5
 [0.10.4]: https://github.com/Fractal-Tess/shadoword/compare/v0.10.3...v0.10.4
 [0.10.3]: https://github.com/Fractal-Tess/shadoword/compare/v0.10.2...v0.10.3

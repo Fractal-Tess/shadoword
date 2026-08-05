@@ -170,11 +170,10 @@ measured fidelity inventory and every place the build overruled the comp.
 
 These are the only knowingly unfinished items.
 
-- [ ] **Real latency figures.** Run the bench corpus
-      (`bench_corpus/clip_{10,15,20,30}s.wav`) through
-      `crates/shadoword-model-whisper/tests/whisper_integration.rs`, fill `ms` and
-      `hardware` in `latencyBench`, and delete `placeholder`. The band already has
-      the plate the figures belong in.
+- [ ] **Real latency figures.** Measure the bench corpus
+      (`bench_corpus/clip_{10,15,20,30}s.wav`) with a documented manual workflow,
+      fill `ms` and `hardware` in `latencyBench`, and delete `placeholder`. The band
+      already has the plate the figures belong in.
 - [ ] **A vector mark.** `public/images/shadoword-mark-trim.png` is a raster
       luminance mask cropped to the mark's ink box; the page tints it with
       `mask-image`. An SVG would remove the raster dependency entirely.

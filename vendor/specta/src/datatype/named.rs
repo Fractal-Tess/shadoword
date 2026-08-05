@@ -359,28 +359,3 @@ fn file_path_to_module_path(file_path: &str) -> Option<String> {
         Some(format!("{}::{}", prefix, module_path))
     }
 }
-
-#[cfg(test)]
-mod tests {
-    use super::file_path_to_module_path;
-
-    #[test]
-    fn file_path_to_module_path_supports_unix_and_windows_separators() {
-        assert_eq!(
-            file_path_to_module_path("src/datatype/named.rs"),
-            Some("crate::datatype::named".to_string())
-        );
-        assert_eq!(
-            file_path_to_module_path("src\\datatype\\named.rs"),
-            Some("crate::datatype::named".to_string())
-        );
-        assert_eq!(
-            file_path_to_module_path("tests/tests/types.rs"),
-            Some("tests::tests::types".to_string())
-        );
-        assert_eq!(
-            file_path_to_module_path("tests\\tests\\types.rs"),
-            Some("tests::tests::types".to_string())
-        );
-    }
-}

@@ -35,7 +35,3 @@ shadoword-model-whisper = { path = "../shadoword-model-whisper", optional = true
 sha2 = { workspace = true, optional = true }
 tracing.workspace = true
 tokio = { workspace = true, optional = true }
-
-[dev-dependencies]
-ort = { version = "2.0.0-rc.12", features = ["preload-dylibs"] }
-tracing-subscriber.workspace = true

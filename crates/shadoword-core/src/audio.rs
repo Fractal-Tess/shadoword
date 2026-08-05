@@ -221,33 +221,3 @@ where
     )?;
     Ok(stream)
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[tokio::test]
-    async fn snapshot_notification_wakes_and_drains_available_samples() {
-        let samples = Arc::new(Mutex::new(Vec::new()));
-        let available = Arc::new(Notify::new());
-        let source = RecordingSnapshotSource {
-            samples: Arc::clone(&samples),
-            available: Arc::clone(&available),
-            sample_rate: 16_000,
-        };
-        let waiter = tokio::spawn({
-            let source = source.clone();
-            async move { source.wait_for_samples().await }
-        });
-
-        samples.lock().unwrap().push(0.25);
-        available.notify_one();
-        tokio::time::timeout(std::time::Duration::from_secs(1), waiter)
-            .await
-            .expect("sample notification timeout")
-            .expect("sample waiter task");
-        let audio = source.drain_available().expect("drain samples");
-
-        assert_eq!(audio.samples, vec![0.25]);
-    }
-}

@@ -120,7 +120,6 @@ export type DesktopEvent =
 
 export type DesktopSettings = {
 	mode: ServiceMode;
-	local_runtime_available: boolean;
 	model_path: string;
 	preload_on_startup: boolean;
 	whisper_accelerator: WhisperAccelerator;

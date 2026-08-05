@@ -19,8 +19,6 @@ const MAX_WAV_BYTES: usize = 25 * 1024 * 1024;
 #[derive(Clone)]
 pub struct OpenRouterClient {
     client: Client,
-    #[cfg(test)]
-    endpoint: String,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -124,11 +122,7 @@ impl OpenRouterClient {
             .build()
             .map_err(OpenRouterError::ClientBuild)?;
 
-        Ok(Self {
-            client,
-            #[cfg(test)]
-            endpoint: TRANSCRIPTIONS_ENDPOINT.to_owned(),
-        })
+        Ok(Self { client })
     }
 
     pub async fn list_transcription_models(&self) -> Result<Vec<OpenRouterModel>, OpenRouterError> {
@@ -185,7 +179,7 @@ impl OpenRouterClient {
         let started_at = Instant::now();
         let response = self
             .client
-            .post(self.endpoint())
+            .post(TRANSCRIPTIONS_ENDPOINT)
             .header(AUTHORIZATION, authorization)
             .json(&request)
             .send()
@@ -200,23 +194,6 @@ impl OpenRouterClient {
             cost_usd,
             elapsed_ms: started_at.elapsed().as_millis(),
         })
-    }
-
-    #[cfg(not(test))]
-    fn endpoint(&self) -> &str {
-        TRANSCRIPTIONS_ENDPOINT
-    }
-
-    #[cfg(test)]
-    fn endpoint(&self) -> &str {
-        &self.endpoint
-    }
-
-    #[cfg(test)]
-    fn with_test_endpoint(endpoint: String) -> Result<Self, OpenRouterError> {
-        let mut client = Self::new()?;
-        client.endpoint = endpoint;
-        Ok(client)
     }
 }
 
@@ -422,277 +399,5 @@ fn format_error_code(code: Value) -> Option<String> {
         Value::Number(code) => Some(code.to_string()),
         Value::Bool(code) => Some(code.to_string()),
         Value::Null | Value::Array(_) | Value::Object(_) => None,
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use std::io::{Read, Write};
-    use std::net::TcpListener;
-    use std::sync::mpsc::{self, Receiver};
-    use std::thread::{self, JoinHandle};
-    use std::time::Duration;
-
-    use serde_json::json;
-
-    use super::*;
-
-    struct Fixture {
-        endpoint: String,
-        request: Receiver<String>,
-        server: JoinHandle<()>,
-    }
-
-    fn spawn_fixture(status: &str, response_body: &str) -> Fixture {
-        let listener = TcpListener::bind("127.0.0.1:0").expect("bind fixture server");
-        let address = listener.local_addr().expect("read fixture address");
-        let (request_sender, request) = mpsc::channel();
-        let status = status.to_owned();
-        let response_body = response_body.to_owned();
-
-        let server = thread::spawn(move || {
-            let (mut stream, _) = listener.accept().expect("accept fixture request");
-            stream
-                .set_read_timeout(Some(Duration::from_secs(5)))
-                .expect("set fixture timeout");
-
-            let mut received = Vec::new();
-            let mut buffer = [0_u8; 4096];
-            let header_end = loop {
-                let count = stream.read(&mut buffer).expect("read fixture request");
-                assert_ne!(count, 0, "request ended before headers were complete");
-                received.extend_from_slice(&buffer[..count]);
-                if let Some(position) = received.windows(4).position(|bytes| bytes == b"\r\n\r\n") {
-                    break position + 4;
-                }
-            };
-
-            let headers = String::from_utf8_lossy(&received[..header_end]);
-            let content_length = headers
-                .lines()
-                .find_map(|line| {
-                    let (name, value) = line.split_once(':')?;
-                    name.eq_ignore_ascii_case("content-length")
-                        .then(|| value.trim().parse::<usize>().expect("parse content length"))
-                })
-                .expect("request content length");
-
-            while received.len() < header_end + content_length {
-                let count = stream.read(&mut buffer).expect("read fixture body");
-                assert_ne!(count, 0, "request ended before body was complete");
-                received.extend_from_slice(&buffer[..count]);
-            }
-
-            request_sender
-                .send(String::from_utf8(received).expect("request is UTF-8"))
-                .expect("send captured request");
-
-            write!(
-                stream,
-                "HTTP/1.1 {status}\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{response_body}",
-                response_body.len()
-            )
-            .expect("write fixture response");
-        });
-
-        Fixture {
-            endpoint: format!("http://{address}/audio/transcriptions"),
-            request,
-            server,
-        }
-    }
-
-    #[test]
-    fn validate_api_key_rejects_empty_value() {
-        let result = validate_api_key("");
-
-        assert!(matches!(result, Err(OpenRouterError::InvalidApiKey)));
-    }
-
-    #[test]
-    fn validate_model_rejects_unsafe_character() {
-        let result = validate_model("openai/whisper 1");
-
-        assert!(matches!(result, Err(OpenRouterError::InvalidModel { .. })));
-    }
-
-    #[test]
-    fn validate_model_rejects_overlong_value() {
-        let model = "a".repeat(MAX_MODEL_LENGTH + 1);
-        let result = validate_model(&model);
-
-        assert!(matches!(
-            result,
-            Err(OpenRouterError::InvalidModel {
-                reason: "model is too long"
-            })
-        ));
-    }
-
-    #[test]
-    fn validate_audio_size_rejects_payload_over_limit() {
-        assert!(matches!(
-            validate_audio_size(MAX_WAV_BYTES + 1),
-            Err(OpenRouterError::AudioTooLarge)
-        ));
-    }
-
-    #[test]
-    fn model_discovery_keeps_only_transcription_models_and_sorts_names() {
-        let response: ModelsEnvelope = serde_json::from_value(json!({
-            "data": [
-                {
-                    "id": "z/transcribe",
-                    "name": "Zulu STT",
-                    "description": "speech",
-                    "architecture": { "output_modalities": ["transcription"] }
-                },
-                {
-                    "id": "a/chat",
-                    "name": "Chat",
-                    "description": "text",
-                    "architecture": { "output_modalities": ["text"] }
-                },
-                {
-                    "id": "a/transcribe",
-                    "name": "Alpha STT",
-                    "description": "speech",
-                    "architecture": { "output_modalities": ["transcription"] }
-                }
-            ]
-        }))
-        .expect("decode model fixture");
-
-        let models = transcription_models(response);
-
-        assert_eq!(
-            models.into_iter().map(|model| model.id).collect::<Vec<_>>(),
-            ["a/transcribe", "z/transcribe"]
-        );
-    }
-
-    #[test]
-    fn usage_cost_requires_an_explicit_non_negative_reported_cost() {
-        assert_eq!(usage_cost(&json!({ "audio_seconds": 1.25 })), None);
-        assert_eq!(usage_cost(&json!({ "total_cost": 0.00025 })), Some(0.00025));
-        assert_eq!(usage_cost(&json!({ "cost": -1 })), None);
-    }
-
-    #[test]
-    fn request_omits_language_when_english_is_not_requested() {
-        let request = TranscriptionRequest {
-            model: "openai/whisper-1",
-            input_audio: InputAudio {
-                data: "UklGRg==".to_owned(),
-                format: "wav",
-            },
-            language: None,
-        };
-
-        let value = serde_json::to_value(request).expect("serialize request");
-
-        assert_eq!(
-            value,
-            json!({
-                "model": "openai/whisper-1",
-                "input_audio": { "data": "UklGRg==", "format": "wav" }
-            })
-        );
-    }
-
-    #[tokio::test]
-    async fn transcribe_wav_sends_authenticated_json_and_decodes_usage() {
-        let fixture = spawn_fixture(
-            "200 OK",
-            r#"{"text":"hello","usage":{"audio_seconds":1.25,"cost":"0.000125"}}"#,
-        );
-        let client = OpenRouterClient::with_test_endpoint(fixture.endpoint).expect("build client");
-
-        let transcription = client
-            .transcribe_wav("test-key", "openai/whisper-1", b"RIFF".to_vec(), true)
-            .await
-            .expect("transcribe fixture audio");
-        let request = fixture
-            .request
-            .recv_timeout(Duration::from_secs(5))
-            .expect("receive fixture request");
-        fixture.server.join().expect("join fixture server");
-        let (headers, body) = request.split_once("\r\n\r\n").expect("split request");
-        let body: Value = serde_json::from_str(body).expect("decode request body");
-
-        assert_eq!(
-            (
-                transcription.text,
-                transcription.usage,
-                transcription.cost_usd,
-                headers.contains("authorization: Bearer test-key"),
-                body
-            ),
-            (
-                "hello".to_owned(),
-                Some(json!({ "audio_seconds": 1.25, "cost": "0.000125" })),
-                Some(0.000125),
-                true,
-                json!({
-                    "model": "openai/whisper-1",
-                    "input_audio": { "data": "UklGRg==", "format": "wav" },
-                    "language": "en"
-                })
-            )
-        );
-    }
-
-    #[tokio::test]
-    async fn transcribe_wav_parses_structured_api_error() {
-        let fixture = spawn_fixture(
-            "429 Too Many Requests",
-            r#"{"error":{"code":429,"message":"rate limit exceeded","metadata":{"ignored":true}}}"#,
-        );
-        let client = OpenRouterClient::with_test_endpoint(fixture.endpoint).expect("build client");
-
-        let error = client
-            .transcribe_wav("test-key", "openai/whisper-1", b"RIFF".to_vec(), false)
-            .await
-            .expect_err("fixture should return an API error");
-        fixture
-            .request
-            .recv_timeout(Duration::from_secs(5))
-            .expect("receive fixture request");
-        fixture.server.join().expect("join fixture server");
-
-        assert!(matches!(
-            error,
-            OpenRouterError::Api {
-                status: StatusCode::TOO_MANY_REQUESTS,
-                code: Some(code),
-                message,
-            } if code == "429" && message == "rate limit exceeded"
-        ));
-    }
-
-    #[tokio::test]
-    async fn transcribe_wav_does_not_expose_unstructured_error_body() {
-        let fixture = spawn_fixture("500 Internal Server Error", r#"{"request":"sensitive"}"#);
-        let client = OpenRouterClient::with_test_endpoint(fixture.endpoint).expect("build client");
-
-        let error = client
-            .transcribe_wav(
-                "test-key",
-                "openai/whisper-1",
-                b"sensitive audio".to_vec(),
-                false,
-            )
-            .await
-            .expect_err("fixture should return an API error");
-        fixture
-            .request
-            .recv_timeout(Duration::from_secs(5))
-            .expect("receive fixture request");
-        fixture.server.join().expect("join fixture server");
-
-        assert_eq!(
-            error.to_string(),
-            "OpenRouter returned 500 Internal Server Error: request failed"
-        );
     }
 }

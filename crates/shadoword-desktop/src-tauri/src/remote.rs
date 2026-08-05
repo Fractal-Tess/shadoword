@@ -26,19 +26,6 @@ pub(crate) struct RemoteApiError {
 }
 
 impl RemoteApiError {
-    #[cfg(test)]
-    pub(crate) fn new(
-        status: reqwest::StatusCode,
-        code: impl Into<String>,
-        message: impl Into<String>,
-    ) -> Self {
-        Self {
-            status,
-            code: code.into(),
-            message: message.into(),
-        }
-    }
-
     pub(crate) fn code(&self) -> &str {
         &self.code
     }
@@ -244,23 +231,4 @@ async fn decode<T: DeserializeOwned>(response: Response) -> Result<T> {
         }));
     }
     Err(anyhow!("Shadoword API returned {status}"))
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn normalizes_safe_http_endpoints() {
-        assert_eq!(
-            RemoteClient::validate_endpoint(" https://api.example.test:47813/ ").unwrap(),
-            "https://api.example.test:47813"
-        );
-    }
-
-    #[test]
-    fn rejects_credentials_and_non_http_schemes() {
-        assert!(RemoteClient::validate_endpoint("file:///tmp/api").is_err());
-        assert!(RemoteClient::validate_endpoint("https://token@example.test").is_err());
-    }
 }

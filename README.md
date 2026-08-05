@@ -55,7 +55,7 @@ Together these cover API-only and unified desktop installations. Each release al
 includes `SHA256SUMS`. The archives contain the stripped ELF
 executables used by the Nix packages, allowing NixOS deployments to download
 and patch the release binaries without compiling Rust, CUDA, or the desktop
-frontend locally.
+frontend locally. The installed desktop command is `shadoword`.
 
 Release notes are sourced from [`CHANGELOG.md`](CHANGELOG.md). To publish a
 release, update the workspace and desktop versions plus the changelog, commit

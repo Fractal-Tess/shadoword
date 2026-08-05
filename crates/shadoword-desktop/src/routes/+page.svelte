@@ -8,7 +8,8 @@ OWN-WORLD: Rain-black grounds. Scarlet is the only accent, split into pigment
   (fills, hairlines) and lamp (type), and it is rationed by meaning — the selected
   destination, the marked inference stage, the record slab. Magenta and cyan exist
   only inside the raster. Heavy condensed grotesque against a monospace. Radius 0
-  everywhere except the one riveted identity plate.
+  everywhere except the one riveted identity plate. Magenta and cyan exist only
+  inside the generated spectrum field.
 STORY: The operator confirms which machine will do the work, holds one
   unmistakable control, watches the void column close or stay open, and takes the
   text.
@@ -25,9 +26,10 @@ FORM: Neo-Tokyo Neon Night, abstracted from cityscape to spectrum; seed 322d3899
 	import ModelsView from '$lib/views/ModelsView.svelte';
 	import SettingsView from '$lib/views/SettingsView.svelte';
 	import TranscribeView from '$lib/views/TranscribeView.svelte';
-	import type { PageId } from '$lib/types';
 	import { inferencePoolSummary } from '$lib/inference-pool';
-	import { onMount, tick } from 'svelte';
+	import { DesktopShellState } from '$lib/shell/desktop-shell.svelte';
+	import { provideDesktopShell } from '$lib/shell/desktop-shell-context';
+	import { onMount } from 'svelte';
 
 	const requestedPage = browser ? new URLSearchParams(window.location.search).get('page') : null;
 	const initialPage =
@@ -42,23 +44,18 @@ FORM: Neo-Tokyo Neon Night, abstracted from cityscape to spectrum; seed 322d3899
 			? requestedPage
 			: 'transcribe';
 
-	let activePage = $state<PageId>(initialPage);
 	const app = new DesktopAppState(
 		browser && new URLSearchParams(window.location.search).get('demo') === '1'
 	);
-	let mode = $derived(app.settings?.mode ?? 'remote');
+	const shell = new DesktopShellState(app, initialPage);
+	provideDesktopShell(shell);
+	let mode = $derived(shell.mode);
 	let poolSummary = $derived(inferencePoolSummary(app.overview?.status.inference_pool));
 
 	onMount(() => {
-		void app.initialize();
+		void app.initialize().then(() => shell.reconcilePage());
 		return () => app.dispose();
 	});
-
-	const openSettings = async () => {
-		activePage = 'settings';
-		await tick();
-		document.querySelector<HTMLElement>('.app-shell > main')?.scrollTo({ top: 0 });
-	};
 </script>
 
 <svelte:head>
@@ -79,7 +76,7 @@ FORM: Neo-Tokyo Neon Night, abstracted from cityscape to spectrum; seed 322d3899
 		bins for no reason, and the mark that matters stopped being the only one. In
 		Operate mode the shell's job is to be a window, not a picture.
 	-->
-	<CommandRail {app} bind:activePage />
+	<CommandRail />
 	<main tabindex="-1">
 		<div class="work-surface">
 			{#if app.demo}
@@ -96,21 +93,23 @@ FORM: Neo-Tokyo Neon Night, abstracted from cityscape to spectrum; seed 322d3899
 				</div>
 			{/if}
 			<div class="sr-only" aria-live="polite">
-				{activePage} view · {mode === 'remote'
-					? 'Shadoword API'
-					: mode === 'open_router'
-						? 'OpenRouter'
-						: 'Local machine'} · {poolSummary}
+				{shell.activePage} view · {mode == null
+					? 'Loading execution target'
+					: mode === 'remote'
+						? 'Shadoword API'
+						: mode === 'open_router'
+							? 'OpenRouter'
+							: 'Local machine'} · {poolSummary}
 			</div>
-			{#if activePage === 'transcribe'}
-				<TranscribeView {app} onOpenSettings={openSettings} />
-			{:else if activePage === 'models'}
-				<ModelsView {app} />
-			{:else if activePage === 'history'}
-				<HistoryView {app} />
-			{:else if activePage === 'settings' || activePage === 'capture' || activePage === 'transcription' || activePage === 'output' || activePage === 'application'}
+			{#if shell.activePage === 'transcribe'}
+				<TranscribeView />
+			{:else if shell.activePage === 'models'}
+				<ModelsView />
+			{:else if shell.activePage === 'history'}
+				<HistoryView />
+			{:else if shell.activePage === 'settings' || shell.activePage === 'capture' || shell.activePage === 'transcription' || shell.activePage === 'output' || shell.activePage === 'application'}
 				{#if app.settings}
-					<SettingsView {app} section={activePage} onNavigate={(page) => (activePage = page)} />
+					<SettingsView section={shell.activePage} />
 				{:else}
 					<div class="settings-loading mono-caption" role="status">Loading native settings…</div>
 				{/if}
@@ -222,7 +221,7 @@ FORM: Neo-Tokyo Neon Night, abstracted from cityscape to spectrum; seed 322d3899
 		}
 
 		.work-surface {
-			padding: 1.35rem 1.35rem 7rem;
+			padding: 1.1rem;
 		}
 	}
 </style>

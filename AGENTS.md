@@ -29,12 +29,15 @@ cargo run -p shadoword-api --features whisper-cuda
 ## Required Checks
 
 ```bash
+cargo check --workspace --all-targets
 cargo fmt --all -- --check
 cargo clippy --workspace --all-targets -- -D warnings
-cargo test --workspace
+cd crates/shadoword-desktop
+bun run generate:bindings
+bun run check
+bun run lint
+bun run build
 ```
-
-Real-model and hardware benchmarks are ignored by default and must be run explicitly.
 
 ## Architecture Overview
 
@@ -59,4 +62,4 @@ Shadoword is a Linux-first Rust workspace for offline speech-to-text with a Taur
 - Use Bun exclusively for frontend dependency management and scripts; do not add npm or pnpm lockfiles.
 - Keep backend-specific inference behind the shared model contract.
 - Keep desktop-only and daemon-only configuration separate.
-- Treat external model/hardware benchmarks as opt-in rather than normal tests.
+- Publish model and hardware benchmark claims only from explicitly documented manual measurements.

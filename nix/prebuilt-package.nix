@@ -48,7 +48,9 @@ stdenvNoCC.mkDerivation {
     install -m644 unpacked/README.md unpacked/CHANGELOG.md "$out/share/doc/${pname}/"
 
     wrapProgram "$out/bin/${executable}" \
-      --prefix LD_LIBRARY_PATH : "${libraryPath}"
+      --prefix LD_LIBRARY_PATH : "${libraryPath}" \
+      ${lib.optionalString desktopIntegration ''--set GDK_BACKEND x11 \
+      --set WEBKIT_DISABLE_DMABUF_RENDERER 1''}
 
     ${lib.optionalString desktopIntegration ''
       install -Dm644 ${desktopFile} "$out/share/applications/shadoword.desktop"

@@ -56,13 +56,6 @@ version = "=2.0.0-rc.25"
 version = "=2.0.0-rc.25"
 features = ["serde"]
 
-[dev-dependencies.serde]
-version = "1"
-features = ["derive"]
-
-[dev-dependencies.specta]
-version = "=2.0.0-rc.25"
-features = ["derive"]
 
 [lints.clippy.all]
 level = "warn"

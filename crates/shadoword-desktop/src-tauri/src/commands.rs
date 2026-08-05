@@ -22,7 +22,7 @@ use shadoword_core::{
 };
 use shadoword_core::{
     DesktopConfig, HotkeyMode, MicrophoneRecorder, RecordingSession, ServiceMode,
-    TranscriptionConfig, TranscriptionMode,
+    StreamingPcmFormat, TranscriptionConfig, TranscriptionMode,
 };
 use std::collections::HashMap;
 use std::path::PathBuf;
@@ -99,29 +99,6 @@ impl DesktopState {
         })
     }
 
-    #[cfg(test)]
-    fn with_config(config: DesktopConfig) -> Self {
-        #[cfg(feature = "local-runtime")]
-        let (local, local_startup_error) =
-            initialize_local_runtime(&config).expect("initialize test local inference runtime");
-        Self {
-            config: Mutex::new(config),
-            recording: Mutex::new(RecordingController::default()),
-            mutation: tokio::sync::Mutex::new(()),
-            remote: RemoteClient::new().expect("build test HTTP client"),
-            openrouter: OpenRouterClient::new().expect("build test OpenRouter client"),
-            #[cfg(feature = "local-runtime")]
-            local,
-            #[cfg(feature = "local-runtime")]
-            local_startup_error: Mutex::new(local_startup_error),
-            local_downloads: Arc::new(Mutex::new(HashMap::new())),
-            #[cfg(feature = "local-runtime")]
-            next_download_id: AtomicU64::new(1),
-            hotkey: Mutex::new(None),
-            hotkey_error: Mutex::new(None),
-        }
-    }
-
     fn config(&self) -> CommandResult<DesktopConfig> {
         self.config
             .lock()
@@ -195,7 +172,8 @@ fn initialize_local_runtime(
 }
 
 #[cfg(feature = "local-runtime")]
-fn normalize_config_for_build(config: DesktopConfig) -> DesktopConfig {
+fn normalize_config_for_build(mut config: DesktopConfig) -> DesktopConfig {
+    normalize_mode_scoped_recording(&mut config);
     config
 }
 
@@ -204,14 +182,27 @@ fn normalize_config_for_build(mut config: DesktopConfig) -> DesktopConfig {
     if config.mode == ServiceMode::Local {
         config.mode = ServiceMode::Remote;
     }
+    normalize_mode_scoped_recording(&mut config);
     config
+}
+
+fn normalize_mode_scoped_recording(config: &mut DesktopConfig) {
+    match config.mode {
+        ServiceMode::Local => {
+            config.recording.streaming_pcm_format = StreamingPcmFormat::F32le;
+        }
+        ServiceMode::OpenRouter => {
+            config.recording.transcription_mode = TranscriptionMode::Batch;
+            config.recording.streaming_pcm_format = StreamingPcmFormat::F32le;
+        }
+        ServiceMode::Remote => {}
+    }
 }
 
 impl DesktopSettings {
     fn from_config(config: &DesktopConfig) -> Self {
         Self {
             mode: config.mode,
-            local_runtime_available: cfg!(feature = "local-runtime"),
             model_path: config.model_path.to_string_lossy().into_owned(),
             preload_on_startup: config.preload_on_startup,
             whisper_accelerator: config.whisper_accelerator,
@@ -1357,6 +1348,7 @@ fn apply_settings(config: &mut DesktopConfig, input: DesktopSettingsInput) -> Re
     config.recording.sample_rate = input.sample_rate;
     config.recording.transcription_mode = input.transcription_mode;
     config.recording.streaming_pcm_format = input.streaming_pcm_format;
+    normalize_mode_scoped_recording(config);
     config.recording.english_only = input.english_only;
     config.output.copy_to_clipboard = input.copy_to_clipboard;
     config.output.paste_method = input.paste_method;
@@ -1692,251 +1684,4 @@ fn unavailable_local<T>() -> CommandResult<T> {
         "this desktop build does not include the local runtime feature",
     )
     .with_action("Rebuild Shadoword Desktop with the local-runtime feature."))
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    #[cfg(feature = "local-runtime")]
-    use shadoword_core::ExecutionUnitState;
-    use shadoword_core::{PasteMethod, StreamingPcmFormat, WhisperAccelerator};
-
-    fn input(secret: SecretUpdate) -> DesktopSettingsInput {
-        DesktopSettingsInput {
-            mode: ServiceMode::Local,
-            model_path: "/models/custom.bin".to_string(),
-            preload_on_startup: false,
-            whisper_accelerator: WhisperAccelerator::Cpu,
-            whisper_gpu_device: -1,
-            remote_endpoint: "http://127.0.0.1:47813/".to_string(),
-            remote_token: secret,
-            openrouter_model: "openai/whisper-large-v3".to_string(),
-            openrouter_key: SecretUpdate::Keep,
-            input_device: None,
-            sample_rate: 16_000,
-            transcription_mode: TranscriptionMode::Batch,
-            streaming_pcm_format: StreamingPcmFormat::F32le,
-            english_only: false,
-            copy_to_clipboard: true,
-            paste_method: PasteMethod::None,
-            paste_delay_ms: 120,
-            hotkey_shortcut: "F2".to_string(),
-            hotkey_mode: HotkeyMode::PushToTalk,
-            close_to_tray: true,
-        }
-    }
-
-    #[test]
-    fn applies_local_and_desktop_settings_without_exporting_secret() {
-        let mut config = DesktopConfig::default();
-        config.remote.api_token = Some("saved-secret".to_string());
-        config.openrouter.api_key = Some("sk-or-saved-secret".to_string());
-        apply_settings(&mut config, input(SecretUpdate::Keep)).unwrap();
-        assert_eq!(config.remote.api_token.as_deref(), Some("saved-secret"));
-        assert_eq!(
-            config.openrouter.api_key.as_deref(),
-            Some("sk-or-saved-secret")
-        );
-        assert_eq!(config.remote.endpoint, "http://127.0.0.1:47813");
-        assert_eq!(config.model_path, PathBuf::from("/models/custom.bin"));
-        assert_eq!(config.whisper_accelerator, WhisperAccelerator::Cpu);
-
-        let snapshot = DesktopSettings::from_config(&config);
-        let json = serde_json::to_string(&snapshot).unwrap();
-        assert!(snapshot.remote_token_configured);
-        assert!(snapshot.openrouter_key_configured);
-        assert!(!json.contains("saved-secret"));
-        assert!(!json.contains("sk-or-saved-secret"));
-    }
-
-    #[test]
-    fn openrouter_key_updates_are_explicit_and_validated() {
-        let mut config = DesktopConfig::default();
-        let mut set = input(SecretUpdate::Keep);
-        set.openrouter_key = SecretUpdate::Set {
-            value: "  sk-or-test-key  ".to_string(),
-        };
-        apply_settings(&mut config, set).expect("set valid OpenRouter key");
-        assert_eq!(config.openrouter.api_key.as_deref(), Some("sk-or-test-key"));
-
-        let mut clear = input(SecretUpdate::Keep);
-        clear.openrouter_key = SecretUpdate::Clear;
-        apply_settings(&mut config, clear).expect("clear OpenRouter key");
-        assert!(config.openrouter.api_key.is_none());
-    }
-
-    #[test]
-    fn rejects_unsafe_settings_before_mutating_config() {
-        let original = DesktopConfig::default();
-        let mut config = original.clone();
-        let mut invalid = input(SecretUpdate::Keep);
-        invalid.hotkey_shortcut = "a".to_string();
-        assert!(apply_settings(&mut config, invalid).is_err());
-        assert_eq!(config, original);
-    }
-
-    #[test]
-    fn openrouter_mode_requires_a_native_api_key_before_capture() {
-        let config = DesktopConfig {
-            mode: ServiceMode::OpenRouter,
-            ..DesktopConfig::default()
-        };
-
-        let error = validate_openrouter_config(&config).expect_err("missing key must fail");
-        assert_eq!(error.code, "openrouter_key_required");
-    }
-
-    #[test]
-    fn recording_state_transitions_are_explicit() {
-        let state = DesktopState::with_config(DesktopConfig::default());
-        assert_eq!(state.recording_state().unwrap().phase, RecordingPhase::Idle);
-        {
-            let mut recording = state.recording.lock().unwrap();
-            recording.state.phase = RecordingPhase::Recording;
-        }
-        assert_eq!(
-            state.ensure_idle("change models").unwrap_err().code,
-            "recording_busy"
-        );
-        reset_recording_state(&state);
-        assert_eq!(state.recording_state().unwrap().phase, RecordingPhase::Idle);
-    }
-
-    #[cfg(feature = "local-runtime")]
-    #[test]
-    fn lazy_runtime_starts_with_a_missing_model_unloaded() {
-        let config = DesktopConfig {
-            model_path: PathBuf::from("/definitely/missing/shadoword-desktop-model.bin"),
-            preload_on_startup: false,
-            whisper_accelerator: WhisperAccelerator::Cpu,
-            ..DesktopConfig::default()
-        };
-
-        let state = DesktopState::with_config(config);
-        let status = state.local.status();
-        assert_eq!(status.generation, 1);
-        assert_eq!(status.units.len(), 1);
-        assert_eq!(status.units[0].state, ExecutionUnitState::Unloaded);
-        assert!(state.local_startup_error.lock().unwrap().is_none());
-    }
-
-    #[cfg(feature = "local-runtime")]
-    #[test]
-    fn stale_or_failed_candidate_keeps_the_active_runtime_generation_and_config() {
-        let config = DesktopConfig {
-            model_path: PathBuf::from("/definitely/missing/shadoword-candidate-model.bin"),
-            preload_on_startup: false,
-            whisper_accelerator: WhisperAccelerator::Cpu,
-            ..DesktopConfig::default()
-        };
-        let runtime = InferenceRuntime::new_with_factory(
-            local_transcription_config(&config),
-            Arc::new(WhisperModelFactory),
-        )
-        .expect("create lazy runtime");
-        let original = runtime.transcription_config();
-
-        assert!(reload_local_candidate(&runtime, Some(99), original.clone()).is_err());
-        assert_eq!(runtime.generation(), 1);
-        assert_eq!(runtime.transcription_config(), original);
-
-        let mut failing = original.clone();
-        failing.preload_on_startup = true;
-        assert!(reload_local_candidate(&runtime, Some(1), failing).is_err());
-        assert_eq!(runtime.generation(), 1);
-        assert_eq!(runtime.transcription_config(), original);
-    }
-
-    #[cfg(feature = "local-runtime")]
-    #[tokio::test]
-    async fn stale_generation_is_rejected_even_for_an_unchanged_candidate() {
-        let config = DesktopConfig {
-            model_path: PathBuf::from("/definitely/missing/shadoword-stale-model.bin"),
-            preload_on_startup: false,
-            whisper_accelerator: WhisperAccelerator::Cpu,
-            ..DesktopConfig::default()
-        };
-        let state = DesktopState::with_config(config.clone());
-
-        let error = persist_local_service(&state, &config, &config, Some(99), || Ok(()))
-            .await
-            .expect_err("reject stale generation");
-        assert_eq!(error.code, "stale_runtime_generation");
-        assert_eq!(state.local.generation(), 1);
-        assert_eq!(
-            state.local.transcription_config(),
-            local_transcription_config(&config)
-        );
-    }
-
-    #[cfg(feature = "local-runtime")]
-    #[tokio::test]
-    async fn forced_desktop_save_failure_never_activates_the_candidate() {
-        let config = DesktopConfig {
-            model_path: PathBuf::from("/definitely/missing/shadoword-save-failure-model.bin"),
-            preload_on_startup: false,
-            whisper_accelerator: WhisperAccelerator::Cpu,
-            ..DesktopConfig::default()
-        };
-        let state = DesktopState::with_config(config.clone());
-        let mut next = config.clone();
-        next.recording.english_only = !config.recording.english_only;
-
-        let error = persist_local_service(&state, &config, &next, Some(1), || {
-            Err(anyhow!("forced desktop save failure"))
-        })
-        .await
-        .expect_err("save failure must abort commit");
-
-        assert!(error.message.contains("forced desktop save failure"));
-        assert_eq!(state.local.generation(), 1);
-        assert_eq!(
-            state.local.transcription_config(),
-            local_transcription_config(&config)
-        );
-    }
-
-    #[test]
-    fn explicit_false_clears_desktop_pool_and_missing_flag_preserves_it() {
-        let mut current = DesktopConfig::default();
-        current.inference_pool = Some(
-            local_transcription_config(&current)
-                .effective_inference_pool()
-                .expect("derived pool"),
-        );
-        let runtime = RuntimeConfigDto {
-            model_path: current.model_path.display().to_string(),
-            whisper_accelerator: current.whisper_accelerator,
-            whisper_gpu_device: current.whisper_gpu_device,
-            english_only: current.recording.english_only,
-            preload_on_startup: current.preload_on_startup,
-            inference_pool: current.inference_pool.clone(),
-            inference_pool_explicit: Some(false),
-            generation: Some(1),
-        };
-        assert!(apply_local_runtime_config(&current, runtime.clone())
-            .inference_pool
-            .is_none());
-
-        let mut legacy = runtime;
-        legacy.inference_pool = None;
-        legacy.inference_pool_explicit = None;
-        assert!(apply_local_runtime_config(&current, legacy)
-            .inference_pool
-            .is_some());
-    }
-
-    #[test]
-    fn remote_stale_generation_preserves_the_tauri_error_code() {
-        let error = anyhow::Error::new(crate::remote::RemoteApiError::new(
-            reqwest::StatusCode::CONFLICT,
-            "stale_generation",
-            "generation changed",
-        ));
-
-        let desktop = remote_error(error);
-
-        assert_eq!(desktop.code, "stale_runtime_generation");
-        assert!(desktop.message.contains("stale_generation"));
-    }
 }

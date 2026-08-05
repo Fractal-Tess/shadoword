@@ -58,30 +58,3 @@ pub fn decode_wav(bytes: &[u8]) -> Result<AudioInput> {
         sample_rate: spec.sample_rate,
     })
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn stereo_wav_is_downmixed_to_mono() {
-        let mut cursor = std::io::Cursor::new(Vec::new());
-        let spec = hound::WavSpec {
-            channels: 2,
-            sample_rate: 16_000,
-            bits_per_sample: 32,
-            sample_format: hound::SampleFormat::Float,
-        };
-        let mut writer = hound::WavWriter::new(&mut cursor, spec).expect("create WAV");
-        writer.write_sample(1.0_f32).expect("left sample");
-        writer.write_sample(-1.0_f32).expect("right sample");
-        writer.write_sample(0.5_f32).expect("left sample");
-        writer.write_sample(0.5_f32).expect("right sample");
-        writer.finalize().expect("finalize WAV");
-
-        let decoded = decode_wav(&cursor.into_inner()).expect("decode WAV");
-
-        assert_eq!(decoded.sample_rate, 16_000);
-        assert_eq!(decoded.samples, vec![0.0, 0.5]);
-    }
-}

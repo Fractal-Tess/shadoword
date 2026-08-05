@@ -69,10 +69,9 @@ Four claims, in priority order. All four are load-bearing; none may be softened.
 
 Design must not supply these. Where a surface needs one, it states the absence.
 
-- **Measured latency.** No figure has been run on stated hardware. The bench
-  harness is `crates/shadoword-model-whisper/tests/whisper_integration.rs`
-  against `bench_corpus/clip_{10,15,20,30}s.wav`, and it is opt-in, not part of
-  the normal test run.
+- **Measured latency.** No figure has been recorded on stated hardware. Reference
+  clips remain in `bench_corpus/clip_{10,15,20,30}s.wav` for a documented manual
+  measurement workflow.
 - **macOS and Windows support.** Undecided.
 - **Licensing and pricing.** See `LICENSE` in the repository; no commercial
   model is decided.

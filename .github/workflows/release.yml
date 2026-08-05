@@ -69,7 +69,7 @@ jobs:
           install -m755 "$api_cpu/bin/.shadoword-api-wrapped" dist/stage/api-cpu/bin/shadoword-api
           install -m755 "$api_cuda/bin/.shadoword-api-wrapped" dist/stage/api-cuda/bin/shadoword-api
           install -m755 "$api_vulkan/bin/.shadoword-api-wrapped" dist/stage/api-vulkan/bin/shadoword-api
-          install -m755 "$desktop/bin/.shadoword-desktop-wrapped" dist/stage/desktop/bin/shadoword-desktop
+          install -m755 "$desktop/bin/.shadoword-wrapped" dist/stage/desktop/bin/shadoword
           cp -R "$desktop/share" dist/stage/desktop/
 
           cp README.md CHANGELOG.md dist/stage/api-cpu/

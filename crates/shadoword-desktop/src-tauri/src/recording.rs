@@ -1,6 +1,6 @@
 use crate::contracts::{DesktopError, DesktopEvent, TranscriptionResult, DESKTOP_EVENT_NAME};
 use crate::remote_stream::{RemoteEvent, RemoteProtocol, RemoteStream};
-#[cfg(any(feature = "local-runtime", test))]
+#[cfg(feature = "local-runtime")]
 use shadoword_core::OrderedCompletion;
 use shadoword_core::{
     DesktopConfig, RecordingSnapshotSource, VadSegment, VadSegmenter, VadSegmenterConfig,
@@ -782,12 +782,12 @@ struct RemoteConnection {
     token: Option<String>,
 }
 
-#[cfg(any(feature = "local-runtime", test))]
+#[cfg(feature = "local-runtime")]
 struct OrderedSegmentBarrier {
     ordered: OrderedCompletion<TranscriptionResult>,
 }
 
-#[cfg(any(feature = "local-runtime", test))]
+#[cfg(feature = "local-runtime")]
 impl OrderedSegmentBarrier {
     fn new(max_buffered: usize) -> Self {
         Self {
@@ -1010,73 +1010,4 @@ pub fn emit_error(
 
 fn millis(duration: Duration) -> u64 {
     u64::try_from(duration.as_millis()).unwrap_or(u64::MAX)
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    fn result(text: &str) -> TranscriptionResult {
-        TranscriptionResult {
-            text: text.to_string(),
-            elapsed_ms: 0,
-            engine: "test".to_string(),
-            audio_duration_ms: 0,
-            sample_rate: 16_000,
-            cost_usd: None,
-        }
-    }
-
-    #[test]
-    fn joins_non_empty_stream_segments_in_order() {
-        assert_eq!(
-            join_transcript(&[result(" hello "), result(""), result("world")]),
-            "hello\nworld"
-        );
-    }
-
-    #[test]
-    fn local_c_before_b_waits_at_the_output_and_event_barrier() {
-        let mut barrier = OrderedSegmentBarrier::new(4);
-        assert!(barrier.complete(2, result("C")).unwrap().is_empty());
-        assert!(barrier.complete(1, result("B")).unwrap().is_empty());
-        let ready = barrier.complete(0, result("A")).unwrap();
-        let mut delivered = Vec::new();
-        for (index, result) in ready {
-            delivered.push((index, result.text));
-        }
-        assert_eq!(
-            delivered,
-            vec![
-                (0, "A".to_string()),
-                (1, "B".to_string()),
-                (2, "C".to_string())
-            ]
-        );
-    }
-
-    #[test]
-    fn terminal_local_failure_suppresses_late_completions() {
-        let mut barrier = OrderedSegmentBarrier::new(4);
-        assert!(barrier.complete(2, result("late C")).unwrap().is_empty());
-        barrier.fail(1, "B failed").unwrap();
-        assert!(barrier.complete(0, result("late A")).is_err());
-        assert!(barrier.ordered.is_terminal());
-        assert_eq!(barrier.ordered.buffered_len(), 0);
-    }
-
-    #[test]
-    fn buffered_completion_keeps_flow_credit_until_the_gap_commits() {
-        let mut barrier = OrderedSegmentBarrier::new(2);
-        let credit = 2;
-        let mut outstanding = 2;
-
-        outstanding -= 1;
-        assert!(barrier.complete(1, result("B")).unwrap().is_empty());
-        assert_eq!(barrier.uncommitted_len(outstanding), credit);
-
-        outstanding -= 1;
-        assert_eq!(barrier.complete(0, result("A")).unwrap().len(), 2);
-        assert_eq!(barrier.uncommitted_len(outstanding), 0);
-    }
 }

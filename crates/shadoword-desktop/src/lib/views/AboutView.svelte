@@ -8,7 +8,6 @@
 
 <div class="about-view">
 	<SurfaceHeader
-		kicker="About"
 		title="Local by default, connected by choice."
 		description="Shadoword is a Linux-first speech-to-text workspace for local, self-hosted, or direct provider transcription."
 	/>
@@ -19,7 +18,7 @@
 			<p>Run locally, connect to your own API, or opt into OpenRouter per recording.</p>
 		</div>
 		<div class="version-block">
-			<span>Linux desktop</span><strong>0.10.5</strong><Badge variant="outline">Production</Badge>
+			<span>Linux desktop</span><strong>0.10.6</strong><Badge variant="outline">Production</Badge>
 		</div>
 	</section>
 

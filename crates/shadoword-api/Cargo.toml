@@ -22,9 +22,5 @@ serde.workspace = true
 serde_json.workspace = true
 shadoword-core = { path = "../shadoword-core", default-features = false, features = ["local-whisper"] }
 tokio.workspace = true
-tower.workspace = true
 tracing.workspace = true
 tracing-subscriber.workspace = true
-
-[dev-dependencies]
-shadoword-shared = { path = "../shadoword-shared" }

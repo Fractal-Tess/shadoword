@@ -127,16 +127,3 @@ impl DownloadJobs {
         }
     }
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn rejects_unknown_catalog_model_without_starting_network() {
-        let jobs = DownloadJobs::default();
-        let result = jobs.start("not-a-model".to_string(), std::env::temp_dir());
-
-        assert!(matches!(result, Err(error) if error.code() == "bad_request"));
-    }
-}

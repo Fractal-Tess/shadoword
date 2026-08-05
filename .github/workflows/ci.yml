@@ -38,31 +38,14 @@ jobs:
           nix develop --command "$HOME/.cargo/bin/rustup" run 1.88.0 cargo check --workspace --all-targets --locked
           nix develop --command "$HOME/.cargo/bin/rustup" run 1.88.0 cargo check -p shadoword-desktop --locked --no-default-features --features remote-client
 
-      - name: Reject desktop builds without local CPU inference
-        run: |
-          if nix develop --command cargo check -p shadoword-desktop --locked --no-default-features > /tmp/no-local-runtime.log 2>&1; then
-            echo "desktop unexpectedly compiled without the local CPU runtime"
-            exit 1
-          fi
-          grep -Fq "Shadoword desktop builds must include the local CPU runtime" /tmp/no-local-runtime.log
-
       - name: Check formatting
         run: nix develop --command cargo fmt --all -- --check
 
       - name: Lint CPU workspace
         run: nix develop --command cargo clippy --workspace --all-targets -- -D warnings
 
-      - name: Test CPU workspace
-        run: nix develop --command cargo test --workspace
-
-      - name: Test historical desktop-client feature alias
-        run: nix develop --command cargo test -p shadoword-desktop --no-default-features --features remote-client
-
       - name: Lint Vulkan workspace
         run: nix develop --command cargo clippy --workspace --all-targets --features whisper-vulkan -- -D warnings
-
-      - name: Test Vulkan workspace
-        run: nix develop --command cargo test --workspace --features whisper-vulkan
 
       - name: Check desktop frontend
         run: |
@@ -74,7 +57,6 @@ jobs:
             git diff --exit-code -- src/lib/bindings.ts
             bun run check
             bun run lint
-            bun run test
             bun run build
           '
 

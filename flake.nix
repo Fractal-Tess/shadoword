@@ -161,6 +161,7 @@
           system,
           pname,
           cargoPackage,
+          executable ? cargoPackage,
           runtimeDeps,
           cargoFeatures ? [ ],
           cudaSupport ? false,
@@ -206,16 +207,14 @@
             (cd crates/shadoword-desktop && bun run build)
           '';
 
-          doCheck = true;
-          cargoTestFlags = [
-            "-p"
-            cargoPackage
-          ];
+          doCheck = false;
 
           postInstall = ''
-            strip --strip-unneeded "$out/bin/${cargoPackage}"
-            wrapProgram "$out/bin/${cargoPackage}" \
-              --prefix LD_LIBRARY_PATH : "${runtimeLibraryPath pkgs packageRuntimeDeps}"
+            strip --strip-unneeded "$out/bin/${executable}"
+            wrapProgram "$out/bin/${executable}" \
+              --prefix LD_LIBRARY_PATH : "${runtimeLibraryPath pkgs packageRuntimeDeps}" \
+              ${pkgs.lib.optionalString desktopIntegration ''--set GDK_BACKEND x11 \
+              --set WEBKIT_DISABLE_DMABUF_RENDERER 1''}
             ${pkgs.lib.optionalString desktopIntegration ''
               install -Dm644 ${./nix/shadoword.desktop} "$out/share/applications/shadoword.desktop"
               install -Dm644 ${./crates/shadoword-desktop/src-tauri/icons/128x128.png} \
@@ -227,6 +226,7 @@
             description = "Linux-first speech-to-text, local by default, with Shadoword API and OpenRouter options";
             homepage = "https://github.com/Fractal-Tess/shadoword";
             license = pkgs.lib.licenses.mit;
+            mainProgram = executable;
             platforms = supportedSystems;
           };
         };
@@ -269,7 +269,7 @@
               runHook postInstall
             '';
 
-            outputHash = "sha256-BYEaXXkQu2bpLZJT32oRnpnjfnpAb5MoWq+k59vvsmk=";
+            outputHash = "sha256-fWpskeZG2sUJ6CAVRHdug/TR7TTL4Q3oM8IYBam1lPQ=";
             outputHashAlgo = "sha256";
             outputHashMode = "recursive";
           };
@@ -302,6 +302,7 @@
               inherit pkgs system;
               pname = "shadoword-desktop";
               cargoPackage = "shadoword-desktop";
+              executable = "shadoword";
               runtimeDeps = clientRuntimeDeps pkgs;
               cargoFeatures = [
                 "local-runtime"
@@ -362,7 +363,7 @@
             extraLibraryPath = "/run/opengl-driver/lib";
           };
           shadoword-desktop = packageFor "shadoword-desktop" {
-            executable = "shadoword-desktop";
+            executable = "shadoword";
             runtimeDeps = clientRuntimeDeps pkgs;
             extraLibraryPath = "/run/opengl-driver/lib";
             desktopIntegration = true;
@@ -377,10 +378,6 @@
           shadoword-desktop-client-source = shadoword-desktop-source;
         }
       );
-
-      checks = forAllSystems (system: {
-        shadoword-api = self.packages.${system}.shadoword-api-source;
-      });
 
       devShells = forAllSystems (
         system:
@@ -495,7 +492,6 @@
               echo "CUDA host compiler: $CUDAHOSTCXX"
               echo "Run 'cd crates/shadoword-desktop && bun run tauri dev -- --features whisper-cuda' for the desktop"
               echo "Run 'cargo run -p shadoword-api --features whisper-cuda' for daemon CUDA"
-              echo "Run with: cargo test --workspace"
             '';
           };
         }

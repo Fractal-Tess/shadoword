@@ -1,18 +1,17 @@
 <script lang="ts">
-	import { Check, Clock3, Copy, Search, Trash2 } from '@lucide/svelte';
-	import { Badge } from '$lib/components/ui/badge';
+	import { Clock3, Search, Trash2 } from '@lucide/svelte';
 	import { Button } from '$lib/components/ui/button';
 	import { Input } from '$lib/components/ui/input';
 	import SurfaceHeader from '$lib/components/SurfaceHeader.svelte';
-	import type { DesktopAppState } from '$lib/app-state.svelte';
+	import { useDesktopShell } from '$lib/shell/desktop-shell-context';
 	import type { HistoryRecord } from '$lib/types';
+	import HistoryEntry from './history/HistoryEntry.svelte';
 
-	let { app }: { app: DesktopAppState } = $props();
+	const app = useDesktopShell().app;
 	let history = $derived(app.history);
 	let query = $state('');
 	let copiedId = $state<string | null>(null);
 	let lastDeleted = $state<{ record: HistoryRecord; index: number } | null>(null);
-
 	let filteredHistory = $derived(
 		history.filter((item) => item.text.toLowerCase().includes(query.trim().toLowerCase()))
 	);
@@ -29,14 +28,6 @@
 		app.history = history.filter((item) => item.id !== id);
 	};
 
-	const formatCost = (cost: number) => {
-		if (cost === 0) return '$0.00';
-		if (cost < 0.000001) return '<$0.000001';
-		if (cost < 0.0001) return `$${cost.toFixed(6)}`;
-		if (cost < 0.01) return `$${cost.toFixed(5)}`;
-		return `$${cost.toFixed(4)}`;
-	};
-
 	const undoDelete = () => {
 		if (lastDeleted) {
 			const restored = [...history];
@@ -49,7 +40,6 @@
 
 <div class="history-view">
 	<SurfaceHeader
-		kicker="History"
 		title="Words from this session."
 		description="Review, copy, or remove transcripts captured while Shadoword is running."
 	>
@@ -85,42 +75,12 @@
 	{#if filteredHistory.length > 0}
 		<section class="timeline" aria-label="Transcript history">
 			{#each filteredHistory as item (item.id)}
-				<article>
-					<div class="timeline-marker" aria-hidden="true"><span></span></div>
-					<div class="entry">
-						<header>
-							<div class="entry-time"><Clock3 size={13} />{item.timestamp}</div>
-							<div class="entry-actions">
-								<Button
-									variant="ghost"
-									size="icon-sm"
-									onclick={() => copyItem(item.id, item.text)}
-									aria-label="Copy transcript"
-								>
-									{#if copiedId === item.id}<Check size={14} />{:else}<Copy size={14} />{/if}
-								</Button>
-								<Button
-									variant="ghost"
-									size="icon-sm"
-									onclick={() => deleteItem(item.id)}
-									aria-label="Delete transcript"
-								>
-									<Trash2 size={14} />
-								</Button>
-							</div>
-						</header>
-						<p>{item.text}</p>
-						<footer>
-							<Badge variant="outline">{item.engine}</Badge>
-							<span>{item.duration} audio</span>
-							<span>{item.segments} {item.segments === 1 ? 'segment' : 'segments'}</span>
-							<span>{item.latency} inference</span>
-							{#if item.costUsd != null}
-								<span class="request-cost">{formatCost(item.costUsd)} request cost</span>
-							{/if}
-						</footer>
-					</div>
-				</article>
+				<HistoryEntry
+					{item}
+					copied={copiedId === item.id}
+					onCopy={() => copyItem(item.id, item.text)}
+					onDelete={() => deleteItem(item.id)}
+				/>
 			{/each}
 		</section>
 	{:else}
@@ -190,114 +150,6 @@
 		padding-top: 0.35rem;
 	}
 
-	.timeline article {
-		display: grid;
-		grid-template-columns: 1.5rem minmax(0, 1fr);
-		gap: 0.8rem;
-	}
-
-	.timeline-marker {
-		position: relative;
-		display: flex;
-		justify-content: center;
-	}
-
-	.timeline-marker::after {
-		position: absolute;
-		top: 1.25rem;
-		bottom: 0;
-		width: 1px;
-		background: var(--line);
-		content: '';
-	}
-
-	.timeline article:last-child .timeline-marker::after {
-		display: none;
-	}
-
-	/* A square node on the timeline, in off-white. Every entry in this list is a
-	   completed transcript, so no entry is more urgent than any other and none of
-	   them earns the accent — this is the same solid ink square the status pill's
-	   `ready` state uses, and it means the same thing. The 2px ground-coloured border
-	   is what punches the node out of the line running behind it, so the halo the old
-	   marker carried is redundant. */
-	.timeline-marker span {
-		z-index: 1;
-		width: 0.5rem;
-		height: 0.5rem;
-		margin-top: 1.15rem;
-		border: 2px solid var(--surface-0);
-		background: var(--ink);
-	}
-
-	.entry {
-		margin-bottom: 0.7rem;
-		border: 1px solid var(--line);
-		background: var(--surface-1);
-		transition:
-			border-color 140ms ease,
-			background-color 140ms ease;
-	}
-
-	.entry:hover {
-		border-color: var(--line-strong);
-		background: var(--surface-2);
-	}
-
-	.entry header {
-		display: flex;
-		align-items: center;
-		justify-content: space-between;
-		gap: 1rem;
-		border-bottom: 1px solid var(--line);
-		padding: 0.55rem 0.65rem 0.55rem 0.9rem;
-	}
-
-	.entry-time,
-	.entry-actions,
-	.entry footer {
-		display: flex;
-		align-items: center;
-	}
-
-	.entry-time {
-		gap: 0.4rem;
-		color: var(--ink-muted);
-		font-family: var(--font-mono);
-		font-size: 0.6875rem;
-	}
-
-	.entry-actions {
-		gap: 0.15rem;
-	}
-
-	.entry > p {
-		max-width: 72ch;
-		margin: 0;
-		padding: 1rem 1rem 0.85rem;
-		color: var(--ink);
-		font-size: 0.875rem;
-		line-height: 1.6;
-	}
-
-	.entry footer {
-		gap: 0.7rem;
-		flex-wrap: wrap;
-		padding: 0 1rem 1rem;
-	}
-
-	.entry footer > span {
-		color: var(--ink-muted);
-		font-family: var(--font-mono);
-		font-size: 0.6875rem;
-	}
-
-	.entry footer > .request-cost {
-		border-left: 1px solid var(--scarlet);
-		padding-left: 0.7rem;
-		color: var(--ink);
-	}
-
 	.empty-state {
 		display: grid;
 		min-height: 22rem;
@@ -336,7 +188,7 @@
 		justify-content: space-between;
 		gap: 1rem;
 		width: min(24rem, 100%);
-		margin: 0 0 0 auto;
+		margin-left: auto;
 		border: 1px solid var(--line-strong);
 		padding: 0.65rem 0.75rem 0.65rem 0.9rem;
 		background: var(--surface-2);

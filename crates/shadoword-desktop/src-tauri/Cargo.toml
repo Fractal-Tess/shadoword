@@ -7,6 +7,8 @@ license.workspace = true
 authors.workspace = true
 repository.workspace = true
 description = "Tauri desktop shell for Shadoword"
+default-run = "shadoword"
+autobins = false
 
 [features]
 default = ["local-runtime"]
@@ -16,10 +18,20 @@ remote-client = ["local-runtime"]
 custom-protocol = ["tauri/custom-protocol", "local-runtime"]
 whisper-vulkan = ["local-runtime", "shadoword-core/whisper-vulkan"]
 whisper-cuda = ["local-runtime", "shadoword-core/whisper-cuda"]
+bindings-generator = []
 
 [lib]
 name = "shadoword_desktop_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
+
+[[bin]]
+name = "shadoword"
+path = "src/main.rs"
+
+[[bin]]
+name = "export-bindings"
+path = "src/bin/export-bindings.rs"
+required-features = ["bindings-generator"]
 
 [build-dependencies]
 tauri-build = { version = "2.6.3", features = [] }
@@ -47,6 +59,3 @@ tokio.workspace = true
 tokio-tungstenite.workspace = true
 tracing.workspace = true
 wait-timeout.workspace = true
-
-[dev-dependencies]
-tempfile = "3.23.0"

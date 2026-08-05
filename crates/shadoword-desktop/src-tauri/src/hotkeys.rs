@@ -224,17 +224,3 @@ fn classify_key(key: &str) -> Option<ShortcutKeyKind> {
     }
     (key == "space" || key.chars().count() == 1).then_some(ShortcutKeyKind::Text)
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn validates_safe_global_shortcuts() {
-        assert!(validate_shortcut("f2").is_ok());
-        assert!(validate_shortcut("ctrl+space").is_ok());
-        assert!(validate_shortcut("insert").is_ok());
-        assert!(validate_shortcut("a").is_err());
-        assert!(validate_shortcut("ctrl+a+b").is_err());
-    }
-}

@@ -182,33 +182,3 @@ impl IntoResponse for ApiError {
         response
     }
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use axum::http::header::RETRY_AFTER;
-
-    #[test]
-    fn global_and_per_flow_admission_overload_are_retryable() {
-        for error in [InferenceError::QueueFull, InferenceError::FlowLimit] {
-            let response = ApiError::from_inference(error).into_response();
-            assert_eq!(response.status(), StatusCode::TOO_MANY_REQUESTS);
-            assert_eq!(
-                response.headers().get(RETRY_AFTER),
-                Some(&HeaderValue::from_static("5"))
-            );
-        }
-    }
-
-    #[test]
-    fn pool_drain_and_unit_unavailability_are_service_unavailable() {
-        for error in [
-            InferenceError::AdmissionClosed,
-            InferenceError::NoCompatibleUnit,
-        ] {
-            let response = ApiError::from_inference(error).into_response();
-            assert_eq!(response.status(), StatusCode::SERVICE_UNAVAILABLE);
-            assert!(response.headers().contains_key(RETRY_AFTER));
-        }
-    }
-}

@@ -50,9 +50,9 @@ https://github.com/Fractal-Tess/shadoword/discussions
 It is not explicitly required to gather feedback, but it certainly helps your PR get merged.
 -->
 
-## Testing
+## Validation
 
-<!-- Describe how you tested your changes and if you need help getting additional testing -->
+<!-- List the formatting, lint, compile, and build checks you ran. -->
 
 ## Screenshots/Videos (if applicable)
 

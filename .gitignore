@@ -32,17 +32,11 @@ dist-ssr
 recording_*
 .crush/
 
-# Playwright
-playwright-report/
-test-results/
-blob-report/
-
 .direnv
 .envrc
 
 # Generated model benchmark artifacts
 crates/shadoword-model-whisper/bench-results/
-crates/shadoword-model-whisper/test-output/
 
 # Nix build output
 result

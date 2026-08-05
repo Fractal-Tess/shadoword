@@ -1,8 +1,8 @@
 # bench_corpus
 
-Benchmark audio corpus for `crates/shadoword-model-whisper/tests/whisper_integration.rs`.
+Reference audio corpus retained for documented manual performance measurements.
 
-Expected files:
+Included files:
 
 - `clip_10s.wav` / `clip_10s_ref.txt`
 - `clip_15s.wav` / `clip_15s_ref.txt`

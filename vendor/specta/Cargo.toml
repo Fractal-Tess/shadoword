@@ -324,8 +324,6 @@ features = []
 optional = true
 default-features = false
 
-[dev-dependencies]
-
 [build-dependencies.rustc_version]
 version = "0.4.1"
 

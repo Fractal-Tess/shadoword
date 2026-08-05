@@ -16,6 +16,3 @@ whisper-cuda = ["transcribe-rs/whisper-cuda"]
 [dependencies]
 shadoword-shared = { path = "../shadoword-shared" }
 transcribe-rs.workspace = true
-
-[dev-dependencies]
-hound.workspace = true

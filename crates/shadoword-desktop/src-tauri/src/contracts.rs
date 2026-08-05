@@ -9,7 +9,6 @@ use specta::Type;
 #[derive(Debug, Clone, Serialize, Type)]
 pub struct DesktopSettings {
     pub mode: ServiceMode,
-    pub local_runtime_available: bool,
     pub model_path: String,
     pub preload_on_startup: bool,
     pub whisper_accelerator: WhisperAccelerator,
