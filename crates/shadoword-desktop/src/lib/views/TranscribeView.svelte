@@ -78,7 +78,7 @@
 	function modeLabel(value: typeof mode) {
 		if (value === 'local') return 'Local';
 		if (value === 'open_router') return 'OpenRouter';
-		return 'Remote';
+		return 'Shadoword API';
 	}
 
 	function endpointLabel(endpoint: string | undefined) {
@@ -163,7 +163,7 @@
 						aria-pressed={mode === 'remote'}
 					>
 						<Radio size={16} strokeWidth={1.9} aria-hidden="true" />
-						<span class="mono-micro">Remote API</span>
+						<span class="mono-micro">Shadoword API</span>
 					</button>
 					<button
 						class:active={mode === 'open_router'}
@@ -257,7 +257,7 @@
 							(mode === 'remote'
 								? 'Check the endpoint and bearer token in Settings, then retry.'
 								: mode === 'open_router'
-									? 'Enter an OpenRouter API key in Settings, choose a transcription model, and save.'
+									? 'Enter an OpenRouter API key in Execution and choose a transcription model.'
 									: 'Select or download a local model, then refresh the runtime.'))}
 				</span>
 				{#if captureBlocked}

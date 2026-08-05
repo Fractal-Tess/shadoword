@@ -11,6 +11,7 @@
 	} from '@lucide/svelte';
 	import type { DesktopAppState } from '$lib/app-state.svelte';
 	import type { WhisperAccelerator } from '$lib/bindings';
+	import BrutalistSelect from '$lib/components/BrutalistSelect.svelte';
 	import ExecutionPool from '$lib/components/ExecutionPool.svelte';
 	import { downloadPercent, formatBytes } from '$lib/display';
 	import { Badge } from '$lib/components/ui/badge';
@@ -35,6 +36,14 @@
 	let accelerator = $derived(runtime?.whisper_accelerator ?? 'auto');
 	let gpuDevice = $derived(runtime?.whisper_gpu_device ?? -1);
 	let gpuDevices = $derived(app.overview?.status.available_gpu_devices ?? []);
+	let gpuDeviceOptions = $derived([
+		{ value: '-1', label: 'Automatic', detail: 'Best available device' },
+		...gpuDevices.map((device) => ({
+			value: String(device.id),
+			label: `GPU ${device.id} · ${device.name}`,
+			detail: formatBytes(device.total_vram)
+		}))
+	]);
 	let customPath = $derived(runtime?.model_path ?? app.settings?.model_path ?? '');
 	let failedDownload = $derived(
 		Object.values(app.downloads).find((download) => download.state === 'failed') ?? null
@@ -91,7 +100,7 @@
 			<div>
 				<span>Active runtime</span>
 				<h2 id="runtime-title" class="display-legend">
-					{mode === 'remote' ? 'Remote API' : 'Local machine'}
+					{mode === 'remote' ? 'Shadoword API' : 'Local machine'}
 				</h2>
 				<p>
 					{mode === 'remote'
@@ -141,37 +150,29 @@
 				<label for="accelerator">Whisper accelerator</label>
 				<span>Auto uses the best backend compiled into this runtime.</span>
 			</div>
-			<select
+			<BrutalistSelect
 				id="accelerator"
 				value={accelerator}
+				options={[
+					{ value: 'auto', label: 'Automatic', detail: 'Best compiled backend' },
+					{ value: 'gpu', label: 'GPU', detail: 'Hardware acceleration' },
+					{ value: 'cpu', label: 'CPU', detail: 'Portable execution' }
+				]}
 				disabled={controlsLocked}
-				onchange={(event) =>
-					updateRuntime({
-						whisper_accelerator: event.currentTarget.value as WhisperAccelerator
-					})}
-			>
-				<option value="auto">Auto</option><option value="gpu">GPU</option><option value="cpu"
-					>CPU</option
-				>
-			</select>
+				onValueChange={(value) =>
+					updateRuntime({ whisper_accelerator: value as WhisperAccelerator })}
+			/>
 			<div>
 				<label for="gpu-device">GPU device</label>
 				<span>Select a specific device or let Shadoword choose.</span>
 			</div>
-			<select
+			<BrutalistSelect
 				id="gpu-device"
-				value={gpuDevice}
+				value={String(gpuDevice)}
+				options={gpuDeviceOptions}
 				disabled={controlsLocked || accelerator === 'cpu'}
-				onchange={(event) =>
-					updateRuntime({ whisper_gpu_device: Number(event.currentTarget.value) })}
-			>
-				<option value={-1}>Auto (best available)</option>
-				{#each gpuDevices as device (device.id)}
-					<option value={device.id}
-						>GPU {device.id} · {device.name} · {formatBytes(device.total_vram)}</option
-					>
-				{/each}
-			</select>
+				onValueChange={(value) => updateRuntime({ whisper_gpu_device: Number(value) })}
+			/>
 		</section>
 	{/if}
 
@@ -289,7 +290,7 @@
 				<AlertTriangle size={17} />
 				<div>
 					<strong>No model catalog available</strong><span
-						>Refresh the {mode === 'remote' ? 'remote API' : 'local runtime'}.</span
+						>Refresh the {mode === 'remote' ? 'Shadoword API' : 'local runtime'}.</span
 					>
 				</div>
 			</div>
@@ -345,15 +346,6 @@
 	.models-view {
 		display: grid;
 		gap: 1rem;
-	}
-
-	.execution-settings select {
-		height: 2rem;
-		border: 1px solid var(--line);
-		padding: 0 1.8rem 0 0.6rem;
-		background: var(--surface-1);
-		color: var(--ink-dim);
-		font-size: 0.6875rem;
 	}
 
 	.runtime-band {
@@ -475,10 +467,6 @@
 	.execution-settings span {
 		color: var(--ink-muted);
 		font-size: 0.6875rem;
-	}
-
-	.execution-settings select:disabled {
-		opacity: 0.45;
 	}
 
 	.model-notice {

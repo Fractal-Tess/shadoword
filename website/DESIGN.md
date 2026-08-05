@@ -140,8 +140,8 @@ abstract spectrogram burning in magenta and cyan, densest at the right and
 dissolving to black at the left, with one perfectly black column standing at its
 centre. Everything around that column is energised and broadcasting; the column
 carries no signal at all, and it is the reader's machine. The argument of the
-product — audio never leaves your hardware — is made as an image before a word is
-read.
+product — local execution stays silent on the network and remains the default —
+is made as an image before a word is read.
 
 **The imagery is not photographic and does not depict anything.** The
 composition descends from comp A, "Sealed Tower"

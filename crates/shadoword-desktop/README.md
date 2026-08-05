@@ -16,7 +16,7 @@ Implemented operations:
 - tray show/hide/quit, close-to-tray, clipboard copy, direct typing, and configurable paste shortcuts;
 - private endpoint/token and desktop preference persistence plus in-memory session history.
 
-The remote API has no server-side download cancellation, custom-model, or model-delete endpoint. “Stop watching” stops client polling without claiming to cancel the server job; custom paths remain local-only.
+The Shadoword API has no server-side download cancellation, custom-model, or model-delete endpoint. “Stop watching” stops client polling without claiming to cancel the server job; custom paths remain local-only.
 
 ## Generated contracts
 

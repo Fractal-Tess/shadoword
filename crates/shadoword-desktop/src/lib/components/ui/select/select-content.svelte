@@ -27,16 +27,14 @@
 		{preventScroll}
 		data-slot="select-content"
 		class={cn(
-			'relative isolate z-50 min-w-36 overflow-x-hidden overflow-y-auto rounded-lg bg-popover text-popover-foreground shadow-md ring-1 ring-foreground/10 duration-100 data-[side=bottom]:slide-in-from-top-2 data-[side=inline-end]:slide-in-from-left-2 data-[side=inline-start]:slide-in-from-right-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95',
+			'relative isolate z-50 max-h-80 min-w-44 overflow-x-hidden overflow-y-auto border border-line-strong bg-plate text-ink shadow-[0_12px_32px_rgb(0_0_0/0.42)] duration-100 data-[side=bottom]:slide-in-from-top-1 data-[side=inline-end]:slide-in-from-left-1 data-[side=inline-start]:slide-in-from-right-1 data-[side=left]:slide-in-from-right-1 data-[side=right]:slide-in-from-left-1 data-[side=top]:slide-in-from-bottom-1 data-open:animate-in data-open:fade-in-0 data-closed:animate-out data-closed:fade-out-0',
 			className
 		)}
 		{...restProps}
 	>
 		<SelectScrollUpButton />
 		<SelectPrimitive.Viewport
-			class={cn(
-				'h-(--bits-select-anchor-height) w-full min-w-(--bits-select-anchor-width) scroll-my-1'
-			)}
+			class={cn('w-full min-w-(--bits-select-anchor-width) scroll-my-1 p-1')}
 		>
 			{@render children?.()}
 		</SelectPrimitive.Viewport>

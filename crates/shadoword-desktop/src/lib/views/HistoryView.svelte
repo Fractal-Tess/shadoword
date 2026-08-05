@@ -29,6 +29,14 @@
 		app.history = history.filter((item) => item.id !== id);
 	};
 
+	const formatCost = (cost: number) => {
+		if (cost === 0) return '$0.00';
+		if (cost < 0.000001) return '<$0.000001';
+		if (cost < 0.0001) return `$${cost.toFixed(6)}`;
+		if (cost < 0.01) return `$${cost.toFixed(5)}`;
+		return `$${cost.toFixed(4)}`;
+	};
+
 	const undoDelete = () => {
 		if (lastDeleted) {
 			const restored = [...history];
@@ -105,8 +113,11 @@
 						<footer>
 							<Badge variant="outline">{item.engine}</Badge>
 							<span>{item.duration} audio</span>
-							<span>{item.segments} segments</span>
+							<span>{item.segments} {item.segments === 1 ? 'segment' : 'segments'}</span>
 							<span>{item.latency} inference</span>
+							{#if item.costUsd != null}
+								<span class="request-cost">{formatCost(item.costUsd)} request cost</span>
+							{/if}
 						</footer>
 					</div>
 				</article>
@@ -281,6 +292,12 @@
 		font-size: 0.6875rem;
 	}
 
+	.entry footer > .request-cost {
+		border-left: 1px solid var(--scarlet);
+		padding-left: 0.7rem;
+		color: var(--ink);
+	}
+
 	.empty-state {
 		display: grid;
 		min-height: 22rem;
@@ -329,8 +346,7 @@
 	}
 
 	@media (max-width: 720px) {
-		.history-toolbar > span,
-		.entry footer span:last-child {
+		.history-toolbar > span {
 			display: none;
 		}
 	}

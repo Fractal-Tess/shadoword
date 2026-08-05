@@ -177,6 +177,7 @@
           minimalBuildDeps ? false,
           frontendNodeModules ? null,
           extraEnv ? { },
+          desktopIntegration ? false,
         }:
         let
           packageRuntimeDeps = runtimeDeps ++ pkgs.lib.optionals cudaSupport (cudaRuntimeDeps pkgs);
@@ -232,10 +233,15 @@
             strip --strip-unneeded "$out/bin/${cargoPackage}"
             wrapProgram "$out/bin/${cargoPackage}" \
               --prefix LD_LIBRARY_PATH : "${runtimeLibraryPath pkgs packageRuntimeDeps}"
+            ${pkgs.lib.optionalString desktopIntegration ''
+              install -Dm644 ${./nix/shadoword.desktop} "$out/share/applications/shadoword.desktop"
+              install -Dm644 ${./crates/shadoword-desktop/src-tauri/icons/128x128.png} \
+                "$out/share/icons/hicolor/128x128/apps/shadoword.png"
+            ''}
           '';
 
           meta = {
-            description = "Offline speech-to-text workspace with a Tauri desktop UI and Whisper daemon";
+            description = "Linux-first speech-to-text, local by default, with Shadoword API and OpenRouter options";
             homepage = "https://github.com/Fractal-Tess/shadoword";
             license = pkgs.lib.licenses.mit;
             platforms = supportedSystems;
@@ -321,6 +327,7 @@
               noDefaultFeatures = true;
               minimalBuildDeps = true;
               frontendNodeModules = desktopNodeModules;
+              desktopIntegration = true;
             };
 
             shadoword-desktop = mkRustPackage {
@@ -335,6 +342,7 @@
               noDefaultFeatures = true;
               frontendNodeModules = desktopNodeModules;
               extraEnv.GGML_NATIVE = "OFF";
+              desktopIntegration = true;
             };
           };
           packageFor =
@@ -343,6 +351,7 @@
               executable,
               runtimeDeps,
               extraLibraryPath ? "",
+              desktopIntegration ? false,
             }:
             let
               artifact = artifactFor system packageName;
@@ -357,8 +366,11 @@
                   extraLibraryPath
                   runtimeDeps
                   version
+                  desktopIntegration
                   ;
                 pname = packageName;
+                desktopFile = ./nix/shadoword.desktop;
+                desktopIcon = ./crates/shadoword-desktop/src-tauri/icons/128x128.png;
               };
         in
         rec {
@@ -382,11 +394,13 @@
             executable = "shadoword-desktop";
             runtimeDeps = clientRuntimeDeps pkgs;
             extraLibraryPath = "/run/opengl-driver/lib";
+            desktopIntegration = true;
           };
           shadoword-desktop = packageFor "shadoword-desktop" {
             executable = "shadoword-desktop";
             runtimeDeps = clientRuntimeDeps pkgs;
             extraLibraryPath = "/run/opengl-driver/lib";
+            desktopIntegration = true;
           };
 
           shadoword-api-source = sourcePackages.shadoword-api;

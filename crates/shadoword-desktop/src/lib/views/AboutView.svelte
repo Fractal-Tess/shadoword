@@ -9,17 +9,17 @@
 <div class="about-view">
 	<SurfaceHeader
 		kicker="About"
-		title="Private speech, in your hands."
+		title="Local by default, connected by choice."
 		description="Shadoword is a Linux-first speech-to-text workspace for local, self-hosted, or direct provider transcription."
 	/>
 
 	<section class="identity-block">
 		<div class="brand-lockup">
 			<BrandMark />
-			<p>Speech capture and transcription without surrendering your audio.</p>
+			<p>Run locally, connect to your own API, or opt into OpenRouter per recording.</p>
 		</div>
 		<div class="version-block">
-			<span>Linux desktop</span><strong>0.10.3</strong><Badge variant="outline">Production</Badge>
+			<span>Linux desktop</span><strong>0.10.4</strong><Badge variant="outline">Production</Badge>
 		</div>
 	</section>
 
@@ -34,7 +34,7 @@
 					<span class="numeral-outline">01</span>
 					<div>
 						<strong>User-controlled inference</strong>
-						<p>Run Whisper here or on infrastructure you operate.</p>
+						<p>Run locally, on infrastructure you operate, or through OpenRouter when chosen.</p>
 					</div>
 				</li>
 				<li>

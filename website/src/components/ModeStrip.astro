@@ -2,11 +2,9 @@
 import { modes } from '../data/site'
 
 /**
- * A real three-position control, not a picture of one. The comp drew it as a
- * decorative strip with invented sub-copy — one line of which ("REMOTE —
- * DISABLED BY DEFAULT") is simply false, since remote is a working mode pointing
- * at a daemon the user hosts. So the strip keeps the comp's geometry and takes
- * the product's own detent strings, which run longer than the mock's.
+ * A real three-position control, not a picture of one. The strip keeps the
+ * comp's geometry but now presents the product's actual execution targets:
+ * local Whisper, a self-hosted Shadoword API, and direct OpenRouter batch STT.
  *
  * Radio semantics, because the three modes are mutually exclusive and this is
  * exactly what a radio group is. Arrow keys work, the label is the click target,
@@ -15,10 +13,8 @@ import { modes } from '../data/site'
  * What the detent means is the one thing this band has to get right. It is the
  * reader's cursor through three descriptions, *not* a claim about a running
  * machine — a static page cannot have one, and the THESIS refuses any instrument
- * faking data. The detent copy is present tense, so if the scarlet mark were the
- * only thing distinguishing Local, a reader who clicked `Off` would leave the
- * band reading "the microphone is released" as the product's live state. So the
- * product fact gets its own immovable mark: `Local` carries a `Default` flag in
+ * faking data. Since the selected detent moves, the product fact gets its own
+ * immovable mark: `Local` carries a `Default` flag in
  * the same scarlet-ink micro label the model catalog uses for its own default,
  * and no selection can move it.
  */

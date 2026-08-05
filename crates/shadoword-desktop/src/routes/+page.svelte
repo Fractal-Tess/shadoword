@@ -34,6 +34,10 @@ FORM: Neo-Tokyo Neon Night, abstracted from cityscape to spectrum; seed 322d3899
 		requestedPage === 'models' ||
 		requestedPage === 'history' ||
 		requestedPage === 'settings' ||
+		requestedPage === 'capture' ||
+		requestedPage === 'transcription' ||
+		requestedPage === 'output' ||
+		requestedPage === 'application' ||
 		requestedPage === 'about'
 			? requestedPage
 			: 'transcribe';
@@ -58,8 +62,11 @@ FORM: Neo-Tokyo Neon Night, abstracted from cityscape to spectrum; seed 322d3899
 </script>
 
 <svelte:head>
-	<title>Shadoword · Private speech to text</title>
-	<meta name="description" content="Shadoword private speech-to-text desktop application." />
+	<title>Shadoword · Speech to text, local by default</title>
+	<meta
+		name="description"
+		content="Shadoword speech to text with local, self-hosted, and OpenRouter execution."
+	/>
 </svelte:head>
 
 <div class="app-shell">
@@ -90,7 +97,7 @@ FORM: Neo-Tokyo Neon Night, abstracted from cityscape to spectrum; seed 322d3899
 			{/if}
 			<div class="sr-only" aria-live="polite">
 				{activePage} view · {mode === 'remote'
-					? 'Remote API'
+					? 'Shadoword API'
 					: mode === 'open_router'
 						? 'OpenRouter'
 						: 'Local machine'} · {poolSummary}
@@ -101,10 +108,12 @@ FORM: Neo-Tokyo Neon Night, abstracted from cityscape to spectrum; seed 322d3899
 				<ModelsView {app} />
 			{:else if activePage === 'history'}
 				<HistoryView {app} />
-			{:else if activePage === 'settings'}
-				{#key app.settings}
-					<SettingsView {app} />
-				{/key}
+			{:else if activePage === 'settings' || activePage === 'capture' || activePage === 'transcription' || activePage === 'output' || activePage === 'application'}
+				{#if app.settings}
+					<SettingsView {app} section={activePage} onNavigate={(page) => (activePage = page)} />
+				{:else}
+					<div class="settings-loading mono-caption" role="status">Loading native settings…</div>
+				{/if}
 			{:else}
 				<AboutView />
 			{/if}
@@ -144,6 +153,12 @@ FORM: Neo-Tokyo Neon Night, abstracted from cityscape to spectrum; seed 322d3899
 	.work-surface :global(.transcribe-view) {
 		min-height: 0;
 		flex: 1;
+	}
+
+	.settings-loading {
+		border: 1px solid var(--line);
+		padding: 1rem;
+		color: var(--ink-muted);
 	}
 
 	.demo-banner,

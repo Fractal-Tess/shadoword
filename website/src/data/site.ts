@@ -7,10 +7,10 @@
 
 export const repoUrl = 'https://github.com/Fractal-Tess/shadoword'
 
-export const hook = 'Speech to text that never leaves your machine.'
+export const hook = 'Speech to text, local by default.'
 
 export const subLegend =
-  'Linux first. Local Whisper by default. You choose the model and the silicon.'
+  'Run Whisper here, connect to your Shadoword API, or opt into OpenRouter. You choose the path.'
 
 /**
  * The three selector positions. These are the product's real runtime modes.
@@ -18,29 +18,29 @@ export const subLegend =
  * `isDefault` marks Local, and it is a *product fact* rather than the strip's
  * selection: the desktop client boots into local inference. The strip renders it
  * as a flag that never moves, because the detent the reader can move must not be
- * the only thing on the band saying which mode is the real one — the detent copy
- * is present tense, so a reader who clicks `Off` would otherwise leave the page
- * asserting "the microphone is released" as its live state.
+ * the only thing on the band saying which mode is the default — the other
+ * positions are explicit network choices rather than weaker versions of Local.
  */
 export const modes = [
-  {
-    id: 'off',
-    label: 'Off',
-    isDefault: false,
-    detent: 'No capture. The microphone is released and no model is resident.',
-  },
   {
     id: 'local',
     label: 'Local',
     isDefault: true,
     detent:
-      'Whisper runs on this machine. Audio reaches the model over a function call, never a socket.',
+      'The default path. Whisper runs on this machine and audio reaches the model without a socket.',
   },
   {
     id: 'remote',
-    label: 'Remote',
+    label: 'Shadoword API',
     isDefault: false,
-    detent: 'Audio is sent to a daemon you host, over an authenticated connection you configured.',
+    detent: 'Audio is sent to a daemon you host over an authenticated connection you configured.',
+  },
+  {
+    id: 'openrouter',
+    label: 'OpenRouter',
+    isDefault: false,
+    detent:
+      'Audio is uploaded after capture stops, only when you explicitly select this cloud path.',
   },
 ] as const
 
@@ -231,11 +231,11 @@ export const streamProtocol = [
   { dir: 'rx', frame: 'Done', note: 'exactly once' },
 ]
 
-/** Honest pre-launch status. Do not soften these. */
+/** Current distribution status. Keep these claims tied to published artifacts. */
 export const typePlate = [
-  { k: 'Status', v: 'Pre-launch. Build from source.' },
+  { k: 'Status', v: 'Active development. Releases published.' },
   { k: 'Platform', v: 'Linux. Wayland and X11.' },
-  { k: 'Desktop client', v: 'Tauri 2 port in progress toward full parity.' },
-  { k: 'Packages', v: 'None published yet.' },
+  { k: 'Desktop client', v: 'Tauri 2 with local, Shadoword API, and OpenRouter execution.' },
+  { k: 'Packages', v: 'Linux desktop and API archives on GitHub Releases.' },
   { k: 'License', v: 'See LICENSE in the repository.' },
 ]

@@ -1071,6 +1071,7 @@ async fn finish_batch(
             "the microphone recording did not contain any samples",
         ));
     }
+    let mut cost_usd = None;
     let response = match active.config.mode {
         ServiceMode::Local => {
             #[cfg(feature = "local-runtime")]
@@ -1114,7 +1115,7 @@ async fn finish_batch(
                 .api_key
                 .as_deref()
                 .ok_or_else(openrouter_key_required)?;
-            let response = state
+            let openrouter_response = state
                 .openrouter
                 .transcribe_wav(
                     api_key,
@@ -1124,9 +1125,10 @@ async fn finish_batch(
                 )
                 .await
                 .map_err(openrouter_error)?;
+            cost_usd = openrouter_response.cost_usd;
             shadoword_core::TranscriptResponse {
-                text: response.text,
-                elapsed_ms: response.elapsed_ms,
+                text: openrouter_response.text,
+                elapsed_ms: openrouter_response.elapsed_ms,
                 engine: format!("OpenRouter · {}", active.config.openrouter.model),
             }
         }
@@ -1137,6 +1139,7 @@ async fn finish_batch(
         engine: response.engine,
         audio_duration_ms: u64::try_from(duration.as_millis()).unwrap_or(u64::MAX),
         sample_rate: active.sample_rate,
+        cost_usd,
     };
     let output = active.config.output;
     let text = result.text.clone();

@@ -327,7 +327,7 @@ export class DesktopAppState {
 			const route = commandNamesForMode(mode);
 			this.overview = await commands[route.refreshOverview]();
 			this.activity = 'ready';
-			this.statusMessage = `${mode === 'local' ? 'Local' : 'Remote'} runtime connected`;
+			this.statusMessage = `${mode === 'local' ? 'Local' : 'Shadoword API'} runtime connected`;
 		} catch (error) {
 			this.failOverview(error, `Could not refresh the ${mode} runtime`);
 		}
@@ -359,7 +359,9 @@ export class DesktopAppState {
 		this.openRouterModelsState = 'loading';
 		this.openRouterModelsError = null;
 		try {
-			this.openRouterModels = this.demo ? [] : await commands.listOpenrouterModels();
+			this.openRouterModels = this.demo
+				? demoOpenRouterModels()
+				: await commands.listOpenrouterModels();
 			this.openRouterModelsState = 'ready';
 		} catch (error) {
 			this.openRouterModelsState = 'failed';
@@ -455,7 +457,7 @@ export class DesktopAppState {
 			}
 			if (this.overview) this.syncLocalSettingsFromRuntime(mode, this.overview.runtime);
 			this.activity = 'ready';
-			this.statusMessage = `${mode === 'local' ? 'Local' : 'Remote'} runtime updated`;
+			this.statusMessage = `${mode === 'local' ? 'Local' : 'Shadoword API'} runtime updated`;
 		} catch (error) {
 			this.activity = this.overview ? 'ready' : 'offline';
 			this.setError(error, `Could not update the ${mode} runtime`);
@@ -577,7 +579,7 @@ export class DesktopAppState {
 			}
 			if (this.overview) this.syncLocalSettingsFromRuntime(mode, this.overview.runtime);
 			this.activity = 'ready';
-			this.statusMessage = `${mode === 'local' ? 'Local' : 'Remote'} model selected`;
+			this.statusMessage = `${mode === 'local' ? 'Local' : 'Shadoword API'} model selected`;
 		} catch (error) {
 			this.activity = this.overview ? 'ready' : 'offline';
 			this.setError(error, `Could not select the ${mode} model`);
@@ -1101,6 +1103,26 @@ function advanceDemoDownload(status: DownloadJobStatus | undefined): DownloadJob
 	};
 }
 
+function demoOpenRouterModels() {
+	return [
+		{
+			id: 'openai/whisper-large-v3',
+			name: 'Whisper Large v3',
+			description: 'High-accuracy multilingual speech recognition.'
+		},
+		{
+			id: 'mistralai/voxtral-small-24b-2507',
+			name: 'Voxtral Small 24B',
+			description: 'Multilingual transcription through OpenRouter.'
+		},
+		{
+			id: 'google/gemini-2.5-flash',
+			name: 'Gemini 2.5 Flash',
+			description: 'Fast multimodal transcription.'
+		}
+	];
+}
+
 function demoTranscription(mode: TranscriptionMode): TranscriptionResult {
 	return {
 		text:
@@ -1110,7 +1132,8 @@ function demoTranscription(mode: TranscriptionMode): TranscriptionResult {
 		elapsed_ms: 612,
 		engine: 'whisper.cpp · CUDA',
 		audio_duration_ms: 4200,
-		sample_rate: 48000
+		sample_rate: 48000,
+		cost_usd: null
 	};
 }
 

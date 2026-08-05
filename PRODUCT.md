@@ -6,9 +6,9 @@ exist yet it is recorded as absent rather than filled in.
 
 ## What it is
 
-Shadoword is offline speech to text for Linux developers. It turns held-key
+Shadoword is Linux-first speech to text for developers. It turns held-key
 speech into text at the cursor, running Whisper inference on the user's own
-machine by default.
+machine by default, with explicit Shadoword API and OpenRouter alternatives.
 
 It ships in two shapes over one core:
 
@@ -36,9 +36,9 @@ team, not a tenant — one person, several computers.
 
 Four claims, in priority order. All four are load-bearing; none may be softened.
 
-1. **Fully offline by default.** In local mode audio reaches the model over a
-   function call. No socket is opened. Remote mode exists, and it points at a
-   daemon the user hosts on their own network.
+1. **Local and offline by default.** In local mode audio reaches the model over
+   a function call and no socket is opened. The user can explicitly select a
+   self-hosted Shadoword API or direct OpenRouter batch transcription instead.
 2. **Linux first.** Wayland and X11. Not "Linux also supported."
 3. **Hardware control is explicit.** The user picks the model and the
    accelerator. Nothing is chosen silently on their behalf.
@@ -47,7 +47,7 @@ Four claims, in priority order. All four are load-bearing; none may be softened.
 
 ## Product truth a design may state
 
-- **Runtime modes:** Off, Local, Remote.
+- **Execution targets:** Local (default), Shadoword API, OpenRouter.
 - **Push-to-talk default:** `f2` (from `shadoword-core` config).
 - **Model catalog:** Large v3 Turbo (1.62 GiB, default, multilingual), Large v3
   (2.88 GiB), Medium English (1.42 GiB), Small English (466 MiB).
@@ -59,6 +59,8 @@ Four claims, in priority order. All four are load-bearing; none may be softened.
 - **Streaming protocol:** WebSocket at `/v1/stream`; `Start` frame, raw Opus
   packets, `CommitSegment` → `Partial`, `Finish` → `Done` exactly once.
 - **Batch:** `POST /v1/transcribe-wav`, raw WAV body, 64 MiB cap.
+- **Distribution:** GitHub Releases publishes Linux API, desktop-client, and
+  embedded CPU desktop archives; Nix source packages remain available.
 - **Toolchain:** Bun only for frontend dependencies and scripts. No npm or pnpm
   lockfiles.
 
@@ -70,12 +72,10 @@ Design must not supply these. Where a surface needs one, it states the absence.
   harness is `crates/shadoword-model-whisper/tests/whisper_integration.rs`
   against `bench_corpus/clip_{10,15,20,30}s.wav`, and it is opt-in, not part of
   the normal test run.
-- **Published packages.** None. Build from source is the only distribution.
 - **macOS and Windows support.** Undecided.
 - **Licensing and pricing.** See `LICENSE` in the repository; no commercial
   model is decided.
 - **Users, testimonials, logos, adoption or star counts.** None exist.
-- **Real captures of the running desktop client.** Not yet supplied.
 
 ## Voice
 

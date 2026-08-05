@@ -1,10 +1,17 @@
 <script lang="ts">
 	import {
 		AlertTriangle,
+		AppWindow,
+		ArrowRight,
+		Captions,
+		Cloud,
+		Cpu,
 		Eye,
 		EyeOff,
 		Keyboard,
+		RadioTower,
 		RefreshCw,
+		Send,
 		ShieldCheck,
 		SlidersHorizontal
 	} from '@lucide/svelte';
@@ -19,15 +26,53 @@
 		TranscriptionMode
 	} from '$lib/bindings';
 	import { errorMessage } from '$lib/display';
-	import { untrack } from 'svelte';
+	import { onDestroy, untrack } from 'svelte';
+	import BrutalistSelect from '$lib/components/BrutalistSelect.svelte';
 	import { Button } from '$lib/components/ui/button';
 	import { Input } from '$lib/components/ui/input';
+	import * as Select from '$lib/components/ui/select';
 	import { Switch } from '$lib/components/ui/switch';
 	import SurfaceHeader from '$lib/components/SurfaceHeader.svelte';
 	import StatusPill from '$lib/components/StatusPill.svelte';
-	import { inferencePoolSummary, isExplicitPool } from '$lib/inference-pool';
+	import { inferencePoolSummary } from '$lib/inference-pool';
+	import type { PageId } from '$lib/types';
 
-	let { app }: { app: DesktopAppState } = $props();
+	const OPENROUTER_KEY_PATTERN = /^sk-or-v1-[a-f\d]{64}$/i;
+	const SAMPLE_RATE_OPTIONS = [
+		{ value: '16000', label: '16 kHz', detail: 'Speech optimized' },
+		{ value: '44100', label: '44.1 kHz', detail: 'Device standard' },
+		{ value: '48000', label: '48 kHz', detail: 'Studio rate' }
+	];
+	const PCM_FORMAT_OPTIONS = [
+		{ value: 's16le', label: '16-bit integer', detail: 'Half bandwidth' },
+		{ value: 'f32le', label: '32-bit float', detail: 'Capture native' }
+	];
+	const SHORTCUT_MODE_OPTIONS = [
+		{ value: 'push_to_talk', label: 'Push to talk', detail: 'Hold while speaking' },
+		{ value: 'toggle', label: 'Toggle', detail: 'Press to start and stop' }
+	];
+	const PASTE_METHOD_OPTIONS = [
+		{ value: 'none', label: 'Disabled' },
+		{ value: 'direct', label: 'Type directly' },
+		{ value: 'ctrl_v', label: 'Paste with Ctrl+V' },
+		{ value: 'ctrl_shift_v', label: 'Paste with Ctrl+Shift+V' },
+		{ value: 'shift_insert', label: 'Paste with Shift+Insert' }
+	];
+
+	type SettingsSection = Extract<
+		PageId,
+		'settings' | 'capture' | 'transcription' | 'output' | 'application'
+	>;
+
+	let {
+		app,
+		section = 'settings',
+		onNavigate = () => {}
+	}: {
+		app: DesktopAppState;
+		section?: SettingsSection;
+		onNavigate?: (page: PageId) => void;
+	} = $props();
 	const initial = untrack(() => app.settings);
 	const initialOverview = untrack(() => app.overview);
 	let mode = $state<ServiceMode>(initial?.mode ?? 'remote');
@@ -56,14 +101,64 @@
 	let closeToTray = $state(initial?.close_to_tray ?? true);
 	let connectionState = $state<'idle' | 'testing' | 'success' | 'failed'>('idle');
 	let openRouterConnectionState = $state<'idle' | 'testing' | 'success' | 'failed'>('idle');
-	let saveState = $state<'saved' | 'saving' | 'failed'>('saved');
+	let saveState = $state<'saved' | 'pending' | 'saving' | 'failed'>('saved');
 	let localError = $state('');
-	let settingsLocked = $derived(app.poolMutationLocked || saveState === 'saving');
+	let settingsLocked = $derived(app.captureLocked || saveState === 'saving');
 	let activeRuntime = $derived(app.overview?.runtime ?? null);
 	let poolSummary = $derived(inferencePoolSummary(app.overview?.status.inference_pool));
+	let localModelName = $derived.by(() => {
+		const path = app.overview?.runtime.model_path;
+		return (
+			app.overview?.models.find((model) => path?.endsWith(model.filename))?.name ??
+			'No model selected'
+		);
+	});
 	let selectedOpenRouterModel = $derived(
 		app.openRouterModels.find((model) => model.id === openRouterModel) ?? null
 	);
+	let selectedOpenRouterModelName = $derived(selectedOpenRouterModel?.name ?? openRouterModel);
+	let microphoneOptions = $derived([
+		{ value: '', label: 'System default', detail: 'Follow the desktop audio default' },
+		...app.inputDevices.map((device) => ({
+			value: device.name,
+			label: device.name,
+			detail: device.is_default ? 'Default input' : 'Available input'
+		}))
+	]);
+	let pageCopy = $derived(
+		{
+			settings: {
+				kicker: 'Execution',
+				title: 'Choose the execution path.',
+				description: 'Run locally by default, connect to your Shadoword API, or use OpenRouter.'
+			},
+			capture: {
+				kicker: 'Capture',
+				title: 'Capture at the source.',
+				description: 'Choose the microphone and global shortcut used for every execution path.'
+			},
+			transcription: {
+				kicker: 'Transcription',
+				title: 'Shape transcription.',
+				description: 'Control language constraints, segmentation, and streaming precision.'
+			},
+			output: {
+				kicker: 'Output',
+				title: 'Deliver the text.',
+				description: 'Choose how completed transcripts move into the active application.'
+			},
+			application: {
+				kicker: 'Application',
+				title: 'Set window behavior.',
+				description: 'Control how Shadoword behaves when its window closes.'
+			}
+		}[section]
+	);
+	let autoSaveReady = false;
+	let skipNextAutoSave = false;
+	let keyValidationTimer: ReturnType<typeof setTimeout> | null = null;
+	let saveRetryTimer: ReturnType<typeof setTimeout> | null = null;
+	let saveRetryCount = 0;
 
 	const selectMode = (next: ServiceMode) => {
 		mode = next;
@@ -73,38 +168,72 @@
 	};
 
 	const testConnection = async () => {
+		const testedEndpoint = endpoint;
+		const testedToken = token;
+		const testedTokenDirty = tokenDirty;
+		const testedClearToken = clearToken;
+		const inputIsCurrent = () =>
+			endpoint === testedEndpoint &&
+			token === testedToken &&
+			tokenDirty === testedTokenDirty &&
+			clearToken === testedClearToken;
+
 		connectionState = 'testing';
 		localError = '';
 		try {
 			await app.testConnection({
-				endpoint,
-				token: tokenDirty && !clearToken ? token : null,
-				use_saved_token: !tokenDirty && !clearToken
+				endpoint: testedEndpoint,
+				token: testedTokenDirty && !testedClearToken ? testedToken : null,
+				use_saved_token: !testedTokenDirty && !testedClearToken
 			});
-			connectionState = 'success';
+			if (inputIsCurrent()) connectionState = 'success';
 		} catch (error) {
+			if (!inputIsCurrent()) return;
 			connectionState = 'failed';
 			localError = errorMessage(error);
 		}
 	};
 
-	const testOpenRouterKey = async () => {
-		openRouterConnectionState = 'testing';
-		localError = '';
+	const validateOpenRouterKey = async (key: string) => {
 		try {
-			await app.testOpenRouterKey(
-				openRouterKeyDirty && !clearOpenRouterKey ? openRouterKey : null,
-				!openRouterKeyDirty && !clearOpenRouterKey
-			);
-			openRouterConnectionState = 'success';
-		} catch (error) {
-			openRouterConnectionState = 'failed';
-			localError = errorMessage(error);
+			await app.testOpenRouterKey(key, false);
+			if (openRouterKey.trim() === key) openRouterConnectionState = 'success';
+		} catch {
+			if (openRouterKey.trim() === key) openRouterConnectionState = 'failed';
 		}
+	};
+
+	const handleOpenRouterKeyInput = () => {
+		openRouterKeyDirty = true;
+		clearOpenRouterKey = false;
+		openRouterConnectionState = 'idle';
+		app.openRouterKeyReport = null;
+		if (keyValidationTimer) clearTimeout(keyValidationTimer);
+
+		const key = openRouterKey.trim();
+		if (key === '') {
+			openRouterKeyDirty = false;
+			return;
+		}
+		if (!OPENROUTER_KEY_PATTERN.test(key)) return;
+		openRouterConnectionState = 'testing';
+		keyValidationTimer = setTimeout(() => void validateOpenRouterKey(key), 250);
 	};
 
 	const save = async () => {
 		if (!app.settings) return;
+		if (tokenDirty && !clearToken && connectionState !== 'success') {
+			saveState = 'pending';
+			return;
+		}
+		if (openRouterKeyDirty && !clearOpenRouterKey && openRouterConnectionState !== 'success') {
+			saveState = 'pending';
+			return;
+		}
+		if (app.captureLocked) {
+			saveState = 'pending';
+			return;
+		}
 		saveState = 'saving';
 		localError = '';
 		const remoteToken: SecretUpdate = clearToken
@@ -144,18 +273,101 @@
 			if (mode === 'remote' && app.overview) {
 				await app.updateRuntime({ ...app.overview.runtime, english_only: englishOnly });
 			}
+			skipNextAutoSave =
+				token !== '' ||
+				tokenDirty ||
+				clearToken ||
+				openRouterKey !== '' ||
+				openRouterKeyDirty ||
+				clearOpenRouterKey;
 			token = '';
 			tokenDirty = false;
 			clearToken = false;
 			openRouterKey = '';
 			openRouterKeyDirty = false;
 			clearOpenRouterKey = false;
+			saveRetryCount = 0;
 			saveState = 'saved';
 		} catch (error) {
-			saveState = 'failed';
 			localError = errorMessage(error);
+			if (saveRetryCount < 2) {
+				saveRetryCount += 1;
+				saveState = 'pending';
+				saveRetryTimer = setTimeout(() => {
+					saveRetryTimer = null;
+					void save();
+				}, 900 * saveRetryCount);
+			} else {
+				saveState = 'failed';
+			}
 		}
 	};
+
+	$effect(() => {
+		const formState = [
+			mode,
+			endpoint,
+			connectionState,
+			token,
+			tokenDirty,
+			clearToken,
+			openRouterModel,
+			openRouterKey,
+			openRouterKeyDirty,
+			clearOpenRouterKey,
+			openRouterConnectionState,
+			microphone,
+			sampleRate,
+			shortcutMode,
+			shortcut,
+			transcriptionMode,
+			streamingPcmFormat,
+			englishOnly,
+			copyFinal,
+			pasteMethod,
+			pasteDelay,
+			closeToTray
+		];
+		void formState;
+
+		if (!autoSaveReady) {
+			autoSaveReady = true;
+			return;
+		}
+		if (skipNextAutoSave) {
+			skipNextAutoSave = false;
+			return;
+		}
+		if (!untrack(() => app.settings)) return;
+		if (saveRetryTimer) {
+			clearTimeout(saveRetryTimer);
+			saveRetryTimer = null;
+			saveRetryCount = 0;
+		}
+		if (tokenDirty && !clearToken && connectionState !== 'success') {
+			saveState = 'pending';
+			return;
+		}
+		if (openRouterKeyDirty && !clearOpenRouterKey && openRouterConnectionState !== 'success') {
+			saveState = 'pending';
+			return;
+		}
+		const parsedPasteDelay = Number(pasteDelay);
+		if (!Number.isInteger(parsedPasteDelay) || parsedPasteDelay < 0 || parsedPasteDelay > 1000) {
+			saveState = 'failed';
+			localError = 'Paste delay must be a whole number from 0 to 1000 milliseconds.';
+			return;
+		}
+
+		if (app.captureLocked) {
+			saveState = 'pending';
+			return;
+		}
+
+		saveState = 'pending';
+		const timeout = window.setTimeout(() => void save(), 650);
+		return () => window.clearTimeout(timeout);
+	});
 
 	const captureShortcut = (event: KeyboardEvent) => {
 		if (!shortcutCapturing || event.repeat || event.isComposing) return;
@@ -189,6 +401,12 @@
 		shortcutCapturing = false;
 	};
 
+	onDestroy(() => {
+		if (saveState === 'pending') void save();
+		if (keyValidationTimer) clearTimeout(keyValidationTimer);
+		if (saveRetryTimer) clearTimeout(saveRetryTimer);
+	});
+
 	function shortcutKey(key: string) {
 		if (key === ' ') return 'Space';
 		if (key.startsWith('Arrow')) return key.slice('Arrow'.length);
@@ -216,27 +434,24 @@
 <svelte:window onkeydown={captureShortcut} />
 
 <div class="settings-view">
-	<SurfaceHeader
-		kicker="Settings"
-		title="One path, tuned to you."
-		description="Choose where transcription runs, how capture starts, and where completed text goes."
-	>
+	<SurfaceHeader kicker={pageCopy.kicker} title={pageCopy.title} description={pageCopy.description}>
 		{#snippet actions()}
 			<span class:failed={saveState === 'failed'} class="saved-state" aria-live="polite">
-				{#if saveState === 'failed'}<AlertTriangle
-						size={14}
-					/>{:else if saveState === 'saved'}<ShieldCheck size={14} />{:else}<RefreshCw
-						size={14}
-					/>{/if}
+				{#if saveState === 'failed'}
+					<AlertTriangle size={14} />
+				{:else if saveState === 'saved'}
+					<ShieldCheck size={14} />
+				{:else}
+					<span class:spin={saveState === 'saving'}><RefreshCw size={14} /></span>
+				{/if}
 				{saveState === 'failed'
 					? 'Changes not saved'
-					: saveState === 'saving'
-						? 'Saving changes…'
-						: 'Desktop configuration loaded'}
+					: saveState === 'pending'
+						? 'Waiting to save…'
+						: saveState === 'saving'
+							? 'Saving changes…'
+							: 'All changes saved'}
 			</span>
-			<Button size="sm" onclick={save} disabled={settingsLocked || !app.settings}>
-				{saveState === 'saving' ? 'Saving…' : 'Save changes'}
-			</Button>
 		{/snippet}
 	</SurfaceHeader>
 
@@ -261,16 +476,8 @@
 		</div>
 	{/if}
 
-	<div class="settings-layout">
-		<nav aria-label="Settings sections">
-			<a href="#runtime">Runtime</a>
-			<a href="#capture">Capture</a>
-			<a href="#transcription">Transcription</a>
-			<a href="#output">Output</a>
-			<a href="#application">Application</a>
-		</nav>
-
-		<div class="settings-sections">
+	<div class="settings-sections">
+		{#if section === 'settings'}
 			<section id="runtime">
 				<header>
 					<div class="section-icon"><SlidersHorizontal size={16} /></div>
@@ -280,44 +487,87 @@
 					</div>
 				</header>
 				<div class="setting-list">
-					<div class="setting-row">
-						<div>
-							<span class="setting-label" id="target-label">Transcription target</span>
-							<p>Audio is always captured on this computer.</p>
-						</div>
-						<div class="segmented-control" aria-labelledby="target-label">
-							{#if app.settings?.local_runtime_available}
-								<button
-									class:active={mode === 'local'}
-									type="button"
-									disabled={settingsLocked}
-									onclick={() => selectMode('local')}
-									aria-pressed={mode === 'local'}>Local</button
-								>
-							{/if}
-							<button
-								class:active={mode === 'remote'}
-								type="button"
-								disabled={settingsLocked}
-								onclick={() => selectMode('remote')}
-								aria-pressed={mode === 'remote'}>Remote API</button
-							>
-							<button
-								class:active={mode === 'open_router'}
-								type="button"
-								disabled={settingsLocked}
-								onclick={() => selectMode('open_router')}
-								aria-pressed={mode === 'open_router'}>OpenRouter</button
-							>
-						</div>
+					<div class="target-grid" aria-label="Execution target">
+						<button
+							class:active={mode === 'local'}
+							type="button"
+							disabled={settingsLocked || !app.settings?.local_runtime_available}
+							onclick={() => selectMode('local')}
+							aria-pressed={mode === 'local'}
+						>
+							<span class="target-icon"><Cpu size={20} /></span>
+							<span class="target-copy">
+								<strong>Local execution</strong>
+								<small>Whisper runs on this machine</small>
+							</span>
+							<span class="target-state">
+								{app.settings?.local_runtime_available
+									? 'Default · private'
+									: 'Requires full desktop build'}
+							</span>
+						</button>
+						<button
+							class:active={mode === 'remote'}
+							type="button"
+							disabled={settingsLocked}
+							onclick={() => selectMode('remote')}
+							aria-pressed={mode === 'remote'}
+						>
+							<span class="target-icon"><RadioTower size={20} /></span>
+							<span class="target-copy">
+								<strong>Shadoword API</strong>
+								<small>Your self-hosted inference host</small>
+							</span>
+							<span class="target-state">Private network</span>
+						</button>
+						<button
+							class:active={mode === 'open_router'}
+							type="button"
+							disabled={settingsLocked}
+							onclick={() => selectMode('open_router')}
+							aria-pressed={mode === 'open_router'}
+						>
+							<span class="target-icon"><Cloud size={20} /></span>
+							<span class="target-copy">
+								<strong>OpenRouter</strong>
+								<small>Direct managed transcription</small>
+							</span>
+							<span class="target-state">Cloud · batch</span>
+						</button>
 					</div>
+					{#if mode === 'local'}
+						<div class="setting-row local-runtime-row">
+							<div>
+								<span class="setting-label">Active model</span>
+								<p>Model weights stay on this machine.</p>
+							</div>
+							<div class="runtime-summary">
+								<strong>{localModelName}</strong>
+								<span>{activeRuntime?.whisper_accelerator ?? 'CPU'} · {poolSummary}</span>
+							</div>
+						</div>
+						<div class="setting-row">
+							<div>
+								<span class="setting-label">Models and execution pool</span>
+								<p>Manage model downloads, accelerator affinity, and worker topology.</p>
+							</div>
+							<Button variant="outline" size="sm" onclick={() => onNavigate('models')}>
+								Open runtime <ArrowRight size={14} />
+							</Button>
+						</div>
+					{/if}
 					{#if mode === 'remote'}
 						<div class="stacked-setting">
 							<div>
 								<label for="endpoint">API endpoint</label>
 								<p>Use HTTPS outside an encrypted private network.</p>
 							</div>
-							<Input id="endpoint" bind:value={endpoint} disabled={settingsLocked} />
+							<Input
+								id="endpoint"
+								bind:value={endpoint}
+								disabled={settingsLocked}
+								oninput={() => (connectionState = 'idle')}
+							/>
 						</div>
 						<div class="stacked-setting">
 							<div>
@@ -334,8 +584,9 @@
 										: 'No token configured'}
 									disabled={settingsLocked}
 									oninput={() => {
-										tokenDirty = true;
+										tokenDirty = token.trim() !== '';
 										clearToken = false;
+										connectionState = 'idle';
 									}}
 								/>
 								<Button
@@ -359,7 +610,7 @@
 										token = '';
 									}}
 								>
-									{clearToken ? 'Keep stored token' : 'Clear stored token on save'}
+									{clearToken ? 'Keep stored token' : 'Clear stored token'}
 								</Button>
 							{/if}
 						</div>
@@ -379,7 +630,10 @@
 							{:else if connectionState === 'failed'}<StatusPill
 									state="offline"
 									label="Connection failed"
-								/>{/if}
+								/>
+							{:else if tokenDirty}<span class="verification-note"
+									>Test to verify and save this token.</span
+								>{/if}
 						</div>
 					{/if}
 					{#if mode === 'open_router'}
@@ -389,28 +643,54 @@
 								<p>Use an OpenRouter model with transcription output.</p>
 							</div>
 							<div class="model-picker">
-								<select
-									id="openrouter-model"
+								<Select.Root
+									type="single"
 									bind:value={openRouterModel}
 									disabled={settingsLocked || app.openRouterModelsState === 'loading'}
 								>
-									{#if !app.openRouterModels.some((model) => model.id === openRouterModel)}
-										<option value={openRouterModel}>{openRouterModel}</option>
-									{/if}
-									{#each app.openRouterModels as model (model.id)}
-										<option value={model.id}>{model.name}</option>
-									{/each}
-								</select>
+									<Select.Trigger id="openrouter-model" class="model-select-trigger">
+										<span class="model-select-value">
+											<strong>{selectedOpenRouterModelName}</strong>
+											<code>{openRouterModel}</code>
+										</span>
+									</Select.Trigger>
+									<Select.Content class="model-select-content" sideOffset={6}>
+										<Select.Label>
+											{app.openRouterModels.length} transcription models
+										</Select.Label>
+										{#if !app.openRouterModels.some((model) => model.id === openRouterModel)}
+											<Select.Item
+												value={openRouterModel}
+												label={openRouterModel}
+												class="model-select-item"
+											>
+												<span class="model-option-copy">
+													<strong>Current model</strong>
+													<code>{openRouterModel}</code>
+												</span>
+											</Select.Item>
+										{/if}
+										{#each app.openRouterModels as model (model.id)}
+											<Select.Item value={model.id} label={model.name} class="model-select-item">
+												<span class="model-option-copy">
+													<strong>{model.name}</strong>
+													<code>{model.id}</code>
+												</span>
+											</Select.Item>
+										{/each}
+									</Select.Content>
+								</Select.Root>
 								<Button
 									variant="outline"
 									size="sm"
+									aria-label="Refresh OpenRouter transcription models"
 									onclick={() => app.refreshOpenRouterModels()}
 									disabled={settingsLocked || app.openRouterModelsState === 'loading'}
 								>
-									<span class:spin={app.openRouterModelsState === 'loading'}
-										><RefreshCw size={14} /></span
-									>
-									{app.openRouterModelsState === 'loading' ? 'Loading…' : 'Refresh models'}
+									<span class:spin={app.openRouterModelsState === 'loading'}>
+										<RefreshCw size={14} />
+									</span>
+									{app.openRouterModelsState === 'loading' ? 'Syncing…' : 'Sync models'}
 								</Button>
 							</div>
 							{#if selectedOpenRouterModel}
@@ -433,12 +713,7 @@
 										? 'Stored key unchanged'
 										: 'Enter an OpenRouter API key'}
 									disabled={settingsLocked}
-									oninput={() => {
-										openRouterKeyDirty = true;
-										clearOpenRouterKey = false;
-										openRouterConnectionState = 'idle';
-										app.openRouterKeyReport = null;
-									}}
+									oninput={handleOpenRouterKeyInput}
 								/>
 								<Button
 									variant="ghost"
@@ -463,28 +738,32 @@
 										app.openRouterKeyReport = null;
 									}}
 								>
-									{clearOpenRouterKey ? 'Keep stored key' : 'Clear stored key on save'}
+									{clearOpenRouterKey ? 'Keep stored key' : 'Clear stored key'}
 								</Button>
 							{/if}
-							<div class="connection-row">
-								<Button
-									variant="outline"
-									size="sm"
-									onclick={testOpenRouterKey}
-									disabled={settingsLocked ||
-										openRouterConnectionState === 'testing' ||
-										(!openRouterKeyDirty && !app.settings?.openrouter_key_configured) ||
-										clearOpenRouterKey}
-								>
-									<span class:spin={openRouterConnectionState === 'testing'}
-										><RefreshCw size={14} /></span
-									>
-									{openRouterConnectionState === 'testing' ? 'Testing…' : 'Test API key'}
-								</Button>
-								{#if openRouterConnectionState === 'success'}
-									<StatusPill label="Key verified" />
+							<div
+								class:valid={openRouterConnectionState === 'success'}
+								class="key-validation"
+								aria-live="polite"
+							>
+								{#if openRouterConnectionState === 'testing'}
+									<span class="spin"><RefreshCw size={14} /></span>
+									<span>Checking key with OpenRouter…</span>
+								{:else if openRouterConnectionState === 'success'}
+									<ShieldCheck size={15} />
+									<strong>API key verified</strong>
 								{:else if openRouterConnectionState === 'failed'}
-									<StatusPill state="offline" label="Key test failed" />
+									<AlertTriangle size={15} />
+									<span>OpenRouter rejected this key. Check it and try again.</span>
+								{:else if openRouterKeyDirty && openRouterKey.trim() !== ''}
+									<span
+										>{openRouterKey.trim().length} / 73 characters · validation starts when complete</span
+									>
+								{:else if app.settings?.openrouter_key_configured}
+									<ShieldCheck size={15} />
+									<span>Stored API key</span>
+								{:else}
+									<span>Keys are validated automatically and saved only after verification.</span>
 								{/if}
 							</div>
 							{#if openRouterConnectionState === 'success' && app.openRouterKeyReport}
@@ -503,7 +782,9 @@
 					{/if}
 				</div>
 			</section>
+		{/if}
 
+		{#if section === 'capture'}
 			<section id="capture">
 				<header>
 					<div class="section-icon"><Keyboard size={16} /></div>
@@ -526,14 +807,14 @@
 								disabled={settingsLocked}
 								onclick={() => app.refreshInputDevices()}><RefreshCw size={14} />Refresh</Button
 							>
-							<select id="microphone" bind:value={microphone} disabled={settingsLocked}>
-								<option value="">System default</option>
-								{#each app.inputDevices as device (device.name)}
-									<option value={device.name}
-										>{device.name}{device.is_default ? ' · default' : ''}</option
-									>
-								{/each}
-							</select>
+							<BrutalistSelect
+								id="microphone"
+								bind:value={microphone}
+								options={microphoneOptions}
+								disabled={settingsLocked}
+								ariaLabel="Microphone"
+								menuLabel="Available inputs"
+							/>
 						</div>
 						{#if app.inputDevicesError}
 							<p class="inline-error" role="alert">{app.inputDevicesError}</p>
@@ -544,30 +825,31 @@
 							<label for="sample-rate">Capture sample rate</label>
 							<p>The native recorder currently follows the selected device's default rate.</p>
 						</div>
-						<select id="sample-rate" bind:value={sampleRate} disabled>
-							<option value="16000">16 kHz · speech</option>
-							<option value="44100">44.1 kHz</option>
-							<option value="48000">48 kHz · studio</option>
-						</select>
+						<BrutalistSelect
+							id="sample-rate"
+							bind:value={sampleRate}
+							options={SAMPLE_RATE_OPTIONS}
+							disabled
+							ariaLabel="Capture sample rate"
+						/>
 					</div>
 					<div class="setting-row">
 						<div>
 							<label for="streaming-pcm-format">Streaming PCM precision</label>
 							<p>Choose the protocol-v3 wire format used for remote live audio.</p>
 						</div>
-						<select
+						<BrutalistSelect
 							id="streaming-pcm-format"
 							bind:value={streamingPcmFormat}
+							options={PCM_FORMAT_OPTIONS}
 							disabled={settingsLocked || mode === 'open_router'}
-						>
-							<option value="s16le">16-bit integer · half bandwidth</option>
-							<option value="f32le">32-bit float · capture-native</option>
-						</select>
+							ariaLabel="Streaming PCM precision"
+						/>
 					</div>
 					<div class="setting-row">
 						<div>
 							<label for="shortcut-key">Global shortcut</label>
-							<p>Registered globally by the native desktop host when settings are saved.</p>
+							<p>Registered globally by the native desktop host when this shortcut changes.</p>
 						</div>
 						<button
 							id="shortcut-key"
@@ -594,17 +876,22 @@
 							<label for="shortcut-mode">Shortcut behavior</label>
 							<p>Hold to speak or press once to toggle capture.</p>
 						</div>
-						<select id="shortcut-mode" bind:value={shortcutMode} disabled={settingsLocked}>
-							<option value="push_to_talk">Push to talk</option><option value="toggle"
-								>Toggle</option
-							>
-						</select>
+						<BrutalistSelect
+							id="shortcut-mode"
+							bind:value={shortcutMode}
+							options={SHORTCUT_MODE_OPTIONS}
+							disabled={settingsLocked}
+							ariaLabel="Shortcut behavior"
+						/>
 					</div>
 				</div>
 			</section>
+		{/if}
 
+		{#if section === 'transcription'}
 			<section id="transcription">
 				<header>
+					<div class="section-icon"><Captions size={16} /></div>
 					<div>
 						<h2 class="display-legend">Transcription</h2>
 						<p>Recognition and segmentation preferences for the active runtime.</p>
@@ -643,9 +930,12 @@
 					</div>
 				</div>
 			</section>
+		{/if}
 
+		{#if section === 'output'}
 			<section id="output">
 				<header>
+					<div class="section-icon"><Send size={16} /></div>
 					<div>
 						<h2 class="display-legend">Output</h2>
 						<p>Control where completed transcript text is delivered.</p>
@@ -669,12 +959,13 @@
 							<label for="paste-method">Active-window delivery</label>
 							<p>Type directly or paste into the active window through the native host.</p>
 						</div>
-						<select id="paste-method" bind:value={pasteMethod} disabled={settingsLocked}>
-							<option value="none">Disabled</option><option value="direct">Type directly</option
-							><option value="ctrl_v">Paste with Ctrl+V</option><option value="ctrl_shift_v"
-								>Paste with Ctrl+Shift+V</option
-							><option value="shift_insert">Paste with Shift+Insert</option>
-						</select>
+						<BrutalistSelect
+							id="paste-method"
+							bind:value={pasteMethod}
+							options={PASTE_METHOD_OPTIONS}
+							disabled={settingsLocked}
+							ariaLabel="Active-window delivery"
+						/>
 					</div>
 					{#if pasteMethod !== 'none' && pasteMethod !== 'direct'}
 						<div class="setting-row">
@@ -693,24 +984,15 @@
 								/><span>ms</span>
 							</div>
 						</div>
-						<div class="setting-row pool-summary-row">
-							<div>
-								<span class="setting-label">Execution topology</span>
-								<p>The full pool editor and live unit telemetry are in Models.</p>
-							</div>
-							<div class="runtime-summary">
-								<strong
-									>{isExplicitPool(activeRuntime) ? 'Explicit pool' : 'Legacy single unit'}</strong
-								>
-								<span>{poolSummary}</span>
-							</div>
-						</div>
 					{/if}
 				</div>
 			</section>
+		{/if}
 
+		{#if section === 'application'}
 			<section id="application">
 				<header>
+					<div class="section-icon"><AppWindow size={16} /></div>
 					<div>
 						<h2 class="display-legend">Application</h2>
 						<p>Window and background behavior.</p>
@@ -731,7 +1013,7 @@
 					</div>
 				</div>
 			</section>
-		</div>
+		{/if}
 	</div>
 </div>
 
@@ -809,39 +1091,103 @@
 		line-height: 1.55;
 	}
 
-	.settings-layout {
+	.settings-sections {
 		display: grid;
-		grid-template-columns: 8.5rem minmax(0, 1fr);
-		align-items: start;
-		gap: 1.5rem;
+		gap: 2.25rem;
 		border-top: 1px solid var(--line);
 		padding-top: 1.25rem;
 	}
 
-	.settings-layout > nav {
-		position: sticky;
-		top: 0;
+	.target-grid {
 		display: grid;
-		gap: 0.18rem;
+		grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr));
+		gap: 1px;
+		padding: 1px;
+		background: var(--line);
 	}
 
-	.settings-layout > nav a {
-		padding: 0.5rem 0.6rem;
+	.target-grid button {
+		position: relative;
+		display: grid;
+		grid-template-columns: auto minmax(0, 1fr);
+		grid-template-rows: 1fr auto;
+		align-items: start;
+		gap: 0.8rem;
+		min-height: 8.5rem;
+		border: 0;
+		padding: 1rem;
+		background: var(--surface-1);
 		color: var(--ink-muted);
-		font-size: 0.6875rem;
-		font-weight: 540;
-		text-decoration: none;
+		font: inherit;
+		text-align: left;
+		cursor: pointer;
+		transition:
+			background-color 120ms linear,
+			color 120ms linear;
 	}
 
-	.settings-layout > nav a:hover,
-	.settings-layout > nav a:focus-visible {
+	.target-grid button:hover:not(:disabled),
+	.target-grid button:focus-visible {
 		background: var(--surface-2);
 		color: var(--ink);
 	}
 
-	.settings-sections {
+	.target-grid button:focus-visible {
+		outline: 2px solid var(--ink);
+		outline-offset: -2px;
+	}
+
+	.target-grid button.active {
+		box-shadow: inset 0 2px 0 var(--scarlet);
+		background: var(--surface-2);
+	}
+
+	.target-grid button:disabled {
+		cursor: not-allowed;
+		opacity: 0.55;
+	}
+
+	.target-icon {
 		display: grid;
-		gap: 2.25rem;
+		width: 2.25rem;
+		height: 2.25rem;
+		place-items: center;
+		border: 1px solid var(--line-strong);
+		color: var(--ink-dim);
+	}
+
+	.target-grid button.active .target-icon {
+		border-color: var(--scarlet);
+		color: var(--scarlet-lamp);
+	}
+
+	.target-copy {
+		display: grid;
+		gap: 0.25rem;
+	}
+
+	.target-copy strong {
+		color: var(--ink);
+		font-size: 0.76rem;
+		font-weight: 620;
+	}
+
+	.target-copy small,
+	.target-state {
+		color: var(--ink-muted);
+		font-size: 0.6rem;
+		line-height: 1.4;
+	}
+
+	.target-state {
+		grid-column: 1 / -1;
+		align-self: end;
+		letter-spacing: 0.04em;
+		text-transform: uppercase;
+	}
+
+	.target-grid button.active .target-state {
+		color: var(--scarlet-lamp);
 	}
 
 	.settings-sections section {
@@ -951,15 +1297,125 @@
 	.connection-row,
 	.inline-control,
 	.model-picker,
-	.delay-control {
+	.delay-control,
+	.key-validation {
 		display: flex;
 		align-items: center;
 		gap: 0.5rem;
 	}
 
-	.model-picker select {
+	.key-validation {
+		grid-column: 2;
+		min-height: 1.8rem;
+		padding: 0;
+		color: var(--ink-muted);
+		font-size: 0.64rem;
+	}
+
+	.key-validation strong {
+		color: var(--ink);
+		font-size: inherit;
+	}
+
+	.verification-note {
+		color: var(--ink-muted);
+		font-size: 0.64rem;
+	}
+
+	.key-validation.valid,
+	.key-validation.valid strong {
+		color: #5ee28a;
+	}
+
+	.key-validation:has(> :global(.lucide-triangle-alert)) {
+		color: var(--scarlet-lamp);
+	}
+
+	.model-picker > :global(*) {
 		min-width: 0;
+	}
+
+	.model-picker > :global([data-slot='select-trigger']) {
 		flex: 1;
+	}
+
+	:global(.model-select-trigger) {
+		height: 3rem;
+		padding: 0.45rem 0.7rem;
+		border-color: var(--line-strong);
+		background: var(--surface-2);
+		text-align: left;
+	}
+
+	:global(.model-select-trigger:hover:not(:disabled)) {
+		border-color: var(--ink-muted);
+		background: color-mix(in srgb, var(--surface-2) 88%, var(--ink) 12%);
+	}
+
+	.model-select-value,
+	.model-option-copy {
+		display: grid;
+		min-width: 0;
+		gap: 0.12rem;
+	}
+
+	.model-select-value {
+		flex: 1;
+	}
+
+	.model-select-value strong,
+	.model-option-copy strong {
+		overflow: hidden;
+		color: var(--ink);
+		font-size: 0.7rem;
+		font-weight: 590;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+
+	.model-select-value code,
+	.model-option-copy code {
+		overflow: hidden;
+		color: var(--ink-muted);
+		font-family: var(--font-mono);
+		font-size: 0.58rem;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+
+	:global(.model-select-content) {
+		width: min(31rem, var(--bits-select-anchor-width));
+		max-height: 22rem;
+		border: 1px solid var(--line-strong);
+		background: var(--surface-1);
+		box-shadow: 0 12px 32px rgb(0 0 0 / 42%);
+	}
+
+	:global(.model-select-content [data-slot='select-label']) {
+		padding: 0.65rem 0.75rem 0.5rem;
+		border-bottom: 1px solid var(--line);
+		color: var(--ink-muted);
+		font-size: 0.58rem;
+		letter-spacing: 0.08em;
+		text-transform: uppercase;
+	}
+
+	:global(.model-select-item) {
+		min-height: 3rem;
+		padding: 0.55rem 2.25rem 0.55rem 0.75rem;
+		border-bottom: 1px solid var(--line);
+	}
+
+	:global(.model-select-item:last-child) {
+		border-bottom: 0;
+	}
+
+	:global(.model-select-item[data-highlighted]) {
+		background: var(--surface-2);
+	}
+
+	:global(.model-select-item[data-selected]) {
+		box-shadow: inset 2px 0 0 var(--scarlet);
 	}
 
 	.model-description,
@@ -989,41 +1445,6 @@
 		font-size: 0.6875rem;
 	}
 
-	/* The same segmented control the capture stage uses: cells butted against each
-	   other on a shared 1px rule, not pills floating inside a padded trough. One
-	   pattern for "pick one of these", stated identically wherever it appears. */
-	.segmented-control {
-		display: inline-flex;
-		gap: 1px;
-		background: var(--line);
-	}
-
-	.segmented-control button {
-		min-width: 5.5rem;
-		height: 1.95rem;
-		border: 0;
-		background: var(--surface-1);
-		color: var(--ink-muted);
-		font: inherit;
-		font-size: 0.6875rem;
-		cursor: pointer;
-		transition:
-			background-color 120ms linear,
-			color 120ms linear;
-	}
-
-	.segmented-control button:hover:not(:disabled) {
-		background: var(--surface-2);
-		color: var(--ink);
-	}
-
-	.segmented-control button.active {
-		background: var(--surface-2);
-		color: var(--scarlet-lamp);
-		box-shadow: inset 0 -2px 0 var(--scarlet);
-	}
-
-	select,
 	.shortcut-key {
 		height: 2.25rem;
 		border: 1px solid var(--line);
@@ -1031,11 +1452,6 @@
 		color: var(--ink);
 		font: inherit;
 		font-size: 0.6875rem;
-	}
-
-	select {
-		min-width: 12rem;
-		padding: 0 2rem 0 0.7rem;
 	}
 
 	.shortcut-key {
@@ -1054,9 +1470,7 @@
 		color: var(--scarlet-lamp);
 	}
 
-	.segmented-control button:disabled,
-	.shortcut-key:disabled,
-	select:disabled {
+	.shortcut-key:disabled {
 		cursor: not-allowed;
 		opacity: 0.48;
 	}
@@ -1073,16 +1487,6 @@
 	}
 
 	@media (max-width: 800px) {
-		.settings-layout {
-			grid-template-columns: 1fr;
-		}
-
-		.settings-layout > nav {
-			position: static;
-			display: flex;
-			overflow-x: auto;
-		}
-
 		.stacked-setting {
 			grid-template-columns: 1fr;
 			gap: 0.7rem;

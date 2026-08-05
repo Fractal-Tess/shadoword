@@ -241,7 +241,7 @@ instead of silently shipping a cropped card.
   measured registration, and the motion
 - `src/components/ModeStrip.astro` — the three runtime modes, as a real radio group
 - `src/components/Daemon.astro` — the daemon's routes and frames, verbatim
-- `src/components/TypePlate.astro` — honest pre-launch status, on the second plate
+- `src/components/TypePlate.astro` — current release and platform status, on the second plate
 - `src/pages/404.astro` — the only other route; exists because `error_page 404`
   serves it, and it is built from the index's own parts
 - `nginx/nginx.conf` — Astro's recipe config, plus gzip_vary and two cache tiers

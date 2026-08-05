@@ -2,9 +2,9 @@
 
 ![Shadoword — private speech to text, local by default](docs/assets/brand/shadoword-readme-splash.png)
 
-Offline speech-to-text workspace with:
+Linux-first speech-to-text, local by default, with:
 
-- a native Tauri 2 + SvelteKit desktop client with local and remote inference
+- a native Tauri 2 + SvelteKit desktop client with local, Shadoword API, and OpenRouter execution
 - an optional authenticated HTTP/WebSocket daemon
 
 The frontend uses Bun exclusively; audio, inference, API, and desktop behavior remain Rust and Whisper-focused.
@@ -44,7 +44,7 @@ cd crates/shadoword-desktop
 bun run tauri dev -- --no-default-features --features remote-client
 ```
 
-This profile can use either a configured remote API or direct OpenRouter
+This profile can use either a configured Shadoword API or direct OpenRouter
 transcription and presents daemon runtime and model controls only in remote mode.
 The full desktop package embeds the portable CPU Whisper runtime in the same
 executable while retaining both remote options.
@@ -90,7 +90,7 @@ bun run tauri dev -- --features whisper-cuda
 
 ### Desktop client
 
-The Tauri desktop supports local Whisper, remote API inference, direct OpenRouter
+The Tauri desktop supports local Whisper, Shadoword API inference, direct OpenRouter
 speech-to-text, batch and VAD-segmented streaming transcription, global shortcuts,
 tray behavior, and transcript delivery. OpenRouter credentials remain in the
 native desktop configuration and audio is sent only when OpenRouter is selected.

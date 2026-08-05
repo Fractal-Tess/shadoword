@@ -12,6 +12,7 @@
 		Zap
 	} from '@lucide/svelte';
 	import type { DesktopAppState } from '$lib/app-state.svelte';
+	import BrutalistSelect from '$lib/components/BrutalistSelect.svelte';
 	import type {
 		ExecutionTarget,
 		ExecutionUnitConfig,
@@ -22,6 +23,7 @@
 	} from '$lib/bindings';
 	import { Button } from '$lib/components/ui/button';
 	import { Input } from '$lib/components/ui/input';
+	import { Switch } from '$lib/components/ui/switch';
 	import StatusPill from '$lib/components/StatusPill.svelte';
 	import { errorMessage, formatBytes } from '$lib/display';
 	import {
@@ -212,6 +214,15 @@
 		return gpuDevices.find((device) => device.id === deviceId);
 	}
 
+	function gpuOptions(currentDevice: number) {
+		return gpuDevices.map((device) => ({
+			value: String(device.id),
+			label: `GPU ${device.id} · ${device.name}`,
+			detail: formatBytes(device.total_vram),
+			disabled: device.id !== currentDevice && assignedGpuDevices.has(device.id)
+		}));
+	}
+
 	function targetLabel(target: ExecutionTarget) {
 		if (target.kind === 'cpu') return `CPU · ${target.threads ?? 'auto'} threads`;
 		const device = gpuName(target.device);
@@ -377,15 +388,20 @@
 							</label>
 							<label>
 								<span>Target</span>
-								<select
+								<BrutalistSelect
 									value={unit.target.kind}
-									aria-label={`Execution unit ${index + 1} target`}
-									onchange={(event) =>
-										setUnitTarget(index, event.currentTarget.value === 'gpu' ? 'gpu' : 'cpu')}
-								>
-									<option value="cpu">CPU</option>
-									<option value="gpu" disabled={gpuDevices.length === 0}>GPU</option>
-								</select>
+									options={[
+										{ value: 'cpu', label: 'CPU', detail: 'Host threads' },
+										{
+											value: 'gpu',
+											label: 'GPU',
+											detail: 'Dedicated accelerator',
+											disabled: gpuDevices.length === 0
+										}
+									]}
+									ariaLabel={`Execution unit ${index + 1} target`}
+									onValueChange={(value) => setUnitTarget(index, value === 'gpu' ? 'gpu' : 'cpu')}
+								/>
 							</label>
 							{#if unit.target.kind === 'cpu'}
 								<label>
@@ -406,23 +422,19 @@
 							{:else}
 								<label class="gpu-select">
 									<span>GPU device</span>
-									<select
-										value={unit.target.device}
-										aria-label={`GPU device for ${unit.id || `unit ${index + 1}`}`}
-										aria-invalid={Boolean(fieldError(index, 'device'))}
-										onchange={(event) => setGpuDevice(index, Number(event.currentTarget.value))}
-									>
-										{#each gpuDevices as device (device.id)}
-											<option
-												value={device.id}
-												disabled={device.id !== unit.target.device &&
-													assignedGpuDevices.has(device.id)}
-												>GPU {device.id} · {device.name} · {formatBytes(device.total_vram)}</option
-											>
-										{/each}
-									</select>
-									{#if fieldError(index, 'device')}<small class="field-error"
-											>{fieldError(index, 'device')}</small
+									<BrutalistSelect
+										value={String(unit.target.device)}
+										options={gpuOptions(unit.target.device)}
+										ariaLabel={`GPU device for ${unit.id || `unit ${index + 1}`}`}
+										ariaInvalid={Boolean(fieldError(index, 'device'))}
+										ariaDescribedBy={fieldError(index, 'device')
+											? `execution-unit-${index}-device-error`
+											: undefined}
+										onValueChange={(value) => setGpuDevice(index, Number(value))}
+									/>
+									{#if fieldError(index, 'device')}<small
+											id={`execution-unit-${index}-device-error`}
+											class="field-error">{fieldError(index, 'device')}</small
 										>{:else if gpuName(unit.target.device)}
 										<small
 											>{formatBytes(gpuName(unit.target.device)?.free_vram ?? 0)} free VRAM</small
@@ -443,23 +455,22 @@
 							{/if}
 						</div>
 						<div class="unit-flags">
-							<label>
-								<input
-									type="checkbox"
+							<label class="flag-control">
+								<Switch
 									checked={unit.enabled ?? true}
-									onchange={(event) =>
-										replaceUnit(index, { ...unit, enabled: event.currentTarget.checked })}
+									onclick={() => replaceUnit(index, { ...unit, enabled: !(unit.enabled ?? true) })}
+									aria-label={`Enable ${unit.id || `unit ${index + 1}`}`}
 								/>
-								Enabled
+								<span>Enabled</span>
 							</label>
-							<label>
-								<input
-									type="checkbox"
+							<label class="flag-control">
+								<Switch
 									checked={unit.required ?? true}
-									onchange={(event) =>
-										replaceUnit(index, { ...unit, required: event.currentTarget.checked })}
+									onclick={() =>
+										replaceUnit(index, { ...unit, required: !(unit.required ?? true) })}
+									aria-label={`Require ${unit.id || `unit ${index + 1}`} during reload`}
 								/>
-								Required to reload
+								<span>Required to reload</span>
 							</label>
 							<div class="unit-order">
 								<Button
@@ -946,16 +957,6 @@
 		font-weight: 620;
 	}
 
-	.unit-controls select {
-		width: 100%;
-		height: 2rem;
-		border: 1px solid var(--line);
-		padding: 0 0.45rem;
-		background: var(--surface-0);
-		color: var(--ink-dim);
-		font-size: 0.6875rem;
-	}
-
 	.gpu-select small,
 	.limit-grid small,
 	.field-error {
@@ -982,13 +983,6 @@
 		display: inline-flex;
 		align-items: center;
 		gap: 0.35rem;
-	}
-
-	/* A checked box is a filled mark, so the pigment is legal here — this is the one
-	   native control in the app whose "on" state the browser paints for us, and
-	   scarlet is what "on" looks like in this world. */
-	.unit-flags input {
-		accent-color: var(--scarlet);
 	}
 
 	.unit-order {

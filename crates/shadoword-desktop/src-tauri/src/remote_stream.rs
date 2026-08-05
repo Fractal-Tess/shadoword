@@ -466,11 +466,11 @@ fn commit_message(protocol: RemoteProtocol, segment_index: u64) -> String {
 
 fn stream_endpoint(endpoint: &str) -> Result<Url> {
     let normalized = crate::remote::RemoteClient::validate_endpoint(endpoint)?;
-    let mut url = Url::parse(&normalized).context("invalid remote API endpoint")?;
+    let mut url = Url::parse(&normalized).context("invalid Shadoword API endpoint")?;
     let websocket_scheme = match url.scheme() {
         "http" => "ws",
         "https" => "wss",
-        _ => return Err(anyhow!("remote API endpoint must use http or https")),
+        _ => return Err(anyhow!("Shadoword API endpoint must use http or https")),
     };
     url.set_scheme(websocket_scheme)
         .map_err(|_| anyhow!("failed to convert API endpoint to WebSocket URL"))?;

@@ -6,6 +6,21 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## [Unreleased]
 
+## [0.10.4] - 2026-08-05
+
+### Added
+
+- Dedicated Execution, Capture, Transcription, Output, and Application pages with large Local, Shadoword API, and OpenRouter target cards.
+- Launcher-visible Linux desktop metadata and icons in source and prebuilt Nix desktop packages.
+- Trustworthy OpenRouter request-cost reporting in session History when the provider returns an explicit usage cost.
+
+### Changed
+
+- Desktop settings now save automatically with debouncing, capture locks, serialized secret updates, validation, and bounded retries.
+- OpenRouter keys are validated automatically at their complete format and persisted only after verification.
+- Native dropdowns and execution-pool checkboxes now use high-contrast neon-brutalist selects and explicit ON/OFF switches.
+- App and website copy now describe Shadoword as local and offline by default while naming the optional Shadoword API and OpenRouter paths.
+
 ## [0.10.3] - 2026-08-04
 
 ### Added
@@ -99,7 +114,8 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 - Prevented duplicate model loads after eager-preload timeouts.
 - Added bounded remote connect, handshake, read, write, and finalization waits.
 
-[Unreleased]: https://github.com/Fractal-Tess/shadoword/compare/v0.10.3...HEAD
+[Unreleased]: https://github.com/Fractal-Tess/shadoword/compare/v0.10.4...HEAD
+[0.10.4]: https://github.com/Fractal-Tess/shadoword/compare/v0.10.3...v0.10.4
 [0.10.3]: https://github.com/Fractal-Tess/shadoword/compare/v0.10.2...v0.10.3
 [0.10.2]: https://github.com/Fractal-Tess/shadoword/compare/v0.10.1...v0.10.2
 [0.10.1]: https://github.com/Fractal-Tess/shadoword/compare/v0.10.0...v0.10.1

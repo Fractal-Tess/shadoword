@@ -11,7 +11,7 @@ import { repoUrl, subLegend, pushToTalk } from '../data/site'
  * with line breaking — a reflow would change the ink width of every line at
  * once. Each line is its own `.hl-line` block.
  */
-const headline = ['Speech to text', 'that never leaves', 'your machine']
+const headline = ['Speech to text', 'local by default', 'connected by choice']
 ---
 
 <section class="hero relative isolate overflow-hidden" aria-labelledby="hero-headline">
@@ -28,9 +28,9 @@ const headline = ['Speech to text', 'that never leaves', 'your machine']
       column at the centre of a field that is otherwise blazing. Measured off the
       delivered plate: the void spans x 738-787 of 1536 (centre 49.64%) and is
       contiguously black from the top edge down to row 299 of 617 (48.5%), where
-      the spectrum reclaims it. The whole page says audio never leaves the
-      machine; this is that sentence as a picture — everywhere signal, and one
-      channel that never lights up. If the plate is regenerated, those three
+      the spectrum reclaims it. The whole page says local execution is the
+      default; this is that default as a picture — everywhere signal,
+      and one channel that stays silent until the user chooses a network path. If the plate is regenerated, those three
       numbers have to be re-measured with it.
 
       eager + high priority and no lazy attribute: this is the LCP element, and
@@ -159,7 +159,9 @@ const headline = ['Speech to text', 'that never leaves', 'your machine']
         */
       }
       <div class="mt-7 flex flex-col items-start gap-y-6">
-        <p class="mono-caption text-ink-soft uppercase">Build from source — no packages yet.</p>
+        <p class="mono-caption text-ink-soft uppercase">
+          Linux releases published · source available.
+        </p>
         <a class="cta-solid" href={repoUrl} rel="noopener">Read the source</a>
       </div>
     </div>

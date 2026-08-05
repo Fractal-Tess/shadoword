@@ -40,10 +40,11 @@ export const demoHistory: HistoryRecord[] = [
 	{
 		id: 'history-1',
 		timestamp: 'Today, 09:42',
-		engine: 'Remote · Large v3 Turbo',
+		engine: 'OpenRouter · Whisper Large v3',
 		duration: '8.4s',
 		latency: '612ms',
-		segments: 3,
+		segments: 1,
+		costUsd: 0.000125,
 		text: 'Keep the API on the workstation and let the laptop remain a lightweight capture client while traveling.'
 	},
 	{
@@ -58,7 +59,7 @@ export const demoHistory: HistoryRecord[] = [
 	{
 		id: 'history-3',
 		timestamp: 'Yesterday, 18:06',
-		engine: 'Remote · Large v3 Turbo',
+		engine: 'Shadoword API · Large v3 Turbo',
 		duration: '12.7s',
 		latency: '701ms',
 		segments: 4,

@@ -1,4 +1,13 @@
-export type PageId = 'transcribe' | 'models' | 'history' | 'settings' | 'about';
+export type PageId =
+	| 'transcribe'
+	| 'models'
+	| 'history'
+	| 'settings'
+	| 'capture'
+	| 'transcription'
+	| 'output'
+	| 'application'
+	| 'about';
 
 export type RuntimeMode = 'local' | 'remote' | 'open_router';
 
@@ -22,4 +31,5 @@ export interface HistoryRecord {
 	latency: string;
 	text: string;
 	segments: number;
+	costUsd?: number;
 }

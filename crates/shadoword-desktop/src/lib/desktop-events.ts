@@ -36,7 +36,8 @@ export function historyRecordFromCompletion(
 		duration: formatDuration(result.audio_duration_ms),
 		latency: `${result.elapsed_ms}ms`,
 		text: result.text,
-		segments
+		segments,
+		costUsd: result.cost_usd ?? undefined
 	};
 }
 
@@ -52,6 +53,7 @@ export function transcriptionFingerprint(
 		result.engine,
 		result.audio_duration_ms,
 		result.sample_rate,
+		result.cost_usd,
 		segments
 	].join('\u001f');
 }
@@ -59,7 +61,7 @@ export function transcriptionFingerprint(
 function serviceModeLabel(mode: ServiceMode) {
 	if (mode === 'local') return 'Local';
 	if (mode === 'open_router') return 'OpenRouter';
-	return 'Remote';
+	return 'Shadoword API';
 }
 
 function transcriptionResultsEqual(left: TranscriptionResult, right: TranscriptionResult) {
@@ -68,6 +70,7 @@ function transcriptionResultsEqual(left: TranscriptionResult, right: Transcripti
 		left.elapsed_ms === right.elapsed_ms &&
 		left.engine === right.engine &&
 		left.audio_duration_ms === right.audio_duration_ms &&
-		left.sample_rate === right.sample_rate
+		left.sample_rate === right.sample_rate &&
+		left.cost_usd === right.cost_usd
 	);
 }

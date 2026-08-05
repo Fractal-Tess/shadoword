@@ -37,10 +37,10 @@ const {
   noindex?: boolean
 }
 
-const pageTitle = title ?? 'Shadoword — offline speech to text, Linux first'
+const pageTitle = title ?? 'Shadoword — speech to text, local by default'
 const pageDescription =
   description ??
-  'Shadoword turns speech into text entirely on your own machine. Local Whisper inference by default, an optional self-hosted daemon, and explicit control over model and accelerator. Linux first.'
+  'Shadoword is Linux-first speech to text with local Whisper by default, an optional self-hosted Shadoword API, direct OpenRouter transcription, and explicit control over every execution path.'
 
 const canonical = new URL(Astro.url.pathname, Astro.site)
 const ogImage = new URL('/images/shadoword-og.jpg', Astro.site)
@@ -49,14 +49,11 @@ const ogImage = new URL('/images/shadoword-og.jpg', Astro.site)
  * Structured data, held to the same rule as the page itself: every field is one
  * the workspace can be checked against.
  *
- * Deliberately absent: `offers`, `license` and `softwareVersion`. Google wants an
- * `offers` block to grant a rich result and it would be trivial to write
- * `price: 0` — but the status plate says "Pre-launch. Build from source." and
- * "None published yet", so there is nothing on offer to price. The license is
- * omitted for the same reason the page omits it: the plate says "See LICENSE in
- * the repository", and the repository's LICENSE is not this project's to
- * summarise in a machine-readable claim. A missing rich result is cheaper than
- * an invented fact — which is the trade this whole site is built on.
+ * Deliberately absent: `offers`, `license` and `softwareVersion`. GitHub release
+ * archives do not define a commercial offer, and the page intentionally avoids
+ * pinning structured metadata to a version that can drift. The license is
+ * omitted because the repository's LICENSE is not summarised here as a separate
+ * machine-readable claim. A missing rich result is cheaper than an invented fact.
  */
 const structuredData = {
   '@context': 'https://schema.org',
@@ -113,7 +110,7 @@ const structuredData = {
     <meta property="og:image:height" content="630" />
     <meta
       property="og:image:alt"
-      content="The Shadoword share card: the wordmark above the headline 'Speech to text that never leaves your machine', set in heavy condensed off-white type on the left of an abstract spectrogram burning in magenta and cyan. One column at the centre is perfectly black and carries a scarlet line down its length. A flat black strip along the foot reads 'github.com/Fractal-Tess/shadoword' and 'Pre-launch. Build from source.'"
+      content="The Shadoword share card: the wordmark above the headline 'Speech to text, local by default, connected by choice', set in heavy condensed off-white type on the left of an abstract spectrogram burning in magenta and cyan. One column at the centre is perfectly black and carries a scarlet line down its length. A flat black strip along the foot reads 'github.com/Fractal-Tess/shadoword' and 'Active development. Releases published.'"
     />
 
     <!-- Twitter falls back to the OpenGraph tags for title, description, image
@@ -123,7 +120,11 @@ const structuredData = {
 
     <link rel="icon" href="/favicon/favicon-32.png" />
     <link rel="apple-touch-icon" href="/favicon/favicon-128.png" />
-    {!noindex && <script type="application/ld+json" set:html={JSON.stringify(structuredData)} />}
+    {
+      !noindex && (
+        <script is:inline type="application/ld+json" set:html={JSON.stringify(structuredData)} />
+      )
+    }
   </head>
   <body class="min-h-screen antialiased">
     <!--
@@ -136,7 +137,7 @@ const structuredData = {
         controls. Heavy condensed grotesque against a monospace. Square buttons,
         rounded riveted plates. 1px hairlines, no glow behind text.
       STORY: A Linux developer sees one channel that never lights up, understands
-        audio never leaves the machine, reads real endpoints and frames, then goes
+        local execution is the default, reads real endpoints and frames, then goes
         to the source.
       FIRST VIEWPORT: Full-bleed abstract spectrogram, densest at the right and
         dissolving to black at the left. One perfectly black column at the centre

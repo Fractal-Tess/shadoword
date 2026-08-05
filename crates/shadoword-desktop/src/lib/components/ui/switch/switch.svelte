@@ -19,13 +19,33 @@
 	data-slot="switch"
 	data-size={size}
 	class={cn(
-		'peer group/switch relative inline-flex shrink-0 items-center border border-transparent transition-all outline-none after:absolute after:-inset-x-3 after:-inset-y-2 focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20 data-[size=default]:h-[18.4px] data-[size=default]:w-[32px] data-[size=sm]:h-[14px] data-[size=sm]:w-[24px] dark:aria-invalid:border-destructive/50 dark:aria-invalid:ring-destructive/40 data-checked:bg-primary data-unchecked:bg-input dark:data-unchecked:bg-input/80 data-disabled:cursor-not-allowed data-disabled:opacity-50',
+		'peer group/switch relative inline-flex h-6 w-14 shrink-0 items-center border border-line-strong bg-night p-0.5 transition-colors outline-none after:absolute after:-inset-x-2 after:-inset-y-2 focus-visible:border-ink focus-visible:ring-2 focus-visible:ring-ink/30 aria-invalid:border-scarlet aria-invalid:ring-2 aria-invalid:ring-scarlet/20 data-checked:border-scarlet data-checked:bg-scarlet-deep data-disabled:cursor-not-allowed data-disabled:opacity-50',
 		className
 	)}
 	{...restProps}
 >
+	<span class:checked class="state-label" aria-hidden="true">{checked ? 'ON' : 'OFF'}</span>
 	<SwitchPrimitive.Thumb
 		data-slot="switch-thumb"
-		class="pointer-events-none block bg-background ring-0 transition-transform group-data-[size=default]/switch:size-4 group-data-[size=sm]/switch:size-3 rtl:data-[state=checked]:translate-x-[calc(-100%)] group-data-[size=default]/switch:data-checked:translate-x-[calc(100%-2px)] group-data-[size=sm]/switch:data-checked:translate-x-[calc(100%-2px)] dark:data-checked:bg-primary-foreground group-data-[size=default]/switch:data-unchecked:translate-x-0 group-data-[size=sm]/switch:data-unchecked:translate-x-0 dark:data-unchecked:bg-foreground"
+		class="pointer-events-none relative z-10 block size-[18px] bg-ink ring-0 transition-transform data-checked:translate-x-[30px] dark:data-checked:bg-on-scarlet data-unchecked:translate-x-0"
 	/>
 </SwitchPrimitive.Root>
+
+<style>
+	.state-label {
+		position: absolute;
+		right: 0.32rem;
+		color: var(--ink-muted);
+		font-family: var(--font-mono);
+		font-size: 0.44rem;
+		font-weight: 700;
+		letter-spacing: 0.04em;
+		line-height: 1;
+	}
+
+	.state-label.checked {
+		right: auto;
+		left: 0.32rem;
+		color: var(--on-scarlet);
+	}
+</style>

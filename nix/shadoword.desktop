@@ -1,0 +1,12 @@
+[Desktop Entry]
+Type=Application
+Name=Shadoword
+GenericName=Speech to Text
+Comment=Linux-first speech to text, local by default
+Exec=shadoword-desktop
+Icon=shadoword
+Terminal=false
+Categories=AudioVideo;Audio;
+Keywords=speech;transcription;dictation;whisper;openrouter;
+StartupNotify=true
+StartupWMClass=Shadoword-desktop

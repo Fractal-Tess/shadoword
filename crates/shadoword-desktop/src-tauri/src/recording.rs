@@ -234,6 +234,7 @@ async fn run_local_streaming(
                             engine: response.engine,
                             audio_duration_ms: completion.audio_duration_ms,
                             sample_rate: completion.sample_rate,
+                            cost_usd: None,
                         };
                         let ready = barrier
                             .complete(completion.sequence, result)
@@ -525,6 +526,7 @@ async fn run_remote_streaming(
                             engine: partial.engine,
                             audio_duration_ms: pending.audio_duration_ms,
                             sample_rate: pending.sample_rate,
+                            cost_usd: None,
                         };
                         deliver_ready_segments(
                             &app,
@@ -707,6 +709,7 @@ async fn run_remote_pcm_streaming(
                             engine: partial.engine,
                             audio_duration_ms: pending.audio_duration_ms,
                             sample_rate: pending.sample_rate,
+                            cost_usd: None,
                         };
                         deliver_ready_segments(
                             &app,
@@ -941,6 +944,7 @@ async fn finish_stream(
         engine,
         audio_duration_ms: millis(started_at.elapsed()),
         sample_rate: source.sample_rate(),
+        cost_usd: None,
     };
     let output = config.output.clone();
     let final_text = result.text.clone();
@@ -1019,6 +1023,7 @@ mod tests {
             engine: "test".to_string(),
             audio_duration_ms: 0,
             sample_rate: 16_000,
+            cost_usd: None,
         }
     }
 

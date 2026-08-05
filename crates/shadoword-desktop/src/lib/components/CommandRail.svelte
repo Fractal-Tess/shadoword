@@ -1,5 +1,15 @@
 <script lang="ts">
-	import { Box, Clock3, Info, Mic2, Settings2 } from '@lucide/svelte';
+	import {
+		AppWindow,
+		AudioLines,
+		Box,
+		Captions,
+		Clock3,
+		Info,
+		Mic2,
+		Send,
+		Settings2
+	} from '@lucide/svelte';
 	import BrandMark from '$lib/components/BrandMark.svelte';
 	import StatusPill from '$lib/components/StatusPill.svelte';
 	import type { DesktopAppState } from '$lib/app-state.svelte';
@@ -32,7 +42,11 @@
 		{ id: 'transcribe', label: 'Transcribe', icon: Mic2 },
 		{ id: 'models', label: 'Models', icon: Box },
 		{ id: 'history', label: 'History', icon: Clock3 },
-		{ id: 'settings', label: 'Settings', icon: Settings2 },
+		{ id: 'settings', label: 'Execution', icon: Settings2 },
+		{ id: 'capture', label: 'Capture', icon: AudioLines },
+		{ id: 'transcription', label: 'Transcription', icon: Captions },
+		{ id: 'output', label: 'Output', icon: Send },
+		{ id: 'application', label: 'Application', icon: AppWindow },
 		{ id: 'about', label: 'About', icon: Info }
 	] satisfies Array<{ id: PageId; label: string; icon: typeof Mic2 }>;
 </script>
@@ -40,7 +54,7 @@
 <aside class="command-rail">
 	<div class="brand-station">
 		<BrandMark />
-		<p class="mono-micro">Private speech workspace</p>
+		<p class="mono-micro">Local-first speech workspace</p>
 	</div>
 
 	<nav aria-label="Primary navigation">
@@ -80,7 +94,7 @@
 					? 'Local runtime'
 					: mode === 'open_router'
 						? 'OpenRouter'
-						: 'Remote API'}</span
+						: 'Shadoword API'}</span
 			>
 			<StatusPill
 				state={runtimeState}

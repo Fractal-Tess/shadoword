@@ -415,6 +415,7 @@ export type TranscriptionResult = {
 	engine: string;
 	audio_duration_ms: number;
 	sample_rate: number;
+	cost_usd: number | null;
 };
 
 export type WhisperAccelerator = 'auto' | 'cpu' | 'gpu';

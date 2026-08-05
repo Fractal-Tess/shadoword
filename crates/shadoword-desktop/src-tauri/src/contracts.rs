@@ -188,6 +188,7 @@ pub struct TranscriptionResult {
     #[specta(type = u32)]
     pub audio_duration_ms: u64,
     pub sample_rate: u32,
+    pub cost_usd: Option<f64>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Type, tauri_specta::Event)]

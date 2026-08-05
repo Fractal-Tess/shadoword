@@ -48,7 +48,7 @@ impl std::fmt::Display for RemoteApiError {
     fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             formatter,
-            "remote API returned {} ({}): {}",
+            "Shadoword API returned {} ({}): {}",
             self.status, self.code, self.message
         )
     }
@@ -232,7 +232,7 @@ async fn decode<T: DeserializeOwned>(response: Response) -> Result<T> {
         return response
             .json()
             .await
-            .context("failed to decode the remote API response");
+            .context("failed to decode the Shadoword API response");
     }
 
     let body = response.text().await.unwrap_or_default();
@@ -243,7 +243,7 @@ async fn decode<T: DeserializeOwned>(response: Response) -> Result<T> {
             message: error.message,
         }));
     }
-    Err(anyhow!("remote API returned {status}"))
+    Err(anyhow!("Shadoword API returned {status}"))
 }
 
 #[cfg(test)]

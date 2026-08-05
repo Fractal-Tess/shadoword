@@ -27,6 +27,7 @@ pub struct OpenRouterClient {
 pub struct OpenRouterTranscription {
     pub text: String,
     pub usage: Option<Value>,
+    pub cost_usd: Option<f64>,
     pub elapsed_ms: u128,
 }
 
@@ -191,10 +192,12 @@ impl OpenRouterClient {
             .await
             .map_err(OpenRouterError::Request)?;
         let response = decode_response(response).await?;
+        let cost_usd = response.usage.as_ref().and_then(usage_cost);
 
         Ok(OpenRouterTranscription {
             text: response.text,
             usage: response.usage,
+            cost_usd,
             elapsed_ms: started_at.elapsed().as_millis(),
         })
     }
@@ -332,6 +335,23 @@ pub(crate) fn validate_model(model: &str) -> Result<(), OpenRouterError> {
         });
     }
     Ok(())
+}
+
+fn usage_cost(usage: &Value) -> Option<f64> {
+    usage
+        .get("cost")
+        .or_else(|| usage.get("total_cost"))
+        .and_then(json_number)
+}
+
+fn json_number(value: &Value) -> Option<f64> {
+    let number = value
+        .as_f64()
+        .or_else(|| value.as_str().and_then(|value| value.parse().ok()))?;
+    number
+        .is_finite()
+        .then_some(number)
+        .filter(|number| *number >= 0.0)
 }
 
 fn transcription_models(response: ModelsEnvelope) -> Vec<OpenRouterModel> {
@@ -552,6 +572,13 @@ mod tests {
     }
 
     #[test]
+    fn usage_cost_requires_an_explicit_non_negative_reported_cost() {
+        assert_eq!(usage_cost(&json!({ "audio_seconds": 1.25 })), None);
+        assert_eq!(usage_cost(&json!({ "total_cost": 0.00025 })), Some(0.00025));
+        assert_eq!(usage_cost(&json!({ "cost": -1 })), None);
+    }
+
+    #[test]
     fn request_omits_language_when_english_is_not_requested() {
         let request = TranscriptionRequest {
             model: "openai/whisper-1",
@@ -577,7 +604,7 @@ mod tests {
     async fn transcribe_wav_sends_authenticated_json_and_decodes_usage() {
         let fixture = spawn_fixture(
             "200 OK",
-            r#"{"text":"hello","usage":{"audio_seconds":1.25}}"#,
+            r#"{"text":"hello","usage":{"audio_seconds":1.25,"cost":"0.000125"}}"#,
         );
         let client = OpenRouterClient::with_test_endpoint(fixture.endpoint).expect("build client");
 
@@ -597,12 +624,14 @@ mod tests {
             (
                 transcription.text,
                 transcription.usage,
+                transcription.cost_usd,
                 headers.contains("authorization: Bearer test-key"),
                 body
             ),
             (
                 "hello".to_owned(),
-                Some(json!({ "audio_seconds": 1.25 })),
+                Some(json!({ "audio_seconds": 1.25, "cost": "0.000125" })),
+                Some(0.000125),
                 true,
                 json!({
                     "model": "openai/whisper-1",

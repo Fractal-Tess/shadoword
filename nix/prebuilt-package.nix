@@ -10,6 +10,9 @@
   artifact,
   runtimeDeps,
   extraLibraryPath ? "",
+  desktopIntegration ? false,
+  desktopFile ? null,
+  desktopIcon ? null,
 }:
 
 let
@@ -47,11 +50,16 @@ stdenvNoCC.mkDerivation {
     wrapProgram "$out/bin/${executable}" \
       --prefix LD_LIBRARY_PATH : "${libraryPath}"
 
+    ${lib.optionalString desktopIntegration ''
+      install -Dm644 ${desktopFile} "$out/share/applications/shadoword.desktop"
+      install -Dm644 ${desktopIcon} "$out/share/icons/hicolor/128x128/apps/shadoword.png"
+    ''}
+
     runHook postInstall
   '';
 
   meta = {
-    description = "Offline speech-to-text with Whisper";
+    description = "Linux-first speech-to-text, local by default";
     homepage = "https://github.com/Fractal-Tess/shadoword";
     license = lib.licenses.mit;
     mainProgram = executable;
