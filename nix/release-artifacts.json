@@ -1,26 +1,22 @@
 {
-  "version": "0.10.4",
+  "version": "0.10.6",
   "systems": {
     "x86_64-linux": {
       "shadoword-api": {
-        "url": "https://github.com/Fractal-Tess/shadoword/releases/download/v0.10.4/shadoword-api-cpu-x86_64-linux.tar.gz",
-        "hash": "sha256-w4OF2g+RYt98Pd5dVFJMiUhv7WYMSVG2NiuDMiWij8E="
+        "url": "https://github.com/Fractal-Tess/shadoword/releases/download/v0.10.6/shadoword-api-cpu-x86_64-linux.tar.gz",
+        "hash": "sha256-qTSWXBm1qGe5F0Ld+ONPCdEGLA33B4dGcMxMx1aMSWI="
       },
       "shadoword-api-cuda": {
-        "url": "https://github.com/Fractal-Tess/shadoword/releases/download/v0.10.4/shadoword-api-cuda-x86_64-linux.tar.gz",
-        "hash": "sha256-Az0Ji/u7U7HoUjdh9zigcimgO+eswtbTbIA8yPWT3co="
+        "url": "https://github.com/Fractal-Tess/shadoword/releases/download/v0.10.6/shadoword-api-cuda-x86_64-linux.tar.gz",
+        "hash": "sha256-KDJWNFljv/Z+riJbbqS56uwxUe+pX66hXueq+70GSyI="
       },
       "shadoword-api-vulkan": {
-        "url": "https://github.com/Fractal-Tess/shadoword/releases/download/v0.10.4/shadoword-api-vulkan-x86_64-linux.tar.gz",
-        "hash": "sha256-M2W3iDaPz7CYvtk2zss+NIc572T1a0/osRI1jN9VoZs="
-      },
-      "shadoword-desktop-client": {
-        "url": "https://github.com/Fractal-Tess/shadoword/releases/download/v0.10.4/shadoword-desktop-client-x86_64-linux.tar.gz",
-        "hash": "sha256-JbriUP5UCVCKpRYHLV2++1n1q80lL3rhaZoP5+FVJ+Y="
+        "url": "https://github.com/Fractal-Tess/shadoword/releases/download/v0.10.6/shadoword-api-vulkan-x86_64-linux.tar.gz",
+        "hash": "sha256-2R/nj7BziIsVEbzvw7yk68+FCwVcYYbZMe8fnREIKfU="
       },
       "shadoword-desktop": {
-        "url": "https://github.com/Fractal-Tess/shadoword/releases/download/v0.10.4/shadoword-desktop-cpu-x86_64-linux.tar.gz",
-        "hash": "sha256-KrJ9WTdvTeSbhBOByQv1V1yFhJJBnO+mDRSW0Dwcwdc="
+        "url": "https://github.com/Fractal-Tess/shadoword/releases/download/v0.10.6/shadoword-desktop-x86_64-linux.tar.gz",
+        "hash": "sha256-z2IPPY6hMqZg0q6to2SC3Oznr8CSTyGq7nxaCkXr1PI="
       }
     }
   }
