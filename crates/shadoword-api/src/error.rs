@@ -39,6 +39,15 @@ impl ApiError {
         }
     }
 
+    pub fn forbidden() -> Self {
+        Self {
+            status: StatusCode::FORBIDDEN,
+            code: "forbidden",
+            message: "this bearer token does not have permission for that operation".to_string(),
+            retry_after: None,
+        }
+    }
+
     pub fn busy() -> Self {
         Self {
             status: StatusCode::TOO_MANY_REQUESTS,

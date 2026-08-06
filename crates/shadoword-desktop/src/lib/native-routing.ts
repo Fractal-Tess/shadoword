@@ -7,6 +7,7 @@ export const MODE_COMMAND_NAMES = {
 		refreshOverview: 'refreshLocalOverview',
 		updateRuntime: 'updateLocalRuntime',
 		selectModel: 'selectLocalModel',
+		deleteModel: 'deleteLocalModel',
 		startDownload: 'startLocalDownload',
 		pollDownload: 'pollLocalDownload'
 	},
@@ -14,6 +15,7 @@ export const MODE_COMMAND_NAMES = {
 		refreshOverview: 'refreshRemoteOverview',
 		updateRuntime: 'updateRemoteRuntime',
 		selectModel: 'selectRemoteModel',
+		deleteModel: 'deleteRemoteModel',
 		startDownload: 'startRemoteDownload',
 		pollDownload: 'pollRemoteDownload'
 	}
@@ -23,6 +25,7 @@ export const MODE_COMMAND_NAMES = {
 		refreshOverview: 'refreshLocalOverview' | 'refreshRemoteOverview';
 		updateRuntime: 'updateLocalRuntime' | 'updateRemoteRuntime';
 		selectModel: 'selectLocalModel' | 'selectRemoteModel';
+		deleteModel: 'deleteLocalModel' | 'deleteRemoteModel';
 		startDownload: 'startLocalDownload' | 'startRemoteDownload';
 		pollDownload: 'pollLocalDownload' | 'pollRemoteDownload';
 	}

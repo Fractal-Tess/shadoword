@@ -6,6 +6,31 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## [Unreleased]
 
+## [0.11.0] - 2026-08-06
+
+### Added
+
+- Named admin and transcription-only user API tokens generated through `shadoword-api token generate`, with one-time secret output and hashed persistence.
+- An accessible API-port tooltip beside the desktop endpoint field.
+- Configurable whitespace before and after delivered transcripts, with a trailing space by default so consecutive recordings remain separated.
+- Secure native credential reveal and copy controls that keep bearer tokens and OpenRouter keys masked in the frontend.
+- Authenticated model deletion with active-model and in-progress-download protection.
+
+### Changed
+
+- **Breaking:** Shadoword API authentication now uses the API-owned named-token registry. The legacy `SHADOWORD_API_TOKEN`, `SHADOWORD_API_TOKEN_FILE`, and `--token-file` configuration paths were removed.
+- Migrated the desktop to native SvelteKit route pages with route-owned settings state, shared application-lifetime operations, semantic UI components, and Sonner notifications.
+- Made explicit worker pools the only execution topology and moved CPU/GPU worker targeting into each pool unit.
+- Separated model asset management from execution topology and added runtime, storage, preload, memory, download, selection, and deletion reconciliation.
+- Save discrete desktop settings immediately while retaining a short debounce for text entry and avoiding unrelated runtime refreshes.
+
+### Fixed
+
+- Automatically refresh draining inference generations so completed worker teardown no longer leaves desktop pool mutations locked by stale status.
+- Stop NixOS from regenerating the mutable desktop settings JSON and overwriting preferences saved in the application.
+- Report outdated Shadoword API daemons and transcription-only token permission failures with actionable desktop errors.
+- Keep mode-specific transcription, PCM format, and English-only preferences stable across target switches and restarts.
+
 ## [0.10.6] - 2026-08-05
 
 ### Added
@@ -144,7 +169,8 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 - Prevented duplicate model loads after eager-preload timeouts.
 - Added bounded remote connect, handshake, read, write, and finalization waits.
 
-[Unreleased]: https://github.com/Fractal-Tess/shadoword/compare/v0.10.6...HEAD
+[Unreleased]: https://github.com/Fractal-Tess/shadoword/compare/v0.11.0...HEAD
+[0.11.0]: https://github.com/Fractal-Tess/shadoword/compare/v0.10.6...v0.11.0
 [0.10.6]: https://github.com/Fractal-Tess/shadoword/compare/v0.10.5...v0.10.6
 [0.10.5]: https://github.com/Fractal-Tess/shadoword/compare/v0.10.4...v0.10.5
 [0.10.4]: https://github.com/Fractal-Tess/shadoword/compare/v0.10.3...v0.10.4

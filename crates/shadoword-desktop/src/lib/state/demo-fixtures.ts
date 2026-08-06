@@ -19,9 +19,12 @@ export const demoSettings: DesktopSettings = {
 	copy_to_clipboard: true,
 	paste_method: 'direct',
 	paste_delay_ms: 120,
+	output_prefix: 'none',
+	output_suffix: 'space',
 	hotkey_shortcut: 'f2',
 	hotkey_mode: 'push_to_talk',
-	close_to_tray: true
+	close_to_tray: true,
+	show_window_title_bar: true
 };
 
 export const demoOverview: OverviewDto = {

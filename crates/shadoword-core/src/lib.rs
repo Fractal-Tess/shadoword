@@ -16,9 +16,11 @@ pub mod wav;
 #[cfg(feature = "desktop-audio")]
 pub use audio::{InputDeviceInfo, MicrophoneRecorder, RecordingSession, RecordingSnapshotSource};
 pub use config::{
-    ApiConfig, ConfigPaths, DesktopConfig, ExecutionTarget, ExecutionUnitConfig, HotkeyMode,
-    InferenceLimits, InferencePoolConfig, OutputConfig, PasteMethod, RecordingConfig, RemoteConfig,
-    ServiceMode, StreamingPcmFormat, TranscriptionConfig, TranscriptionMode, WhisperAccelerator,
+    ApiConfig, ApiTokenConfig, ApiTokenRole, ConfigPaths, DesktopConfig, ExecutionTarget,
+    ExecutionUnitConfig, HotkeyMode, InferenceLimits, InferencePoolConfig,
+    ModeRecordingPreferences, OutputConfig, PasteMethod, RecordingConfig, RemoteConfig,
+    ServiceMode, StreamingPcmFormat, TranscriptBoundary, TranscriptionConfig, TranscriptionMode,
+    WhisperAccelerator,
 };
 pub use contracts::{
     compiled_whisper_backends, DrainingGenerationStatus, ExecutionUnitState, ExecutionUnitStatus,

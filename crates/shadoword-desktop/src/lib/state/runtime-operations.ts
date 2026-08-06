@@ -14,14 +14,15 @@ import {
 } from './demo-operations';
 import { demoOverview } from './demo-fixtures';
 import { setAppError } from './errors';
-import { settingsInput } from './settings-input';
+import { settingsInputForMode } from '$lib/desktop-settings';
 
 export class RuntimeOperations {
 	private settingsQueue = Promise.resolve();
 
 	constructor(
 		private app: DesktopStateContext,
-		private resetDownloads: () => void
+		private resetDownloads: () => void,
+		private invalidateOverviewRefresh: () => void
 	) {}
 
 	saveSettings(input: DesktopSettingsInput) {
@@ -35,7 +36,7 @@ export class RuntimeOperations {
 			const settings = this.app.settings;
 			if (!settings || settings.mode === mode || this.app.captureLocked) return;
 			await this.persistSettings(
-				settingsInput(settings, { action: 'keep' }, mode, { action: 'keep' })
+				settingsInputForMode(settings, { action: 'keep' }, mode, { action: 'keep' })
 			);
 		});
 	}
@@ -45,7 +46,9 @@ export class RuntimeOperations {
 			throw new Error('Stop the active recording before saving settings.');
 		this.app.activity = 'busy';
 		this.app.error = null;
-		const previousMode = this.app.settings?.mode;
+		const previousSettings = this.app.settings;
+		const previousMode = previousSettings?.mode;
+		const refreshRequired = this.settingsRequireOverviewRefresh(previousSettings, input);
 		if (this.app.demo) {
 			const { remote_token: remoteToken, openrouter_key: openRouterKey, ...settings } = input;
 			const savedSettings: DesktopSettings = {
@@ -60,7 +63,9 @@ export class RuntimeOperations {
 			};
 			this.app.settings = savedSettings;
 			this.app.overview = demoOverviewForSettings(savedSettings, this.app.overview ?? demoOverview);
-			this.app.activity = 'ready';
+			if (previousMode !== savedSettings.mode) this.resetModeScopedState();
+			if (refreshRequired) await this.app.refreshOverview();
+			else this.app.activity = 'ready';
 			this.app.statusMessage = 'Simulated settings saved';
 			return;
 		}
@@ -68,7 +73,8 @@ export class RuntimeOperations {
 			this.app.settings = await commands.saveDesktopSettings(input);
 			this.app.hotkeyError = null;
 			if (previousMode !== this.app.settings.mode) this.resetModeScopedState();
-			await this.app.refreshOverview();
+			if (refreshRequired) await this.app.refreshOverview();
+			else this.app.activity = 'ready';
 		} catch (error) {
 			this.app.activity = this.app.overview ? 'ready' : 'offline';
 			setAppError(this.app, error, 'Could not save desktop settings');
@@ -91,6 +97,12 @@ export class RuntimeOperations {
 				this.app.overview = await commands[route.updateRuntime](runtime);
 			}
 			if (this.app.overview) this.syncLocalSettingsFromRuntime(mode, this.app.overview.runtime);
+			if (
+				!this.app.demo &&
+				(this.app.overview?.status.inference_pool?.draining_generations?.length ?? 0) > 0
+			) {
+				await this.app.refreshOverview();
+			}
 			this.app.activity = 'ready';
 			this.app.statusMessage = `${mode === 'local' ? 'Local' : 'Shadoword API'} runtime updated`;
 		} catch (error) {
@@ -120,6 +132,9 @@ export class RuntimeOperations {
 	async selectModel(modelId: string) {
 		const mode = this.app.settings?.mode;
 		if (!mode || this.app.captureLocked) return;
+		const modelName =
+			this.app.overview?.models.find((model) => model.id === modelId)?.name ?? modelId;
+		this.invalidateOverviewRefresh();
 		this.app.activity = 'busy';
 		this.app.error = null;
 		try {
@@ -136,14 +151,79 @@ export class RuntimeOperations {
 			} else {
 				const route = commandNamesForMode(mode);
 				this.app.overview = await commands[route.selectModel](modelId);
+				try {
+					this.app.overview = await commands[route.refreshOverview]();
+				} catch {
+					// The select response is already authoritative; reconciliation is best-effort.
+				}
 			}
 			if (this.app.overview) this.syncLocalSettingsFromRuntime(mode, this.app.overview.runtime);
+			if (
+				!this.app.demo &&
+				(this.app.overview?.status.inference_pool?.draining_generations?.length ?? 0) > 0
+			) {
+				await this.app.refreshOverview();
+			}
 			this.app.activity = 'ready';
 			this.app.statusMessage = `${mode === 'local' ? 'Local' : 'Shadoword API'} model selected`;
+			this.app.notify(
+				`${modelName} reloaded`,
+				`${mode === 'local' ? 'Local Shadoword' : 'Shadoword API'} is now using this model.`
+			);
 		} catch (error) {
 			this.app.activity = this.app.overview ? 'ready' : 'offline';
 			setAppError(this.app, error, `Could not select the ${mode} model`);
 		}
+	}
+
+	async deleteModel(modelId: string) {
+		const mode = this.app.settings?.mode;
+		if (!mode || mode === 'open_router' || this.app.poolMutationLocked) return;
+		this.app.activity = 'busy';
+		this.app.error = null;
+		try {
+			if (this.app.demo) {
+				const overview = this.app.overview ?? demoOverview;
+				this.app.overview = {
+					...overview,
+					models: overview.models.map((model) =>
+						model.id === modelId ? { ...model, installed: false } : model
+					)
+				};
+			} else {
+				const route = commandNamesForMode(mode);
+				this.app.overview = await commands[route.deleteModel](modelId);
+			}
+			this.app.activity = 'ready';
+			this.app.statusMessage = `${mode === 'local' ? 'Local' : 'Shadoword API'} model deleted`;
+		} catch (error) {
+			this.app.activity = this.app.overview ? 'ready' : 'offline';
+			setAppError(this.app, error, `Could not delete the ${mode} model`);
+		}
+	}
+
+	private settingsRequireOverviewRefresh(
+		previous: DesktopSettings | null,
+		input: DesktopSettingsInput
+	) {
+		if (!previous || previous.mode !== input.mode) return true;
+		if (input.mode === 'remote') {
+			return (
+				previous.remote_endpoint.trim() !== input.remote_endpoint.trim() ||
+				input.remote_token.action !== 'keep'
+			);
+		}
+		if (input.mode === 'local') {
+			return (
+				previous.model_path !== input.model_path ||
+				previous.preload_on_startup !== input.preload_on_startup ||
+				previous.whisper_accelerator !== input.whisper_accelerator ||
+				previous.whisper_gpu_device !== input.whisper_gpu_device ||
+				previous.sample_rate !== input.sample_rate ||
+				previous.english_only !== input.english_only
+			);
+		}
+		return false;
 	}
 
 	private enqueueSettings<T>(operation: () => Promise<T>) {
@@ -159,12 +239,13 @@ export class RuntimeOperations {
 		this.resetDownloads();
 		this.app.overview = null;
 		this.app.openRouterKeyReport = null;
-		this.app.openRouterKeyMessage = null;
+		this.app.openRouterCredentialState = this.app.settings?.openrouter_key_configured
+			? 'checking'
+			: 'missing';
 		this.app.poolValidationState = 'idle';
 		this.app.poolApplyState = 'idle';
 		this.app.poolFieldErrors = {};
 		this.app.poolFeedback = null;
-		this.app.validatedPool = null;
 	}
 
 	private syncLocalSettingsFromRuntime(mode: ServiceMode, runtime: RuntimeConfigDto) {

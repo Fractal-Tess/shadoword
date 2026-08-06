@@ -1,4 +1,4 @@
-import { commands, type ConnectionInput, type ServiceMode } from '$lib/bindings';
+import { commands, type ConnectionInput, type OverviewDto, type ServiceMode } from '$lib/bindings';
 import { errorMessage } from '$lib/display';
 import { commandNamesForMode } from '$lib/native-routing';
 import type { DesktopStateContext } from './contracts';
@@ -8,37 +8,64 @@ import { failOverview, setAppError } from './errors';
 
 export class ProviderOperations {
 	#refreshEpoch = 0;
+	#drainRefreshTimer: ReturnType<typeof globalThis.setTimeout> | null = null;
 
 	constructor(private app: DesktopStateContext) {}
 
+	invalidateRefresh() {
+		this.#refreshEpoch += 1;
+		if (this.#drainRefreshTimer !== null) {
+			globalThis.clearTimeout(this.#drainRefreshTimer);
+			this.#drainRefreshTimer = null;
+		}
+	}
+
 	async refreshOverview() {
 		const epoch = ++this.#refreshEpoch;
+		const mode = this.app.settings?.mode;
+		if (!mode) return;
+
+		this.app.activity = 'busy';
+		this.app.error = null;
+		this.app.errorRetry = null;
+
+		if (mode === 'open_router') {
+			this.app.overview = null;
+			await this.refreshOpenRouterModels();
+			if (!this.#isCurrentRefresh(epoch, mode)) return;
+			if (!this.app.settings?.openrouter_key_configured) {
+				this.app.openRouterCredentialState = 'missing';
+				this.app.activity = 'offline';
+				this.app.statusMessage = 'OpenRouter API key required';
+				return;
+			}
+
+			try {
+				await this.testOpenRouterKey(null, true);
+				if (!this.#isCurrentRefresh(epoch, mode)) return;
+				this.app.activity = 'ready';
+				this.app.statusMessage = 'OpenRouter key verified · transcription ready';
+			} catch (error) {
+				if (!this.#isCurrentRefresh(epoch, mode)) return;
+				this.app.activity = 'offline';
+				this.app.statusMessage = `OpenRouter key rejected · ${errorMessage(error)}`;
+			}
+			return;
+		}
+
 		if (this.app.demo) {
 			this.app.overview ??= { ...demoOverview };
 			this.app.activity = 'ready';
 			this.app.statusMessage = 'Simulated runtime ready';
 			return;
 		}
-		const mode = this.app.settings?.mode;
-		if (!mode) return;
-		this.app.activity = 'busy';
-		this.app.error = null;
-		this.app.errorRetry = null;
+
 		try {
-			if (mode === 'open_router') {
-				this.app.overview = null;
-				await this.refreshOpenRouterModels();
-				if (!this.#isCurrentRefresh(epoch, mode)) return;
-				this.app.activity = this.app.settings?.openrouter_key_configured ? 'ready' : 'offline';
-				this.app.statusMessage = this.app.settings?.openrouter_key_configured
-					? 'OpenRouter transcription ready'
-					: 'OpenRouter API key required';
-				return;
-			}
 			const route = commandNamesForMode(mode);
 			const overview = await commands[route.refreshOverview]();
 			if (!this.#isCurrentRefresh(epoch, mode)) return;
 			this.app.overview = overview;
+			this.#scheduleDrainRefresh(epoch, mode, overview);
 			this.app.activity = 'ready';
 			this.app.statusMessage = `${mode === 'local' ? 'Local' : 'Shadoword API'} runtime connected`;
 		} catch (error) {
@@ -85,27 +112,58 @@ export class ProviderOperations {
 	}
 
 	async testOpenRouterKey(key: string | null, useSavedKey: boolean) {
-		this.app.openRouterKeyMessage = null;
 		this.app.openRouterKeyReport = null;
+		if (useSavedKey) this.app.openRouterCredentialState = 'checking';
 		if (this.app.demo) {
-			this.app.openRouterKeyMessage = 'Simulated OpenRouter key verified';
+			if (useSavedKey) this.app.openRouterCredentialState = 'verified';
 			return;
 		}
 		try {
-			const report = await commands.testOpenrouterKey({ key, use_saved_key: useSavedKey });
-			this.app.openRouterKeyReport = report;
-			this.app.openRouterKeyMessage =
-				report.limit_remaining == null
-					? 'OpenRouter key verified'
-					: `OpenRouter key verified · ${report.limit_remaining.toFixed(4)} credits remaining`;
+			this.app.openRouterKeyReport = await commands.testOpenrouterKey({
+				key,
+				use_saved_key: useSavedKey
+			});
+			if (useSavedKey) this.app.openRouterCredentialState = 'verified';
 		} catch (error) {
-			this.app.openRouterKeyMessage = `OpenRouter key test failed: ${errorMessage(error)}`;
+			if (useSavedKey) this.app.openRouterCredentialState = 'invalid';
 			throw error;
 		}
 	}
 
 	#isCurrentRefresh(epoch: number, mode: ServiceMode) {
 		return epoch === this.#refreshEpoch && this.app.settings?.mode === mode;
+	}
+
+	#scheduleDrainRefresh(epoch: number, mode: ServiceMode, overview: OverviewDto) {
+		if (this.#drainRefreshTimer !== null) {
+			globalThis.clearTimeout(this.#drainRefreshTimer);
+			this.#drainRefreshTimer = null;
+		}
+		if (
+			mode === 'open_router' ||
+			(overview.status.inference_pool?.draining_generations?.length ?? 0) === 0
+		)
+			return;
+		this.#drainRefreshTimer = globalThis.setTimeout(
+			() => void this.#refreshDrainingPool(epoch, mode),
+			1000
+		);
+	}
+
+	async #refreshDrainingPool(epoch: number, mode: ServiceMode) {
+		this.#drainRefreshTimer = null;
+		if (mode === 'open_router' || !this.#isCurrentRefresh(epoch, mode)) return;
+		try {
+			const route = commandNamesForMode(mode);
+			const overview = await commands[route.refreshOverview]();
+			if (!this.#isCurrentRefresh(epoch, mode)) return;
+			this.app.overview = overview;
+			this.#scheduleDrainRefresh(epoch, mode, overview);
+		} catch {
+			if (this.#isCurrentRefresh(epoch, mode) && this.app.overview) {
+				this.#scheduleDrainRefresh(epoch, mode, this.app.overview);
+			}
+		}
 	}
 
 	async refreshInputDevices() {

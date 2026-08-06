@@ -30,9 +30,7 @@ export class DownloadOperations {
 	}
 
 	stopWatching(modelId: string) {
-		this.polling.delete(modelId);
-		this.downloadModes.delete(modelId);
-		this.app.downloadWatching = { ...this.app.downloadWatching, [modelId]: false };
+		this.finishWatching(modelId, true);
 	}
 
 	dispose() {
@@ -61,7 +59,7 @@ export class DownloadOperations {
 				transientFailures = 0;
 				this.setDownload(modelId, status, true);
 				if (status.state === 'succeeded' || status.state === 'failed') {
-					this.stopWatching(modelId);
+					this.finishWatching(modelId, status.state === 'succeeded');
 					if (this.app.demo && status.state === 'succeeded' && this.app.overview) {
 						this.app.overview = {
 							...this.app.overview,
@@ -78,13 +76,26 @@ export class DownloadOperations {
 					transientFailures += 1;
 					continue;
 				}
-				this.stopWatching(modelId);
+				this.finishWatching(modelId, false);
 				setAppError(
 					this.app,
 					error,
 					`${sentenceCase(mode)} download polling stopped after three retries`
 				);
 			}
+		}
+	}
+
+	private finishWatching(modelId: string, clearDownload: boolean) {
+		this.polling.delete(modelId);
+		this.downloadModes.delete(modelId);
+		const downloadWatching = { ...this.app.downloadWatching };
+		delete downloadWatching[modelId];
+		this.app.downloadWatching = downloadWatching;
+		if (clearDownload) {
+			const downloads = { ...this.app.downloads };
+			delete downloads[modelId];
+			this.app.downloads = downloads;
 		}
 	}
 

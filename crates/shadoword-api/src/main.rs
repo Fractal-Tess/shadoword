@@ -1,6 +1,6 @@
 use anyhow::{anyhow, Context};
-use clap::Parser;
-use shadoword_api::auth::{enforce_bind_auth, load_token, AuthConfig};
+use clap::{Parser, Subcommand, ValueEnum};
+use shadoword_api::auth::{enforce_bind_auth, generate_token, AuthConfig};
 use shadoword_api::downloads::DownloadJobs;
 use shadoword_api::request_recording::RequestRecorder;
 use shadoword_api::router::{
@@ -8,8 +8,8 @@ use shadoword_api::router::{
 };
 use shadoword_core::{
     default_whisper_model, download_whisper_model, parse_requested_models, resolve_download_dir,
-    resolve_whisper_model, unknown_model_error, ApiConfig, InferenceRuntime, ModelDownloadStatus,
-    WhisperModelFactory,
+    resolve_whisper_model, unknown_model_error, ApiConfig, ApiTokenRole, InferenceRuntime,
+    ModelDownloadStatus, WhisperModelFactory,
 };
 use std::net::SocketAddr;
 use std::path::PathBuf;
@@ -19,7 +19,10 @@ use tracing_subscriber::EnvFilter;
 #[derive(Debug, Parser)]
 #[command(version, about = "Shadoword HTTP/WebSocket transcription API daemon")]
 struct Cli {
-    #[arg(long = "config", env = "SHADOWORD_API_CONFIG")]
+    #[command(subcommand)]
+    command: Option<Command>,
+
+    #[arg(long = "config", env = "SHADOWORD_API_CONFIG", global = true)]
     config_path: Option<PathBuf>,
 
     #[arg(long = "listen", env = "SHADOWORD_LISTEN_ADDR")]
@@ -44,9 +47,6 @@ struct Cli {
     #[arg(long = "download-dir", env = "SHADOWORD_DOWNLOAD_DIR")]
     download_dir: Option<PathBuf>,
 
-    #[arg(long = "token-file", env = "SHADOWORD_API_TOKEN_FILE")]
-    token_file: Option<PathBuf>,
-
     #[arg(long = "queue-capacity", env = "SHADOWORD_QUEUE_CAPACITY")]
     queue_capacity: Option<usize>,
 
@@ -56,6 +56,40 @@ struct Cli {
         env = "SHADOWORD_REQUEST_RECORDING_DIR"
     )]
     request_recording_dir: Option<PathBuf>,
+}
+
+#[derive(Debug, Subcommand)]
+enum Command {
+    /// Manage named API bearer tokens stored as SHA-256 hashes.
+    Token {
+        #[command(subcommand)]
+        command: TokenCommand,
+    },
+}
+
+#[derive(Debug, Subcommand)]
+enum TokenCommand {
+    /// Generate a token and print its secret value once.
+    Generate { role: TokenRole, name: String },
+    /// List token names and roles without exposing token hashes.
+    List,
+    /// Revoke a named token.
+    Revoke { name: String },
+}
+
+#[derive(Debug, Clone, Copy, ValueEnum)]
+enum TokenRole {
+    Admin,
+    User,
+}
+
+impl From<TokenRole> for ApiTokenRole {
+    fn from(role: TokenRole) -> Self {
+        match role {
+            TokenRole::Admin => Self::Admin,
+            TokenRole::User => Self::User,
+        }
+    }
 }
 
 #[tokio::main]
@@ -69,13 +103,17 @@ async fn main() -> anyhow::Result<()> {
     let cli = Cli::parse();
     let config_path = cli.config_path.clone().unwrap_or(ApiConfig::config_path()?);
     let mut config = ApiConfig::load_from_path(&config_path)?;
+    if let Some(Command::Token { command }) = &cli.command {
+        manage_tokens(&config_path, &mut config, command)?;
+        return Ok(());
+    }
     apply_cli_overrides(&mut config, &cli);
 
     let addr: SocketAddr = config
         .listen_addr
         .parse()
         .with_context(|| format!("invalid listen address '{}'", config.listen_addr))?;
-    let auth = AuthConfig::new(load_token(cli.token_file.as_deref())?);
+    let auth = AuthConfig::new(&config.tokens)?;
     enforce_bind_auth(&addr, &auth)?;
 
     let download_dir = resolve_download_dir(
@@ -136,6 +174,7 @@ async fn main() -> anyhow::Result<()> {
         download_dir,
         listen_addr: addr,
         queue_capacity: config.queue_capacity,
+        tokens: Arc::from(config.tokens.clone()),
         config_update_lock: Arc::new(tokio::sync::Mutex::new(())),
     };
     let app = build_router(state, RouterConfig { auth });
@@ -144,6 +183,59 @@ async fn main() -> anyhow::Result<()> {
     let listener = tokio::net::TcpListener::bind(addr).await?;
     axum::serve(listener, app).await?;
     Ok(())
+}
+
+fn manage_tokens(
+    config_path: &std::path::Path,
+    config: &mut ApiConfig,
+    command: &TokenCommand,
+) -> anyhow::Result<()> {
+    match command {
+        TokenCommand::Generate { role, name } => {
+            if config.tokens.iter().any(|token| token.name == name.trim()) {
+                return Err(anyhow!(
+                    "an API token named {:?} already exists; revoke it before generating a replacement",
+                    name.trim()
+                ));
+            }
+            let (value, token) = generate_token((*role).into(), name)?;
+            let role = token_role_name(token.role);
+            let name = token.name.clone();
+            config.tokens.push(token);
+            config.save_to_path(config_path)?;
+            println!("{value}");
+            eprintln!(
+                "Generated {role} token {name:?}. Its hash was saved to {}. Restart shadoword-api to load it.",
+                config_path.display()
+            );
+        }
+        TokenCommand::List => {
+            for token in &config.tokens {
+                println!("{}\t{}", token_role_name(token.role), token.name);
+            }
+        }
+        TokenCommand::Revoke { name } => {
+            let name = name.trim();
+            let previous_len = config.tokens.len();
+            config.tokens.retain(|token| token.name != name);
+            if config.tokens.len() == previous_len {
+                return Err(anyhow!("no API token named {name:?} exists"));
+            }
+            config.save_to_path(config_path)?;
+            eprintln!(
+                "Revoked token {name:?} in {}. Restart shadoword-api to apply the change.",
+                config_path.display()
+            );
+        }
+    }
+    Ok(())
+}
+
+fn token_role_name(role: ApiTokenRole) -> &'static str {
+    match role {
+        ApiTokenRole::Admin => "admin",
+        ApiTokenRole::User => "user",
+    }
 }
 
 fn apply_cli_overrides(config: &mut ApiConfig, cli: &Cli) {

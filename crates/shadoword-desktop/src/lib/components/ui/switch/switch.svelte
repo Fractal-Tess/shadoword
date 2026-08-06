@@ -24,28 +24,17 @@
 	)}
 	{...restProps}
 >
-	<span class:checked class="state-label" aria-hidden="true">{checked ? 'ON' : 'OFF'}</span>
+	<span
+		class={cn(
+			'absolute end-[0.32rem] font-mono text-[0.5rem] leading-none font-bold tracking-[0.04em] text-ink-muted',
+			checked && 'start-[0.32rem] end-auto text-on-scarlet'
+		)}
+		aria-hidden="true"
+	>
+		{checked ? 'ON' : 'OFF'}
+	</span>
 	<SwitchPrimitive.Thumb
 		data-slot="switch-thumb"
-		class="pointer-events-none relative z-10 block size-[18px] bg-ink ring-0 transition-transform data-checked:translate-x-[30px] dark:data-checked:bg-on-scarlet data-unchecked:translate-x-0"
+		class="pointer-events-none relative z-10 block size-[18px] bg-ink ring-0 transition-transform motion-reduce:transition-none data-checked:translate-x-[30px] dark:data-checked:bg-on-scarlet data-unchecked:translate-x-0"
 	/>
 </SwitchPrimitive.Root>
-
-<style>
-	.state-label {
-		position: absolute;
-		right: 0.32rem;
-		color: var(--ink-muted);
-		font-family: var(--font-mono);
-		font-size: 0.44rem;
-		font-weight: 700;
-		letter-spacing: 0.04em;
-		line-height: 1;
-	}
-
-	.state-label.checked {
-		right: auto;
-		left: 0.32rem;
-		color: var(--on-scarlet);
-	}
-</style>

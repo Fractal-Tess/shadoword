@@ -1,8 +1,8 @@
 use crate::contracts::{
     ConnectionInput, ConnectionReport, DesktopBootstrap, DesktopError, DesktopEvent,
-    DesktopSettings, DesktopSettingsInput, OpenRouterConnectionInput, OpenRouterKeyReport,
-    OpenRouterModelInfo, RecordingPhase, RecordingState, RecordingStatus, SecretUpdate,
-    TranscriptionResult, DESKTOP_EVENT_NAME,
+    DesktopSecretKind, DesktopSettings, DesktopSettingsInput, OpenRouterConnectionInput,
+    OpenRouterKeyReport, OpenRouterModelInfo, RecordingPhase, RecordingState, RecordingStatus,
+    SecretUpdate, TranscriptionResult, DESKTOP_EVENT_NAME,
 };
 use crate::hotkeys::{validate_shortcut, HotkeyBackend, HotkeyEventState};
 use crate::openrouter::OpenRouterClient;
@@ -12,7 +12,9 @@ use crate::recording::{
 use crate::remote::RemoteClient;
 use anyhow::{anyhow, Context, Result};
 #[cfg(feature = "local-runtime")]
-use shadoword_core::remote_contracts::{DaemonStatusDto, DownloadJobState, ModelInfoDto};
+use shadoword_core::remote_contracts::{
+    DaemonStatusDto, DownloadJobState, ModelInfoDto, ModelStorageDto,
+};
 use shadoword_core::remote_contracts::{DownloadJobStatus, OverviewDto, RuntimeConfigDto};
 #[cfg(feature = "local-runtime")]
 use shadoword_core::{
@@ -21,8 +23,8 @@ use shadoword_core::{
     InferenceRuntime, TranscriptionService, WhisperModelFactory,
 };
 use shadoword_core::{
-    DesktopConfig, HotkeyMode, MicrophoneRecorder, RecordingSession, ServiceMode,
-    StreamingPcmFormat, TranscriptionConfig, TranscriptionMode,
+    DesktopConfig, HotkeyMode, MicrophoneRecorder, ModeRecordingPreferences, RecordingSession,
+    ServiceMode, StreamingPcmFormat, TranscriptionConfig, TranscriptionMode,
 };
 use std::collections::HashMap;
 use std::path::PathBuf;
@@ -187,15 +189,44 @@ fn normalize_config_for_build(mut config: DesktopConfig) -> DesktopConfig {
 }
 
 fn normalize_mode_scoped_recording(config: &mut DesktopConfig) {
+    let current = ModeRecordingPreferences::from(&config.recording);
+    config
+        .local_recording
+        .get_or_insert_with(|| current.clone());
+    config
+        .remote_recording
+        .get_or_insert_with(|| current.clone());
+    config
+        .openrouter_recording
+        .get_or_insert_with(|| current.clone());
+
+    let preferences = match config.mode {
+        ServiceMode::Local => config.local_recording.as_ref(),
+        ServiceMode::Remote => config.remote_recording.as_ref(),
+        ServiceMode::OpenRouter => config.openrouter_recording.as_ref(),
+    }
+    .expect("mode recording preferences initialized above");
+    config.recording.transcription_mode = preferences.transcription_mode;
+    config.recording.streaming_pcm_format = preferences.streaming_pcm_format;
+    config.recording.english_only = preferences.english_only;
+    config.recording.sample_rate = 16_000;
+
     match config.mode {
-        ServiceMode::Local => {
-            config.recording.streaming_pcm_format = StreamingPcmFormat::F32le;
-        }
+        ServiceMode::Local => config.recording.streaming_pcm_format = StreamingPcmFormat::F32le,
         ServiceMode::OpenRouter => {
             config.recording.transcription_mode = TranscriptionMode::Batch;
             config.recording.streaming_pcm_format = StreamingPcmFormat::F32le;
         }
         ServiceMode::Remote => {}
+    }
+}
+
+fn store_mode_recording(config: &mut DesktopConfig, mode: ServiceMode) {
+    let preferences = Some(ModeRecordingPreferences::from(&config.recording));
+    match mode {
+        ServiceMode::Local => config.local_recording = preferences,
+        ServiceMode::Remote => config.remote_recording = preferences,
+        ServiceMode::OpenRouter => config.openrouter_recording = preferences,
     }
 }
 
@@ -227,9 +258,12 @@ impl DesktopSettings {
             copy_to_clipboard: config.output.copy_to_clipboard,
             paste_method: config.output.paste_method,
             paste_delay_ms: config.output.paste_delay_ms,
+            output_prefix: config.output.prefix,
+            output_suffix: config.output.suffix,
             hotkey_shortcut: config.hotkey.shortcut.clone(),
             hotkey_mode: config.hotkey.mode,
             close_to_tray: config.close_to_tray,
+            show_window_title_bar: config.show_window_title_bar,
         }
     }
 }
@@ -410,6 +444,33 @@ pub async fn save_desktop_settings(
 
 #[tauri::command]
 #[specta::specta]
+pub fn reveal_desktop_secret(
+    kind: DesktopSecretKind,
+    state: tauri::State<'_, DesktopState>,
+) -> CommandResult<String> {
+    configured_secret(&state.config()?, kind)
+}
+
+#[tauri::command]
+#[specta::specta]
+pub fn copy_desktop_secret(
+    kind: DesktopSecretKind,
+    state: tauri::State<'_, DesktopState>,
+) -> CommandResult<()> {
+    let secret = configured_secret(&state.config()?, kind)?;
+    arboard::Clipboard::new()
+        .and_then(|mut clipboard| clipboard.set_text(secret))
+        .map_err(|error| {
+            DesktopError::new(
+                "clipboard_unavailable",
+                "could not copy the saved credential",
+            )
+            .with_action(error.to_string())
+        })
+}
+
+#[tauri::command]
+#[specta::specta]
 pub async fn test_remote_connection(
     input: ConnectionInput,
     state: tauri::State<'_, DesktopState>,
@@ -547,6 +608,28 @@ pub async fn select_remote_model(
     state
         .remote
         .select_model(
+            &config.remote.endpoint,
+            config.remote.api_token.as_deref(),
+            &model_id,
+        )
+        .await
+        .map_err(remote_error)?;
+    refresh_remote(&state.remote, &config).await
+}
+
+#[tauri::command]
+#[specta::specta]
+pub async fn delete_remote_model(
+    model_id: String,
+    state: tauri::State<'_, DesktopState>,
+) -> CommandResult<OverviewDto> {
+    let _mutation = state.mutation.lock().await;
+    state.ensure_idle("delete a remote model")?;
+    let config = state.config()?;
+    ensure_mode(&config, ServiceMode::Remote)?;
+    state
+        .remote
+        .delete_model(
             &config.remote.endpoint,
             config.remote.api_token.as_deref(),
             &model_id,
@@ -736,6 +819,70 @@ pub async fn select_local_model(
             .config
             .lock()
             .map_err(|_| internal_error("desktop config lock poisoned"))? = next;
+        local_overview(&state)
+    }
+    #[cfg(not(feature = "local-runtime"))]
+    {
+        let _ = model_id;
+        unavailable_local()
+    }
+}
+
+#[tauri::command]
+#[specta::specta]
+pub async fn delete_local_model(
+    model_id: String,
+    state: tauri::State<'_, DesktopState>,
+) -> CommandResult<OverviewDto> {
+    let _mutation = state.mutation.lock().await;
+    #[cfg(feature = "local-runtime")]
+    state.ensure_local_runtime_mutable("delete a local model")?;
+    #[cfg(not(feature = "local-runtime"))]
+    state.ensure_idle("delete a local model")?;
+    let config = state.config()?;
+    ensure_mode(&config, ServiceMode::Local)?;
+    #[cfg(feature = "local-runtime")]
+    {
+        let model = resolve_whisper_model(&model_id)
+            .ok_or_else(|| config_error(unknown_model_error(&model_id)))?;
+        let directory = DesktopConfig::models_dir().map_err(config_error)?;
+        let path = directory.join(model.filename);
+        let active_path = if config.model_path.as_os_str().is_empty() {
+            directory.join(default_whisper_model().filename)
+        } else {
+            config.model_path.clone()
+        };
+        if active_path == path {
+            return Err(DesktopError::new(
+                "model_in_use",
+                "select another model before deleting the active model",
+            ));
+        }
+        let download_active = state
+            .local_downloads
+            .lock()
+            .map_err(|_| internal_error("local download lock poisoned"))?
+            .values()
+            .any(|job| {
+                job.model_id == model.id
+                    && matches!(
+                        job.state,
+                        DownloadJobState::Queued | DownloadJobState::Running
+                    )
+            });
+        if download_active {
+            return Err(DesktopError::new(
+                "model_download_active",
+                "stop waiting for the active download before deleting this model",
+            ));
+        }
+        if !path.is_file() {
+            return Err(DesktopError::new(
+                "model_not_installed",
+                format!("local model '{}' is not installed", model.id),
+            ));
+        }
+        tokio::fs::remove_file(&path).await.map_err(local_error)?;
         local_overview(&state)
     }
     #[cfg(not(feature = "local-runtime"))]
@@ -1312,7 +1459,7 @@ fn apply_settings(config: &mut DesktopConfig, input: DesktopSettingsInput) -> Re
             "GPU device must be -1 (automatic) or a non-negative device id"
         ));
     }
-    config.mode = input.mode;
+    let previous_mode = config.mode;
     config.model_path = PathBuf::from(input.model_path.trim());
     config.preload_on_startup = input.preload_on_startup;
     config.whisper_accelerator = input.whisper_accelerator;
@@ -1345,17 +1492,21 @@ fn apply_settings(config: &mut DesktopConfig, input: DesktopSettingsInput) -> Re
         .input_device
         .map(|device| device.trim().to_string())
         .filter(|device| !device.is_empty());
-    config.recording.sample_rate = input.sample_rate;
     config.recording.transcription_mode = input.transcription_mode;
     config.recording.streaming_pcm_format = input.streaming_pcm_format;
-    normalize_mode_scoped_recording(config);
     config.recording.english_only = input.english_only;
+    store_mode_recording(config, previous_mode);
+    config.mode = input.mode;
+    normalize_mode_scoped_recording(config);
     config.output.copy_to_clipboard = input.copy_to_clipboard;
     config.output.paste_method = input.paste_method;
     config.output.paste_delay_ms = input.paste_delay_ms;
+    config.output.prefix = input.output_prefix;
+    config.output.suffix = input.output_suffix;
     config.hotkey.shortcut = input.hotkey_shortcut.trim().to_ascii_lowercase();
     config.hotkey.mode = input.hotkey_mode;
     config.close_to_tray = input.close_to_tray;
+    config.show_window_title_bar = input.show_window_title_bar;
     Ok(())
 }
 
@@ -1555,7 +1706,7 @@ fn local_overview(state: &DesktopState) -> CommandResult<OverviewDto> {
             TranscriptionService::status(state.local.as_ref()).map_err(local_error)?;
         let pool_status = state.local.status();
         service.model_path = resolved_path.to_string_lossy().into_owned();
-        let models = list_whisper_models()
+        let models: Vec<ModelInfoDto> = list_whisper_models()
             .iter()
             .map(|model| ModelInfoDto {
                 id: model.id.to_string(),
@@ -1590,6 +1741,7 @@ fn local_overview(state: &DesktopState) -> CommandResult<OverviewDto> {
                 inference_pool_explicit: Some(config.inference_pool.is_some()),
                 generation,
             },
+            model_storage: Some(model_storage(&directory, &models)),
             models,
         })
     }
@@ -1597,6 +1749,23 @@ fn local_overview(state: &DesktopState) -> CommandResult<OverviewDto> {
     {
         let _ = state;
         unavailable_local()
+    }
+}
+
+#[cfg(feature = "local-runtime")]
+fn model_storage(directory: &std::path::Path, models: &[ModelInfoDto]) -> ModelStorageDto {
+    let total_bytes = std::fs::read_dir(directory)
+        .into_iter()
+        .flatten()
+        .filter_map(|entry| entry.ok())
+        .filter_map(|entry| entry.metadata().ok())
+        .filter(|metadata| metadata.is_file())
+        .map(|metadata| metadata.len())
+        .sum();
+    ModelStorageDto {
+        directory: directory.to_string_lossy().into_owned(),
+        total_bytes,
+        installed_model_count: models.iter().filter(|model| model.installed).count(),
     }
 }
 
@@ -1642,6 +1811,23 @@ fn validate_openrouter_config(config: &DesktopConfig) -> CommandResult<()> {
     Ok(())
 }
 
+fn configured_secret(config: &DesktopConfig, kind: DesktopSecretKind) -> CommandResult<String> {
+    let value = match kind {
+        DesktopSecretKind::RemoteToken => config.remote.api_token.as_deref(),
+        DesktopSecretKind::OpenRouterKey => config.openrouter.api_key.as_deref(),
+    };
+    value
+        .filter(|secret| !secret.trim().is_empty())
+        .map(str::to_owned)
+        .ok_or_else(|| {
+            DesktopError::new(
+                "credential_not_configured",
+                "no saved credential is configured",
+            )
+            .with_action("Enter and verify a credential before revealing or copying it.")
+        })
+}
+
 fn openrouter_key_required() -> DesktopError {
     DesktopError::new(
         "openrouter_key_required",
@@ -1657,12 +1843,22 @@ fn openrouter_error(error: impl std::fmt::Display) -> DesktopError {
 }
 
 fn remote_error(error: anyhow::Error) -> DesktopError {
-    if error
-        .downcast_ref::<crate::remote::RemoteApiError>()
-        .is_some_and(|error| error.code() == "stale_generation")
-    {
-        return DesktopError::new("stale_runtime_generation", error.to_string())
-            .with_action("Refresh the remote runtime overview and retry the change.");
+    if let Some(remote) = error.downcast_ref::<crate::remote::RemoteApiError>() {
+        if remote.code() == "stale_generation" {
+            return DesktopError::new("stale_runtime_generation", error.to_string())
+                .with_action("Refresh the remote runtime overview and retry the change.");
+        }
+        if remote.code() == "model_deletion_unsupported" {
+            return DesktopError::new("remote_model_deletion_unsupported", error.to_string())
+                .with_action(
+                    "Update and restart the Shadoword API daemon before deleting remote models.",
+                );
+        }
+        if remote.code() == "forbidden" {
+            return DesktopError::new("remote_permission_denied", error.to_string()).with_action(
+                "Use an admin token for desktop management; user tokens can only transcribe audio.",
+            );
+        }
     }
     DesktopError::new("remote_request_failed", error.to_string())
         .with_action("Check the endpoint, bearer token, daemon status, and network connection.")

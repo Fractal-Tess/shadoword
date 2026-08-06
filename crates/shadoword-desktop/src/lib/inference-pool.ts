@@ -167,12 +167,12 @@ export function validateInferencePoolCandidate(pool: InferencePoolConfig): PoolV
 
 export function runtimeWithInferencePool(
 	runtime: RuntimeConfigDto,
-	pool: InferencePoolConfig | null
+	pool: InferencePoolConfig
 ): RuntimeConfigDto {
 	return {
 		...runtime,
 		inference_pool: pool,
-		inference_pool_explicit: pool !== null,
+		inference_pool_explicit: true,
 		generation: runtime.generation ?? null
 	};
 }

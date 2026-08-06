@@ -248,6 +248,27 @@ pub enum PasteMethod {
 
 #[derive(Debug, Clone, Copy, Default, Serialize, Deserialize, PartialEq, Eq, Type)]
 #[serde(rename_all = "snake_case")]
+pub enum TranscriptBoundary {
+    #[default]
+    None,
+    Space,
+    Newline,
+    BlankLine,
+}
+
+impl TranscriptBoundary {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::None => "",
+            Self::Space => " ",
+            Self::Newline => "\n",
+            Self::BlankLine => "\n\n",
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, Default, Serialize, Deserialize, PartialEq, Eq, Type)]
+#[serde(rename_all = "snake_case")]
 pub enum TranscriptionMode {
     #[default]
     Batch,
@@ -290,6 +311,8 @@ pub struct OutputConfig {
     pub copy_to_clipboard: bool,
     pub paste_method: PasteMethod,
     pub paste_delay_ms: u64,
+    pub prefix: TranscriptBoundary,
+    pub suffix: TranscriptBoundary,
 }
 
 impl Default for OutputConfig {
@@ -298,6 +321,8 @@ impl Default for OutputConfig {
             copy_to_clipboard: true,
             paste_method: PasteMethod::None,
             paste_delay_ms: 120,
+            prefix: TranscriptBoundary::None,
+            suffix: TranscriptBoundary::Space,
         }
     }
 }
@@ -458,6 +483,23 @@ impl TranscriptionConfig {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ModeRecordingPreferences {
+    pub transcription_mode: TranscriptionMode,
+    pub streaming_pcm_format: StreamingPcmFormat,
+    pub english_only: bool,
+}
+
+impl From<&RecordingConfig> for ModeRecordingPreferences {
+    fn from(recording: &RecordingConfig) -> Self {
+        Self {
+            transcription_mode: recording.transcription_mode,
+            streaming_pcm_format: recording.streaming_pcm_format,
+            english_only: recording.english_only,
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(default)]
 pub struct DesktopConfig {
@@ -466,6 +508,12 @@ pub struct DesktopConfig {
     #[serde(default = "default_preload_on_startup")]
     pub preload_on_startup: bool,
     pub recording: RecordingConfig,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub local_recording: Option<ModeRecordingPreferences>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub remote_recording: Option<ModeRecordingPreferences>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub openrouter_recording: Option<ModeRecordingPreferences>,
     pub output: OutputConfig,
     pub remote: RemoteConfig,
     #[serde(default)]
@@ -474,6 +522,8 @@ pub struct DesktopConfig {
     pub hotkey: HotkeyConfig,
     #[serde(default = "default_close_to_tray")]
     pub close_to_tray: bool,
+    #[serde(default = "default_show_window_title_bar")]
+    pub show_window_title_bar: bool,
     #[serde(default)]
     pub whisper_accelerator: WhisperAccelerator,
     #[serde(default = "default_whisper_gpu_device")]
@@ -489,16 +539,34 @@ impl Default for DesktopConfig {
             model_path: PathBuf::new(),
             preload_on_startup: default_preload_on_startup(),
             recording: RecordingConfig::default(),
+            local_recording: None,
+            remote_recording: None,
+            openrouter_recording: None,
             output: OutputConfig::default(),
             remote: RemoteConfig::default(),
             openrouter: OpenRouterConfig::default(),
             hotkey: HotkeyConfig::default(),
             close_to_tray: default_close_to_tray(),
+            show_window_title_bar: default_show_window_title_bar(),
             whisper_accelerator: WhisperAccelerator::Auto,
             whisper_gpu_device: default_whisper_gpu_device(),
             inference_pool: None,
         }
     }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ApiTokenRole {
+    Admin,
+    User,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ApiTokenConfig {
+    pub name: String,
+    pub role: ApiTokenRole,
+    pub token_hash: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -507,6 +575,7 @@ pub struct ApiConfig {
     pub listen_addr: String,
     pub transcription: TranscriptionConfig,
     pub queue_capacity: usize,
+    pub tokens: Vec<ApiTokenConfig>,
 }
 
 impl Default for ApiConfig {
@@ -515,6 +584,7 @@ impl Default for ApiConfig {
             listen_addr: "127.0.0.1:47813".to_string(),
             transcription: TranscriptionConfig::default(),
             queue_capacity: 4,
+            tokens: Vec::new(),
         }
     }
 }
@@ -549,6 +619,10 @@ fn default_sample_rate() -> u32 {
 }
 
 fn default_close_to_tray() -> bool {
+    true
+}
+
+fn default_show_window_title_bar() -> bool {
     true
 }
 

@@ -1,4 +1,4 @@
-use crate::auth::{require_auth, AuthConfig};
+use crate::auth::{require_admin, require_transcription, AuthConfig};
 use crate::downloads::DownloadJobs;
 use crate::error::{ApiError, ApiResult};
 use crate::request_recording::RequestRecorder;
@@ -6,19 +6,20 @@ use crate::stream;
 use axum::body::Bytes;
 use axum::extract::ws::WebSocketUpgrade;
 use axum::extract::{DefaultBodyLimit, Path, State};
+use axum::http::StatusCode;
 use axum::middleware::from_fn_with_state;
 use axum::response::Response;
-use axum::routing::{get, post};
+use axum::routing::{delete, get, post};
 use axum::{Json, Router};
 use serde::Serialize;
 use shadoword_core::remote_contracts::{
-    DaemonStatusDto, DownloadJobStatus, HealthDto, ModelInfoDto, OverviewDto, RuntimeConfigDto,
-    StartDownloadRequest,
+    DaemonStatusDto, DownloadJobStatus, HealthDto, ModelInfoDto, ModelStorageDto, OverviewDto,
+    RuntimeConfigDto, StartDownloadRequest,
 };
 use shadoword_core::{
     default_whisper_model, list_whisper_gpu_devices, list_whisper_models, resolve_whisper_model,
-    unknown_model_error, wav, ApiConfig, InferenceJob, InferenceRuntime, TranscriptResponse,
-    TranscriptionConfig, TranscriptionService,
+    unknown_model_error, wav, ApiConfig, ApiTokenConfig, InferenceJob, InferenceRuntime,
+    TranscriptResponse, TranscriptionConfig, TranscriptionService,
 };
 use std::net::SocketAddr;
 use std::path::PathBuf;
@@ -38,6 +39,7 @@ pub struct AppState {
     pub download_dir: PathBuf,
     pub listen_addr: SocketAddr,
     pub queue_capacity: usize,
+    pub tokens: Arc<[ApiTokenConfig]>,
     pub config_update_lock: Arc<tokio::sync::Mutex<()>>,
 }
 
@@ -116,30 +118,37 @@ struct DocsLimits {
 }
 
 pub fn build_router(state: AppState, config: RouterConfig) -> Router {
-    let protected = Router::new()
+    let admin = Router::new()
         .route("/", get(docs))
         .route("/docs", get(docs))
         .route("/v1/status", get(status))
         .route("/v1/overview", get(overview))
         .route("/v1/config", get(get_config).put(update_config))
-        .route("/v1/transcribe-wav", post(transcribe_wav))
-        .route("/v1/stream", get(stream_socket))
         .route("/v1/models", get(list_models))
+        .route("/v1/models/{id}", delete(delete_model))
         .route("/v1/models/{id}/select", post(select_model))
         .route("/v1/downloads", post(start_download))
         .route("/v1/downloads/{id}", get(download_status))
+        .with_state(state.clone());
+    let transcription = Router::new()
+        .route("/v1/transcribe-wav", post(transcribe_wav))
+        .route("/v1/stream", get(stream_socket))
         .layer(DefaultBodyLimit::max(MAX_RAW_WAV_BYTES))
         .with_state(state.clone());
 
-    let protected = if config.auth.is_configured() {
-        protected.layer(from_fn_with_state(config.auth, require_auth))
+    let (admin, transcription) = if config.auth.is_configured() {
+        (
+            admin.layer(from_fn_with_state(config.auth.clone(), require_admin)),
+            transcription.layer(from_fn_with_state(config.auth, require_transcription)),
+        )
     } else {
-        protected
+        (admin, transcription)
     };
 
     Router::new()
         .route("/health", get(health))
-        .merge(protected)
+        .merge(admin)
+        .merge(transcription)
         .with_state(state)
 }
 
@@ -221,52 +230,57 @@ async fn docs() -> Json<DaemonDocs> {
             DocEndpoint {
                 method: "GET",
                 path: "/v1/status",
-                description: "Authenticated daemon and inference-pool status, including generation, units, queued/running work, bytes, and counters.",
+                description: "Admin-only daemon and inference-pool status, including generation, units, queued/running work, bytes, and counters.",
             },
             DocEndpoint {
                 method: "GET",
                 path: "/v1/overview",
-                description: "Authenticated combined runtime, status, and model catalog snapshot.",
+                description: "Admin-only combined runtime, status, and model catalog snapshot.",
             },
             DocEndpoint {
                 method: "GET",
                 path: "/v1/config",
-                description: "Authenticated runtime config with effective inference_pool and generation. Units preload eagerly only when preload_on_startup is true; otherwise they load on first dispatch.",
+                description: "Admin-only runtime config with effective inference_pool and generation. Units preload eagerly only when preload_on_startup is true; otherwise they load on first dispatch.",
             },
             DocEndpoint {
                 method: "PUT",
                 path: "/v1/config",
-                description: "Authenticated atomic runtime update. Accepts inference_pool and an optional generation revision; eager candidates prepare before commit and lazy candidates activate unloaded.",
+                description: "Admin-only atomic runtime update. Accepts inference_pool and an optional generation revision; eager candidates prepare before commit and lazy candidates activate unloaded.",
             },
             DocEndpoint {
                 method: "POST",
                 path: "/v1/transcribe-wav",
-                description: "Authenticated raw WAV batch transcription.",
+                description: "Raw WAV batch transcription for admin or user tokens.",
             },
             DocEndpoint {
                 method: "GET",
                 path: "/v1/stream",
-                description: "Authenticated WebSocket stream. Protocol v1 remains lockstep; v2 negotiates indexed concurrent Opus segments. For v3, Start includes protocol_version=3, audio_format=pcm_f32le or pcm_s16le, sample_rate, and channels=1; binary messages contain little-endian mono PCM and the server performs VAD, segmentation, bounded scheduling, and ordered partial delivery.",
+                description: "WebSocket transcription for admin or user tokens. Protocol v1 remains lockstep; v2 negotiates indexed concurrent Opus segments. For v3, Start includes protocol_version=3, audio_format=pcm_f32le or pcm_s16le, sample_rate, and channels=1; binary messages contain little-endian mono PCM and the server performs VAD, segmentation, bounded scheduling, and ordered partial delivery.",
             },
             DocEndpoint {
                 method: "GET",
                 path: "/v1/models",
-                description: "Authenticated catalog and installation status.",
+                description: "Admin-only catalog and installation status.",
+            },
+            DocEndpoint {
+                method: "DELETE",
+                path: "/v1/models/{id}",
+                description: "Admin-only deletion of an installed, inactive catalog model.",
             },
             DocEndpoint {
                 method: "POST",
                 path: "/v1/models/{id}/select",
-                description: "Authenticated selection of an installed catalog model.",
+                description: "Admin-only selection of an installed catalog model.",
             },
             DocEndpoint {
                 method: "POST",
                 path: "/v1/downloads",
-                description: "Authenticated async catalog model download job.",
+                description: "Admin-only async catalog model download job.",
             },
             DocEndpoint {
                 method: "GET",
                 path: "/v1/downloads/{id}",
-                description: "Authenticated model download job status.",
+                description: "Admin-only model download job status.",
             },
         ],
         env: vec![
@@ -279,16 +293,6 @@ async fn docs() -> Json<DaemonDocs> {
                 name: "SHADOWORD_LISTEN_ADDR",
                 description: "API bind address. Non-loopback binds require bearer auth.",
                 example: "0.0.0.0:47813",
-            },
-            DocEnvVar {
-                name: "SHADOWORD_API_TOKEN",
-                description: "Bearer token value. Never returned by the API.",
-                example: "<secret>",
-            },
-            DocEnvVar {
-                name: "SHADOWORD_API_TOKEN_FILE",
-                description: "Path to a mode-0600 bearer token file.",
-                example: "/run/secrets/shadoword-api-token",
             },
             DocEnvVar {
                 name: "SHADOWORD_MODEL_PATH",
@@ -361,6 +365,8 @@ async fn overview(State(state): State<AppState>) -> ApiResult<Json<OverviewDto>>
         &state.runtime.transcription_config(),
         state.runtime.generation(),
     );
+    let models = model_info(&state);
+    let model_storage = Some(model_storage(&state.download_dir, &models));
     Ok(Json(OverviewDto {
         status: DaemonStatusDto {
             service: status,
@@ -368,7 +374,8 @@ async fn overview(State(state): State<AppState>) -> ApiResult<Json<OverviewDto>>
             queue_capacity: state.queue_capacity,
         },
         runtime,
-        models: model_info(&state),
+        models,
+        model_storage,
     }))
 }
 
@@ -425,6 +432,7 @@ async fn update_config(
     let config_path = state.config_path.clone();
     let listen_addr = state.listen_addr;
     let queue_capacity = state.queue_capacity;
+    let tokens = state.tokens.to_vec();
 
     tokio::task::spawn_blocking(move || {
         runtime.reload_transactional(Some(generation), next, move || {
@@ -432,6 +440,7 @@ async fn update_config(
                 listen_addr: listen_addr.to_string(),
                 transcription: saved,
                 queue_capacity,
+                tokens,
             }
             .save_to_path(&config_path)
         })
@@ -525,6 +534,52 @@ async fn list_models(State(state): State<AppState>) -> Json<Vec<ModelInfoDto>> {
     Json(model_info(&state))
 }
 
+async fn delete_model(
+    State(state): State<AppState>,
+    Path(id): Path<String>,
+) -> ApiResult<StatusCode> {
+    let _update = state.config_update_lock.lock().await;
+    let model = resolve_whisper_model(&id)
+        .ok_or_else(|| ApiError::bad_request(unknown_model_error(&id).to_string()))?;
+    let path = state.download_dir.join(model.filename);
+    if state.runtime.transcription_config().model_path == path {
+        return Err(ApiError::conflict(
+            "select another model before deleting the active model",
+        ));
+    }
+    if state.downloads.is_active(model.id) {
+        return Err(ApiError::conflict(
+            "wait for the active model download before deleting it",
+        ));
+    }
+    if !path.is_file() {
+        return Err(ApiError::not_found(format!(
+            "model '{}' is not installed",
+            model.id
+        )));
+    }
+    tokio::fs::remove_file(&path)
+        .await
+        .map_err(|error| ApiError::internal(error.into()))?;
+    Ok(StatusCode::NO_CONTENT)
+}
+
+fn model_storage(directory: &std::path::Path, models: &[ModelInfoDto]) -> ModelStorageDto {
+    let total_bytes = std::fs::read_dir(directory)
+        .into_iter()
+        .flatten()
+        .filter_map(|entry| entry.ok())
+        .filter_map(|entry| entry.metadata().ok())
+        .filter(|metadata| metadata.is_file())
+        .map(|metadata| metadata.len())
+        .sum();
+    ModelStorageDto {
+        directory: directory.to_string_lossy().into_owned(),
+        total_bytes,
+        installed_model_count: models.iter().filter(|model| model.installed).count(),
+    }
+}
+
 fn model_info(state: &AppState) -> Vec<ModelInfoDto> {
     list_whisper_models()
         .iter()
@@ -563,6 +618,7 @@ async fn select_model(
     let config_path = state.config_path.clone();
     let listen_addr = state.listen_addr;
     let queue_capacity = state.queue_capacity;
+    let tokens = state.tokens.to_vec();
 
     tokio::task::spawn_blocking(move || {
         runtime.reload_transactional(Some(generation), next, move || {
@@ -570,6 +626,7 @@ async fn select_model(
                 listen_addr: listen_addr.to_string(),
                 transcription: saved,
                 queue_capacity,
+                tokens,
             }
             .save_to_path(&config_path)
         })
@@ -588,6 +645,7 @@ async fn start_download(
     State(state): State<AppState>,
     Json(request): Json<StartDownloadRequest>,
 ) -> ApiResult<Json<DownloadJobStatus>> {
+    let _update = state.config_update_lock.lock().await;
     state
         .downloads
         .start(request.model_id, state.download_dir)

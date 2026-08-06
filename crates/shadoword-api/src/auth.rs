@@ -4,53 +4,96 @@ use axum::extract::{Request, State};
 use axum::http::header;
 use axum::middleware::Next;
 use axum::response::{IntoResponse, Response};
+use base64::engine::general_purpose::URL_SAFE_NO_PAD;
+use base64::Engine;
+use sha2::{Digest, Sha256};
+use shadoword_core::{ApiTokenConfig, ApiTokenRole};
 use std::net::SocketAddr;
-use std::path::Path;
 use std::sync::Arc;
+
+const TOKEN_BYTES: usize = 32;
+const TOKEN_HASH_PREFIX: &str = "sha256:";
+
+#[derive(Clone, Debug)]
+struct StoredToken {
+    role: ApiTokenRole,
+    digest: [u8; 32],
+}
 
 #[derive(Clone, Debug, Default)]
 pub struct AuthConfig {
-    token: Option<Arc<str>>,
+    tokens: Arc<[StoredToken]>,
 }
 
 impl AuthConfig {
-    pub fn new(token: Option<String>) -> Self {
-        Self {
-            token: token.map(Arc::from),
+    pub fn new(configured: &[ApiTokenConfig]) -> Result<Self> {
+        let mut tokens = Vec::with_capacity(configured.len());
+        for token in configured {
+            tokens.push(StoredToken {
+                role: token.role,
+                digest: parse_token_hash(&token.token_hash).with_context(|| {
+                    format!("invalid stored hash for API token {:?}", token.name)
+                })?,
+            });
         }
+        Ok(Self {
+            tokens: Arc::from(tokens),
+        })
     }
 
     pub fn is_configured(&self) -> bool {
-        self.token.is_some()
+        !self.tokens.is_empty()
     }
 
-    fn accepts(&self, candidate: &str) -> bool {
-        self.token
-            .as_deref()
-            .is_some_and(|expected| constant_time_eq(expected.as_bytes(), candidate.as_bytes()))
+    fn authenticate(&self, candidate: &str) -> Option<ApiTokenRole> {
+        let candidate = token_digest(candidate);
+        let mut admin = false;
+        let mut user = false;
+        for token in self.tokens.iter() {
+            let matched = constant_time_eq(&token.digest, &candidate);
+            admin |= matched && token.role == ApiTokenRole::Admin;
+            user |= matched && token.role == ApiTokenRole::User;
+        }
+        if admin {
+            Some(ApiTokenRole::Admin)
+        } else if user {
+            Some(ApiTokenRole::User)
+        } else {
+            None
+        }
     }
 }
 
-pub fn load_token(token_file: Option<&Path>) -> Result<Option<String>> {
-    if let Ok(token) = std::env::var("SHADOWORD_API_TOKEN") {
-        let token = token.trim();
-        if !token.is_empty() {
-            return Ok(Some(token.to_string()));
-        }
+pub fn generate_token(role: ApiTokenRole, name: &str) -> Result<(String, ApiTokenConfig)> {
+    let name = name.trim();
+    if name.is_empty() {
+        return Err(anyhow!("token name cannot be empty"));
+    }
+    if name.len() > 64 || name.chars().any(char::is_control) {
+        return Err(anyhow!(
+            "token name must be at most 64 characters and contain no control characters"
+        ));
     }
 
-    let Some(token_file) = token_file else {
-        return Ok(None);
+    let mut random = [0_u8; TOKEN_BYTES];
+    getrandom::fill(&mut random).context("failed to obtain secure randomness for API token")?;
+    let role_name = match role {
+        ApiTokenRole::Admin => "admin",
+        ApiTokenRole::User => "user",
     };
-
-    require_private_file_mode(token_file)?;
-    let token = std::fs::read_to_string(token_file)
-        .with_context(|| format!("failed to read token file {}", token_file.display()))?;
-    let token = token.trim();
-    if token.is_empty() {
-        return Err(anyhow!("token file is empty"));
-    }
-    Ok(Some(token.to_string()))
+    let value = format!("swd_{role_name}_{}", URL_SAFE_NO_PAD.encode(random));
+    let token_hash = format!(
+        "{TOKEN_HASH_PREFIX}{}",
+        URL_SAFE_NO_PAD.encode(token_digest(&value))
+    );
+    Ok((
+        value,
+        ApiTokenConfig {
+            name: name.to_string(),
+            role,
+            token_hash,
+        },
+    ))
 }
 
 pub fn enforce_bind_auth(addr: &SocketAddr, auth: &AuthConfig) -> Result<()> {
@@ -58,32 +101,58 @@ pub fn enforce_bind_auth(addr: &SocketAddr, auth: &AuthConfig) -> Result<()> {
         Ok(())
     } else {
         Err(anyhow!(
-            "SHADOWORD_API_TOKEN or a mode-0600 token file is required for non-loopback binds"
+            "an API admin or user token is required for non-loopback binds"
         ))
     }
 }
 
-pub async fn require_auth(
+pub async fn require_admin(
     State(auth): State<AuthConfig>,
     request: Request,
     next: Next,
 ) -> Response {
-    if !auth.is_configured() {
-        return next.run(request).await;
+    match request_role(&auth, &request) {
+        Some(ApiTokenRole::Admin) => next.run(request).await,
+        Some(ApiTokenRole::User) => ApiError::forbidden().into_response(),
+        None => ApiError::unauthorized().into_response(),
     }
+}
 
-    let authorized = request
-        .headers()
-        .get(header::AUTHORIZATION)
-        .and_then(|value| value.to_str().ok())
-        .and_then(|value| value.strip_prefix("Bearer "))
-        .is_some_and(|token| auth.accepts(token));
-
-    if authorized {
+pub async fn require_transcription(
+    State(auth): State<AuthConfig>,
+    request: Request,
+    next: Next,
+) -> Response {
+    if request_role(&auth, &request).is_some() {
         next.run(request).await
     } else {
         ApiError::unauthorized().into_response()
     }
+}
+
+fn request_role(auth: &AuthConfig, request: &Request) -> Option<ApiTokenRole> {
+    request
+        .headers()
+        .get(header::AUTHORIZATION)
+        .and_then(|value| value.to_str().ok())
+        .and_then(|value| value.strip_prefix("Bearer "))
+        .and_then(|token| auth.authenticate(token))
+}
+
+fn token_digest(token: &str) -> [u8; 32] {
+    Sha256::digest(token.as_bytes()).into()
+}
+
+fn parse_token_hash(value: &str) -> Result<[u8; 32]> {
+    let encoded = value
+        .strip_prefix(TOKEN_HASH_PREFIX)
+        .ok_or_else(|| anyhow!("token hash must use sha256"))?;
+    let decoded = URL_SAFE_NO_PAD
+        .decode(encoded)
+        .context("token hash is not valid base64url")?;
+    decoded
+        .try_into()
+        .map_err(|_| anyhow!("token hash must contain 32 bytes"))
 }
 
 fn constant_time_eq(left: &[u8], right: &[u8]) -> bool {
@@ -95,27 +164,4 @@ fn constant_time_eq(left: &[u8], right: &[u8]) -> bool {
         diff |= usize::from(left ^ right);
     }
     diff == 0
-}
-
-#[cfg(unix)]
-fn require_private_file_mode(path: &Path) -> Result<()> {
-    use std::os::unix::fs::PermissionsExt;
-
-    let metadata = std::fs::metadata(path)
-        .with_context(|| format!("failed to inspect token file {}", path.display()))?;
-    let mode = metadata.permissions().mode() & 0o777;
-    if mode == 0o600 {
-        Ok(())
-    } else {
-        Err(anyhow!("token file must be mode 0600"))
-    }
-}
-
-#[cfg(not(unix))]
-fn require_private_file_mode(path: &Path) -> Result<()> {
-    if path.is_file() {
-        Ok(())
-    } else {
-        Err(anyhow!("token file does not exist"))
-    }
 }

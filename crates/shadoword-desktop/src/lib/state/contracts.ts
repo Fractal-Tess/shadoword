@@ -22,8 +22,10 @@ export type CaptureState = 'idle' | 'recording' | 'finalizing' | 'error';
 export type PoolValidationState = 'idle' | 'validating' | 'valid' | 'invalid';
 export type PoolApplyState = 'idle' | 'applying' | 'applied' | 'failed' | 'stale';
 export type OpenRouterModelsState = 'idle' | 'loading' | 'ready' | 'failed';
+export type OpenRouterCredentialState = 'missing' | 'checking' | 'verified' | 'invalid';
+export type NotificationVariant = 'success' | 'error' | 'progress';
 
-export interface DesktopStateContext {
+export type DesktopStateContext = {
 	readonly demo: boolean;
 	activity: ActivityState;
 	settings: DesktopSettings | null;
@@ -38,7 +40,7 @@ export interface DesktopStateContext {
 	openRouterModelsState: OpenRouterModelsState;
 	openRouterModelsError: string | null;
 	openRouterKeyReport: OpenRouterKeyReport | null;
-	openRouterKeyMessage: string | null;
+	openRouterCredentialState: OpenRouterCredentialState;
 	hotkeyError: string | null;
 	statusMessage: string;
 	captureState: CaptureState;
@@ -54,10 +56,10 @@ export interface DesktopStateContext {
 	poolApplyState: PoolApplyState;
 	poolFieldErrors: PoolFieldErrors;
 	poolFeedback: string | null;
-	validatedPool: InferencePoolConfig | null;
 	readonly recording: boolean;
 	readonly processing: boolean;
 	readonly captureLocked: boolean;
+	readonly openRouterReady: boolean;
 	readonly drainingPool: boolean;
 	readonly poolMutationLocked: boolean;
 	readonly segmentCount: number;
@@ -66,6 +68,7 @@ export interface DesktopStateContext {
 	dispose(): void;
 	clearError(): void;
 	retryError(): Promise<void>;
+	notify(title: string, detail: string, variant?: NotificationVariant): void;
 	refreshOverview(): Promise<void>;
 	testConnection(input: ConnectionInput): Promise<void>;
 	refreshOpenRouterModels(): Promise<void>;
@@ -76,13 +79,14 @@ export interface DesktopStateContext {
 	updateRuntime(runtime: RuntimeConfigDto): Promise<void>;
 	clearPoolDraftFeedback(): void;
 	validateInferencePoolDraft(pool: InferencePoolConfig): Promise<InferencePoolConfig>;
-	applyInferencePoolDraft(pool: InferencePoolConfig | null): Promise<OverviewDto | null>;
+	applyInferencePoolDraft(pool: InferencePoolConfig): Promise<OverviewDto | null>;
 	preloadLocalModel(): Promise<void>;
 	selectModel(modelId: string): Promise<void>;
+	deleteModel(modelId: string): Promise<void>;
 	startDownload(modelId: string): Promise<void>;
 	stopWatchingDownload(modelId: string): void;
 	startRecording(): Promise<void>;
 	stopRecording(): Promise<void>;
 	cancelRecording(): Promise<void>;
 	clearHistory(): void;
-}
+};

@@ -139,11 +139,12 @@ cargo run -p shadoword-api --features whisper-vulkan
 docker build -t shadoword-backend .
 ```
 
-Run the CPU API image:
+Run the CPU API image after generating an admin token in the mounted API config:
 
 ```bash
+shadoword-api --config "$PWD/docker/config/api.json" token generate admin "docker admin"
 docker run --rm -p 47813:47813 \
-  -e SHADOWORD_API_TOKEN="$(cat ./api-token)" \
+  -e SHADOWORD_API_CONFIG=/config/api.json \
   -v $PWD/docker/config:/config \
   -v $HOME/.local/share/shadoword/models:/data/shadoword/models \
   shadoword-backend
@@ -160,10 +161,27 @@ cargo run -p shadoword-api -- \
   --download-model turbo
 ```
 
-Non-loopback binds require bearer auth from `SHADOWORD_API_TOKEN` or
-`--token-file`/`SHADOWORD_API_TOKEN_FILE`. Token files must be mode `0600`.
-`GET /health` is public. All other endpoints are protected whenever auth is
-configured.
+Non-loopback binds require at least one named bearer token in the API config.
+Token secrets are generated locally and printed once; only SHA-256 hashes are
+persisted:
+
+```bash
+shadoword-api token generate admin "desktop administrator"
+shadoword-api token generate user "transcription client"
+shadoword-api token list
+shadoword-api token revoke "transcription client"
+```
+
+For a NixOS service whose settings are owned by the `shadoword` user:
+
+```bash
+sudo -u shadoword env XDG_CONFIG_HOME=/var/lib/shadoword/config \
+  shadoword-api token generate admin "desktop administrator"
+```
+
+Admin tokens can use every API endpoint. User tokens can only submit batch or
+streaming transcription requests. `GET /health` remains public. Restart the
+daemon after generating or revoking a token so it reloads the token registry.
 
 For opt-in debugging, the daemon can archive every accepted batch request and
 every committed WebSocket segment as a WAV file with JSON response metadata:
@@ -178,18 +196,10 @@ private and apply an appropriate retention policy.
 
 Daemon endpoints:
 
-- `GET /health`
-- `GET /docs`
-- `GET /v1/status`
-- `GET /v1/overview`
-- `GET /v1/config`
-- `PUT /v1/config`
-- `POST /v1/transcribe-wav`
-- `GET /v1/stream`
-- `GET /v1/models`
-- `POST /v1/models/{id}/select`
-- `POST /v1/downloads`
-- `GET /v1/downloads/{id}`
+- Public: `GET /health`
+- Admin: `GET /docs`, `GET /v1/status`, `GET /v1/overview`, `GET /v1/config`,
+  `PUT /v1/config`, model selection/deletion, and model downloads
+- Admin or user: `POST /v1/transcribe-wav`, `GET /v1/stream`
 
 `POST /v1/transcribe-wav` accepts a raw WAV request body capped at 64 MiB.
 The legacy base64 transcription and remote-device endpoints are not part of the API. Runtime configuration uses the restricted daemon DTO described below.
@@ -215,7 +225,7 @@ Runtime config is intentionally restricted to daemon-safe fields:
 Model downloads are explicit catalog jobs only:
 
 ```bash
-curl -H "Authorization: Bearer $SHADOWORD_API_TOKEN" \
+curl -H "Authorization: Bearer $SHADOWORD_ADMIN_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"model_id":"turbo"}' \
   http://127.0.0.1:47813/v1/downloads

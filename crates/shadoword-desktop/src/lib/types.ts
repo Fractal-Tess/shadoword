@@ -9,11 +9,9 @@ export type PageId =
 	| 'application'
 	| 'about';
 
-export type RuntimeMode = 'local' | 'remote' | 'open_router';
-
 export type RuntimeState = 'ready' | 'loading' | 'offline' | 'warning';
 
-export interface ModelRecord {
+export type ModelRecord = {
 	id: string;
 	name: string;
 	description: string;
@@ -21,9 +19,9 @@ export interface ModelRecord {
 	installed: boolean;
 	selected: boolean;
 	recommended?: boolean;
-}
+};
 
-export interface HistoryRecord {
+export type HistoryRecord = {
 	id: string;
 	timestamp: string;
 	engine: string;
@@ -32,4 +30,4 @@ export interface HistoryRecord {
 	text: string;
 	segments: number;
 	costUsd?: number;
-}
+};

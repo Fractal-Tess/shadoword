@@ -48,19 +48,31 @@ pub fn apply_output(config: &OutputConfig, text: &str) -> Result<()> {
         config.paste_method,
         current_environment(),
     );
-    apply_plan(&plan, config, text)
+    let text = format_transcript(config, text);
+    apply_plan(&plan, config, &text)
 }
 
 pub fn apply_streaming_segment_output(config: &OutputConfig, text: &str) -> Result<()> {
     let plan = plan_output(false, config.paste_method, current_environment());
-    apply_plan(&plan, config, text)
+    let text = format_transcript(config, text);
+    apply_plan(&plan, config, &text)
 }
 
 pub fn apply_final_clipboard(config: &OutputConfig, text: &str) -> Result<()> {
     if config.copy_to_clipboard {
-        write_clipboard(text)?;
+        write_clipboard(&format_transcript(config, text))?;
     }
     Ok(())
+}
+
+fn format_transcript(config: &OutputConfig, text: &str) -> String {
+    let prefix = config.prefix.as_str();
+    let suffix = config.suffix.as_str();
+    let mut formatted = String::with_capacity(prefix.len() + text.len() + suffix.len());
+    formatted.push_str(prefix);
+    formatted.push_str(text);
+    formatted.push_str(suffix);
+    formatted
 }
 
 fn current_environment() -> OutputEnvironment {

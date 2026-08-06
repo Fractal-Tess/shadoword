@@ -16,11 +16,14 @@ import type {
 import type { TranscriptSegments } from '$lib/desktop-events';
 import type { PoolFieldErrors } from '$lib/inference-pool';
 import type { HistoryRecord } from '$lib/types';
+import { toast } from 'svelte-sonner';
 import { CaptureOperations } from '$lib/state/capture-operations';
 import type {
 	ActivityState,
 	CaptureState,
 	DesktopStateContext,
+	NotificationVariant,
+	OpenRouterCredentialState,
 	OpenRouterModelsState,
 	PoolApplyState,
 	PoolValidationState
@@ -37,7 +40,6 @@ export type {
 	PoolApplyState,
 	PoolValidationState
 } from '$lib/state/contracts';
-export { settingsInput } from '$lib/state/settings-input';
 
 export class DesktopAppState implements DesktopStateContext {
 	readonly demo: boolean;
@@ -54,7 +56,7 @@ export class DesktopAppState implements DesktopStateContext {
 	openRouterModelsState = $state<OpenRouterModelsState>('idle');
 	openRouterModelsError = $state<string | null>(null);
 	openRouterKeyReport = $state.raw<OpenRouterKeyReport | null>(null);
-	openRouterKeyMessage = $state<string | null>(null);
+	openRouterCredentialState = $state<OpenRouterCredentialState>('missing');
 	hotkeyError = $state<string | null>(null);
 	statusMessage = $state('Starting native desktop…');
 	captureState = $state<CaptureState>('idle');
@@ -70,8 +72,6 @@ export class DesktopAppState implements DesktopStateContext {
 	poolApplyState = $state<PoolApplyState>('idle');
 	poolFieldErrors = $state.raw<PoolFieldErrors>({});
 	poolFeedback = $state<string | null>(null);
-	validatedPool = $state.raw<InferencePoolConfig | null>(null);
-
 	private captureOperations: CaptureOperations;
 	private downloadOperations: DownloadOperations;
 	private lifecycleOperations: LifecycleOperations;
@@ -84,8 +84,10 @@ export class DesktopAppState implements DesktopStateContext {
 		this.captureOperations = new CaptureOperations(this);
 		this.downloadOperations = new DownloadOperations(this);
 		this.providerOperations = new ProviderOperations(this);
-		this.runtimeOperations = new RuntimeOperations(this, () =>
-			this.downloadOperations.resetModeScopedState()
+		this.runtimeOperations = new RuntimeOperations(
+			this,
+			() => this.downloadOperations.resetModeScopedState(),
+			() => this.providerOperations.invalidateRefresh()
 		);
 		this.poolOperations = new PoolOperations(this);
 		this.lifecycleOperations = new LifecycleOperations(
@@ -105,6 +107,13 @@ export class DesktopAppState implements DesktopStateContext {
 
 	get captureLocked() {
 		return this.captureState === 'recording' || this.captureState === 'finalizing';
+	}
+
+	get openRouterReady() {
+		return (
+			(this.settings?.openrouter_key_configured ?? false) &&
+			this.openRouterCredentialState === 'verified'
+		);
 	}
 
 	get drainingPool() {
@@ -130,6 +139,8 @@ export class DesktopAppState implements DesktopStateContext {
 	}
 
 	dispose() {
+		toast.dismiss();
+		this.providerOperations.invalidateRefresh();
 		this.lifecycleOperations.dispose();
 	}
 
@@ -142,6 +153,13 @@ export class DesktopAppState implements DesktopStateContext {
 	async retryError() {
 		if (this.errorRetry === 'overview') await this.refreshOverview();
 		else this.clearError();
+	}
+
+	notify(title: string, detail: string, variant: NotificationVariant = 'success') {
+		const options = { description: detail, duration: 4200, important: variant === 'error' };
+		if (variant === 'error') toast.error(title, options);
+		else if (variant === 'progress') toast.loading(title, options);
+		else toast.success(title, options);
 	}
 
 	refreshOverview() {
@@ -184,7 +202,7 @@ export class DesktopAppState implements DesktopStateContext {
 		return this.poolOperations.validateDraft(pool);
 	}
 
-	applyInferencePoolDraft(pool: InferencePoolConfig | null) {
+	applyInferencePoolDraft(pool: InferencePoolConfig) {
 		return this.poolOperations.applyDraft(pool);
 	}
 
@@ -194,6 +212,10 @@ export class DesktopAppState implements DesktopStateContext {
 
 	selectModel(modelId: string) {
 		return this.runtimeOperations.selectModel(modelId);
+	}
+
+	deleteModel(modelId: string) {
+		return this.runtimeOperations.deleteModel(modelId);
 	}
 
 	startDownload(modelId: string) {

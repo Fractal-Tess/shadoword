@@ -98,6 +98,21 @@ impl DownloadJobs {
         Ok(status)
     }
 
+    pub fn is_active(&self, model_id: &str) -> bool {
+        self.inner
+            .jobs
+            .lock()
+            .expect("download jobs lock poisoned")
+            .values()
+            .any(|status| {
+                status.model_id == model_id
+                    && matches!(
+                        status.state,
+                        DownloadJobState::Queued | DownloadJobState::Running
+                    )
+            })
+    }
+
     pub fn get(&self, id: &str) -> ApiResult<DownloadJobStatus> {
         self.inner
             .jobs

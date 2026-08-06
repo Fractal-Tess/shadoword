@@ -11,13 +11,13 @@ Normal startup loads native state. The old design fixtures are only enabled expl
 Implemented operations:
 
 - local model status, preload/reload, accelerator/GPU selection, verified downloads, custom paths, and batch or VAD-segmented streaming inference;
-- authenticated remote status, runtime configuration, catalog selection, model download polling, batch WAV transcription, and 48 kHz Opus WebSocket streaming;
+- admin-authenticated remote status, runtime configuration, catalog selection/deletion, model download polling, batch WAV transcription, and streaming;
 - direct batch-only OpenRouter transcription with native key validation and dynamic model discovery;
 - native microphone enumeration and capture shared by UI controls and push-to-talk/toggle global shortcuts;
-- tray show/hide/quit, close-to-tray, clipboard copy, direct typing, and configurable paste shortcuts;
+- tray show/hide/quit, close-to-tray, clipboard copy, direct typing, configurable paste shortcuts, and transcript prefix/suffix spacing;
 - private endpoint/token and desktop preference persistence plus in-memory session history.
 
-The Shadoword API has no server-side download cancellation, custom-model, or model-delete endpoint. “Stop watching” stops client polling without claiming to cancel the server job; custom paths remain local-only.
+The full desktop management connection requires an admin token. User tokens are restricted to batch and streaming transcription clients. The API has no server-side download cancellation or custom-model endpoint; “Stop watching” stops client polling without claiming to cancel the server job, and custom paths remain local-only.
 
 ## Generated contracts
 

@@ -15,14 +15,12 @@ export class PoolOperations {
 		this.app.poolApplyState = 'idle';
 		this.app.poolFieldErrors = {};
 		this.app.poolFeedback = null;
-		this.app.validatedPool = null;
 	}
 
 	async validateDraft(pool: InferencePoolConfig) {
 		if (this.app.captureLocked) throw new Error('Finish the active recording before validation.');
 		const local = validateInferencePoolCandidate(pool);
 		this.app.poolFieldErrors = local.fieldErrors;
-		this.app.validatedPool = null;
 		if (local.globalError) {
 			this.app.poolValidationState = 'invalid';
 			this.app.poolFeedback = local.globalError;
@@ -37,7 +35,6 @@ export class PoolOperations {
 				this.app.demo || this.app.settings?.mode === 'remote'
 					? local.pool
 					: await commands.validateLocalInferencePool(local.pool);
-			this.app.validatedPool = effective;
 			this.app.poolValidationState = 'valid';
 			this.app.poolFeedback =
 				this.app.settings?.mode === 'local'
@@ -51,7 +48,7 @@ export class PoolOperations {
 		}
 	}
 
-	async applyDraft(pool: InferencePoolConfig | null) {
+	async applyDraft(pool: InferencePoolConfig) {
 		if (this.app.poolMutationLocked)
 			throw new Error(
 				this.app.drainingPool
@@ -64,7 +61,7 @@ export class PoolOperations {
 		this.app.poolApplyState = 'applying';
 		this.app.poolFeedback = 'Validating, loading units, and preparing the next generation…';
 		try {
-			const effective = pool === null ? null : await this.validateDraft(pool);
+			const effective = await this.validateDraft(pool);
 			this.app.poolApplyState = 'applying';
 			await this.app.updateRuntime(runtimeWithInferencePool(runtime, effective));
 			this.app.poolApplyState = 'applied';

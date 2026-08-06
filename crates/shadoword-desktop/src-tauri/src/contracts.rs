@@ -1,8 +1,8 @@
 use serde::{Deserialize, Serialize};
 use shadoword_core::remote_contracts::{OverviewDto, RuntimeConfigDto};
 use shadoword_core::{
-    HotkeyMode, InputDeviceInfo, PasteMethod, ServiceMode, StreamingPcmFormat, TranscriptionMode,
-    WhisperAccelerator,
+    HotkeyMode, InputDeviceInfo, PasteMethod, ServiceMode, StreamingPcmFormat, TranscriptBoundary,
+    TranscriptionMode, WhisperAccelerator,
 };
 use specta::Type;
 
@@ -26,9 +26,12 @@ pub struct DesktopSettings {
     pub paste_method: PasteMethod,
     #[specta(type = u32)]
     pub paste_delay_ms: u64,
+    pub output_prefix: TranscriptBoundary,
+    pub output_suffix: TranscriptBoundary,
     pub hotkey_shortcut: String,
     pub hotkey_mode: HotkeyMode,
     pub close_to_tray: bool,
+    pub show_window_title_bar: bool,
 }
 
 #[derive(Debug, Clone, Deserialize, Type)]
@@ -51,9 +54,12 @@ pub struct DesktopSettingsInput {
     pub paste_method: PasteMethod,
     #[specta(type = u32)]
     pub paste_delay_ms: u64,
+    pub output_prefix: TranscriptBoundary,
+    pub output_suffix: TranscriptBoundary,
     pub hotkey_shortcut: String,
     pub hotkey_mode: HotkeyMode,
     pub close_to_tray: bool,
+    pub show_window_title_bar: bool,
 }
 
 #[derive(Debug, Clone, Deserialize, Type)]
@@ -62,6 +68,13 @@ pub enum SecretUpdate {
     Keep,
     Set { value: String },
     Clear,
+}
+
+#[derive(Debug, Clone, Copy, Deserialize, Type)]
+#[serde(rename_all = "snake_case")]
+pub enum DesktopSecretKind {
+    RemoteToken,
+    OpenRouterKey,
 }
 
 #[derive(Debug, Clone, Deserialize, Type)]

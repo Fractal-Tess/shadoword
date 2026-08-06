@@ -129,6 +129,21 @@ impl RemoteClient {
         decode(response).await
     }
 
+    pub async fn delete_model(
+        &self,
+        endpoint: &str,
+        token: Option<&str>,
+        model_id: &str,
+    ) -> Result<()> {
+        let response = self
+            .request(endpoint, token, Method::DELETE, &["v1", "models", model_id])?
+            .timeout(REMOTE_TIMEOUT)
+            .send()
+            .await
+            .context("failed to reach the remote API")?;
+        decode_empty(response).await
+    }
+
     pub async fn start_download(
         &self,
         endpoint: &str,
@@ -213,6 +228,26 @@ impl RemoteClient {
     }
 }
 
+async fn decode_empty(response: Response) -> Result<()> {
+    let status = response.status();
+    if status.is_success() {
+        return Ok(());
+    }
+
+    let body = response.text().await.unwrap_or_default();
+    if let Some(error) = structured_api_error(status, &body) {
+        return Err(error);
+    }
+    if status == reqwest::StatusCode::NOT_FOUND {
+        return Err(anyhow::Error::new(RemoteApiError {
+            status,
+            code: "model_deletion_unsupported".to_string(),
+            message: "this daemon does not expose remote model deletion".to_string(),
+        }));
+    }
+    Err(anyhow!("Shadoword API returned {status}"))
+}
+
 async fn decode<T: DeserializeOwned>(response: Response) -> Result<T> {
     let status = response.status();
     if status.is_success() {
@@ -222,13 +257,23 @@ async fn decode<T: DeserializeOwned>(response: Response) -> Result<T> {
             .context("failed to decode the Shadoword API response");
     }
 
+    decode_error(response).await
+}
+
+async fn decode_error<T>(response: Response) -> Result<T> {
+    let status = response.status();
     let body = response.text().await.unwrap_or_default();
-    if let Ok(error) = serde_json::from_str::<ApiErrorBody>(&body) {
-        return Err(anyhow::Error::new(RemoteApiError {
-            status,
-            code: error.error,
-            message: error.message,
-        }));
+    if let Some(error) = structured_api_error(status, &body) {
+        return Err(error);
     }
     Err(anyhow!("Shadoword API returned {status}"))
+}
+
+fn structured_api_error(status: reqwest::StatusCode, body: &str) -> Option<anyhow::Error> {
+    let error = serde_json::from_str::<ApiErrorBody>(body).ok()?;
+    Some(anyhow::Error::new(RemoteApiError {
+        status,
+        code: error.error,
+        message: error.message,
+    }))
 }

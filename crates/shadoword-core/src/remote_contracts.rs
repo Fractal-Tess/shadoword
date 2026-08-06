@@ -47,11 +47,22 @@ pub struct ModelInfoDto {
     pub installed: bool,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Type)]
+pub struct ModelStorageDto {
+    pub directory: String,
+    #[specta(type = f64)]
+    pub total_bytes: u64,
+    #[specta(type = u32)]
+    pub installed_model_count: usize,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, Type)]
 pub struct OverviewDto {
     pub status: DaemonStatusDto,
     pub runtime: RuntimeConfigDto,
     pub models: Vec<ModelInfoDto>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub model_storage: Option<ModelStorageDto>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Type)]

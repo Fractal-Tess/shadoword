@@ -4038,15 +4038,18 @@ dependencies = [
 
 [[package]]
 name = "shadoword-api"
-version = "0.10.6"
+version = "0.11.0"
 dependencies = [
  "anyhow",
  "axum",
+ "base64 0.22.1",
  "clap",
  "futures-util",
+ "getrandom 0.3.4",
  "opus",
  "serde",
  "serde_json",
+ "sha2",
  "shadoword-core",
  "tokio",
  "tracing",
@@ -4055,7 +4058,7 @@ dependencies = [
 
 [[package]]
 name = "shadoword-core"
-version = "0.10.6"
+version = "0.11.0"
 dependencies = [
  "anyhow",
  "cpal",
@@ -4076,7 +4079,7 @@ dependencies = [
 
 [[package]]
 name = "shadoword-desktop"
-version = "0.10.6"
+version = "0.11.0"
 dependencies = [
  "anyhow",
  "arboard",
@@ -4105,7 +4108,7 @@ dependencies = [
 
 [[package]]
 name = "shadoword-model-whisper"
-version = "0.10.6"
+version = "0.11.0"
 dependencies = [
  "shadoword-shared",
  "transcribe-rs",
@@ -4113,7 +4116,7 @@ dependencies = [
 
 [[package]]
 name = "shadoword-shared"
-version = "0.10.6"
+version = "0.11.0"
 dependencies = [
  "serde",
  "specta",

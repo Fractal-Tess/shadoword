@@ -10,6 +10,10 @@ export const commands = {
 	listInputDevices: () => __TAURI_INVOKE<InputDeviceInfo[]>('list_input_devices'),
 	saveDesktopSettings: (input: DesktopSettingsInput) =>
 		__TAURI_INVOKE<DesktopSettings>('save_desktop_settings', { input }),
+	revealDesktopSecret: (kind: DesktopSecretKind) =>
+		__TAURI_INVOKE<string>('reveal_desktop_secret', { kind }),
+	copyDesktopSecret: (kind: DesktopSecretKind) =>
+		__TAURI_INVOKE<null>('copy_desktop_secret', { kind }),
 	testRemoteConnection: (input: ConnectionInput) =>
 		__TAURI_INVOKE<ConnectionReport_Serialize>('test_remote_connection', { input }),
 	listOpenrouterModels: () => __TAURI_INVOKE<OpenRouterModelInfo[]>('list_openrouter_models'),
@@ -20,6 +24,8 @@ export const commands = {
 		__TAURI_INVOKE<OverviewDto_Serialize>('update_remote_runtime', { runtime }),
 	selectRemoteModel: (modelId: string) =>
 		__TAURI_INVOKE<OverviewDto_Serialize>('select_remote_model', { modelId }),
+	deleteRemoteModel: (modelId: string) =>
+		__TAURI_INVOKE<OverviewDto_Serialize>('delete_remote_model', { modelId }),
 	startRemoteDownload: (modelId: string) =>
 		__TAURI_INVOKE<DownloadJobStatus>('start_remote_download', { modelId }),
 	pollRemoteDownload: (jobId: string) =>
@@ -32,6 +38,8 @@ export const commands = {
 		__TAURI_INVOKE<OverviewDto_Serialize>('update_local_runtime', { runtime }),
 	selectLocalModel: (modelId: string) =>
 		__TAURI_INVOKE<OverviewDto_Serialize>('select_local_model', { modelId }),
+	deleteLocalModel: (modelId: string) =>
+		__TAURI_INVOKE<OverviewDto_Serialize>('delete_local_model', { modelId }),
 	startLocalDownload: (modelId: string) =>
 		__TAURI_INVOKE<DownloadJobStatus>('start_local_download', { modelId }),
 	pollLocalDownload: (jobId: string) =>
@@ -118,6 +126,8 @@ export type DesktopEvent =
 	| { type: 'transcription_complete'; result: TranscriptionResult; segments: number }
 	| { type: 'error'; code: string; context: string; message: string; action: string | null };
 
+export type DesktopSecretKind = 'remote_token' | 'open_router_key';
+
 export type DesktopSettings = {
 	mode: ServiceMode;
 	model_path: string;
@@ -136,9 +146,12 @@ export type DesktopSettings = {
 	copy_to_clipboard: boolean;
 	paste_method: PasteMethod;
 	paste_delay_ms: number;
+	output_prefix: TranscriptBoundary;
+	output_suffix: TranscriptBoundary;
 	hotkey_shortcut: string;
 	hotkey_mode: HotkeyMode;
 	close_to_tray: boolean;
+	show_window_title_bar: boolean;
 };
 
 export type DesktopSettingsInput = {
@@ -159,9 +172,12 @@ export type DesktopSettingsInput = {
 	copy_to_clipboard: boolean;
 	paste_method: PasteMethod;
 	paste_delay_ms: number;
+	output_prefix: TranscriptBoundary;
+	output_suffix: TranscriptBoundary;
 	hotkey_shortcut: string;
 	hotkey_mode: HotkeyMode;
 	close_to_tray: boolean;
+	show_window_title_bar: boolean;
 };
 
 export type DownloadJobState = 'queued' | 'running' | 'succeeded' | 'failed';
@@ -291,6 +307,12 @@ export type ModelInfoDto = {
 	installed: boolean;
 };
 
+export type ModelStorageDto = {
+	directory: string;
+	total_bytes: number | null;
+	installed_model_count: number;
+};
+
 export type OpenRouterConnectionInput = {
 	key: string | null;
 	use_saved_key: boolean;
@@ -316,12 +338,14 @@ export type OverviewDto_Deserialize = {
 	status: DaemonStatusDto_Deserialize;
 	runtime: RuntimeConfigDto_Deserialize;
 	models: ModelInfoDto[];
+	model_storage?: ModelStorageDto | null;
 };
 
 export type OverviewDto_Serialize = {
 	status: DaemonStatusDto_Serialize;
 	runtime: RuntimeConfigDto_Serialize;
 	models: ModelInfoDto[];
+	model_storage?: ModelStorageDto | null;
 };
 
 export type PasteMethod = 'none' | 'direct' | 'ctrl_v' | 'ctrl_shift_v' | 'shift_insert';
@@ -405,6 +429,8 @@ export type ServiceStatus_Serialize = {
 };
 
 export type StreamingPcmFormat = 's16le' | 'f32le';
+
+export type TranscriptBoundary = 'none' | 'space' | 'newline' | 'blank_line';
 
 export type TranscriptionMode = 'batch' | 'streaming';
 
