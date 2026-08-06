@@ -29,10 +29,10 @@ import { modes } from '../data/site'
         current setting. */
     }
     <legend class="sr-only">Where transcription runs — select a mode to read what it does</legend>
-    <div class="grid grid-cols-1 sm:grid-cols-3">
+    <div class="grid grid-cols-1 sm:grid-cols-3" data-reveal-stagger>
       {
         modes.map((mode) => (
-          <label class="mode-cell" for={`mode-${mode.id}`}>
+          <label class="mode-cell" for={`mode-${mode.id}`} data-reveal>
             <input
               class="peer sr-only"
               type="radio"

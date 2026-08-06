@@ -17,7 +17,7 @@ import { signalPath } from '../data/site'
   <div
     class="mx-auto grid max-w-[1536px] grid-cols-1 gap-y-12 px-5 py-14 sm:px-8 lg:py-16 xl:grid-cols-[27rem_1fr] xl:gap-x-14"
   >
-    <div>
+    <div data-reveal>
       {
         /*
           The one scarlet kicker on the page, and it is here because it is the
@@ -50,10 +50,19 @@ import { signalPath } from '../data/site'
         they live on the columns, and the outer edges carry none.
       */
     }
-    <ol class="divide-inset grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4">
+    {
+      /*
+        The stagger group. Four across, the steps all cross the viewport line at
+        the same instant, so the order has to come from the delay the group
+        assigns — and that delay is what makes the motion the propagation the band
+        describes rather than four blocks appearing. Stacked, each one crosses on
+        its own and arrives on its own, which is the same sequence read down.
+      */
+    }
+    <ol class="divide-inset grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4" data-reveal-stagger>
       {
         signalPath.map((step, i) => (
-          <li class:list={['step', i > 0 && 'sm:pl-7']}>
+          <li class:list={['step', i > 0 && 'sm:pl-7']} data-reveal>
             <div class="flex items-baseline gap-3">
               <span class="numeral-outline" aria-hidden="true">
                 {step.n}
@@ -141,5 +150,46 @@ import { signalPath } from '../data/site'
     .step:nth-child(4) {
       padding-top: 0;
     }
+  }
+
+  /* ---- The one band whose entrance carries an argument ---------------------
+     Every band on this page uses the shared `data-reveal` entrance, and every
+     one of them travels upward into place. This band travels *sideways*, and it
+     is the only one that does.
+
+     The reason is the content: Capture, Segment, Commit, Deliver is what happens
+     to a second of audio, in the order it happens. So the steps enter along the
+     axis they are read on, one behind the next, and the band reads as one signal
+     travelling rather than four blocks appearing. Applied to Choices or Operation
+     the identical override would carry nothing, which is why they keep the
+     default.
+
+     20px, not the shared 24 — the horizontal travel is across a column that is
+     only 118px wide at some breakpoints, and the default distance overshoots it. */
+  :global(html.reveal-armed) .step {
+    --reveal-x: -1.25rem;
+    --reveal-y: 0;
+  }
+
+  /* The tick lands after its own step, and last of the four. It marks the fulcrum
+     of the argument — the one step that is a decision rather than a consequence —
+     and a mark that arrives with its own label is decoration on it rather than a
+     stamp applied to it.
+
+     Scale rather than travel, and an overshooting curve: this is a stamp coming
+     down, not a block settling. The delay is the third step's own delay plus the
+     length of its fade, so the ordering holds no matter what the group assigns. */
+  :global(html.reveal-armed) .commit-tick {
+    opacity: 0;
+    scale: 0;
+    transition:
+      opacity 260ms cubic-bezier(0.16, 1, 0.3, 1),
+      scale 260ms cubic-bezier(0.16, 1, 0.3, 1);
+    transition-delay: calc(2 * 100ms + 620ms);
+  }
+
+  :global(html.reveal-armed) .step.is-in .commit-tick {
+    opacity: 1;
+    scale: 1;
   }
 </style>

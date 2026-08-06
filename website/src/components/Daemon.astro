@@ -47,8 +47,8 @@ import { endpoints, streamProtocol } from '../data/site'
     />
   </div>
   <div class="relative mx-auto max-w-[1536px] px-5 pt-[8.5rem] pb-14 sm:px-8 lg:pb-16">
-    <div class="lg:flex lg:items-end lg:justify-between lg:gap-10">
-      <div>
+    <div class="lg:flex lg:items-end lg:justify-between lg:gap-10" data-reveal-stagger>
+      <div data-reveal>
         <h2 id="daemon-heading" class="display-section text-ink">The daemon is yours to host</h2>
       </div>
       {
@@ -56,7 +56,7 @@ import { endpoints, streamProtocol } from '../data/site'
           this against a heading whose own top is already past the fade, so this
           paragraph can only ever sit on flat night, where the token is 5.01:1. */
       }
-      <p class="mono-legend text-ink-soft mt-5 max-w-[52ch] lg:mt-0">
+      <p class="mono-legend text-ink-soft mt-5 max-w-[52ch] lg:mt-0" data-reveal>
         Authenticated, and pointed wherever you point it. Nothing below is illustrative — it is the
         router and the socket as shipped.
       </p>
@@ -72,8 +72,8 @@ import { endpoints, streamProtocol } from '../data/site'
         actually read: down, then down again.
       */
     }
-    <div class="mt-10 space-y-6">
-      <div class="plate">
+    <div class="mt-10 space-y-6" data-reveal-stagger>
+      <div class="plate" data-reveal>
         <h3 class="display-label text-ink border-rule border-b px-5 py-3.5">HTTP surface</h3>
         <ul class="endpoints grid grid-cols-1 md:grid-flow-col md:grid-rows-6">
           {
@@ -101,7 +101,7 @@ import { endpoints, streamProtocol } from '../data/site'
         </ul>
       </div>
 
-      <div class="plate">
+      <div class="plate" data-reveal>
         <h3 class="display-label text-ink border-rule border-b px-5 py-3.5">Streaming, in order</h3>
         <ol>
           {
@@ -138,7 +138,15 @@ import { endpoints, streamProtocol } from '../data/site'
 <style>
   .daemon-band {
     position: relative;
-    overflow: hidden;
+    /* `clip`, not `hidden`, and the difference is load-bearing rather than
+       stylistic: `overflow: hidden` makes a box a scroll container, and
+       `animation-timeline: view()` resolves against the subject's *nearest
+       ancestor scroll container*. So with `hidden` here the rail's drift below
+       took its timeline from this band instead of from the document — and this
+       band never scrolls, so the timeline was inert and the striation sat frozen
+       at one arbitrary offset. `clip` clips identically and creates no scroll
+       container, so `view()` walks past it to the document. */
+    overflow: clip;
   }
 
   /* The strip is pinned to the band's top edge, under the scarlet hairline, and
@@ -197,6 +205,76 @@ import { endpoints, streamProtocol } from '../data/site'
       color-mix(in srgb, var(--color-night) 70%, transparent) 60%,
       var(--color-night) 100%
     );
+  }
+
+  /* ---- The rail advances ---------------------------------------------------
+     The hero's drift is the device that says "a spectrogram slides as time
+     passes", and this band is the hero's rail reprised — so the reprise carries
+     the motion too, or it is a still frame of a moving thing. One layer, not the
+     hero's two: this is a recollection at 10rem, and two layers at two speeds is
+     the depth effect the first viewport is allowed and this band is not.
+
+     The far layer's gradient exactly, at the same 0.03 white, because a reprise
+     that invents its own striation is a second texture rather than the same one
+     seen again.
+
+     Driven by `view()` rather than a duration, which is the one real difference
+     from the hero. Above the fold the drift runs on its own clock because the
+     reader has not started scrolling yet; here the reader is already moving, and
+     tying the rail's advance to that scroll makes the two the same motion. It
+     also means the layer is only ever animated while it is on screen. */
+  .daemon-rail::before {
+    content: '';
+    position: absolute;
+    /* 200% wide and travelling a fraction of its own width, so the repeat never
+       runs out of pattern at either edge. The overflow is clipped by
+       `.daemon-band`'s own `overflow: hidden`. */
+    inset: 0 -50%;
+    width: 200%;
+    background-image: repeating-linear-gradient(
+      90deg,
+      transparent 0 15px,
+      rgb(255 255 255 / 0.03) 15px 16px,
+      transparent 16px 40px
+    );
+    /* The same mask as the image beneath it. Without it the striation would
+       carry full strength down to the rail's foot and rule a hatch of vertical
+       lines across flat night after the signal has already dissolved — the one
+       thing the band's own comment forbids, since below the fade every region is
+       flat matte with crisp type on it. */
+    mask-image: linear-gradient(
+      to bottom,
+      rgb(0 0 0 / 1) 0%,
+      rgb(0 0 0 / 1) 45%,
+      rgb(0 0 0 / 0) 100%
+    );
+  }
+
+  @supports (animation-timeline: view()) {
+    @media (prefers-reduced-motion: no-preference) {
+      .daemon-rail::before {
+        animation-name: rail-advance;
+        animation-timing-function: linear;
+        animation-fill-mode: both;
+        animation-timeline: view();
+        /* The whole time the rail is on screen, so the advance is as slow as the
+           reader's own scroll and never reads as an effect starting. */
+        animation-range: cover 0% cover 100%;
+      }
+    }
+  }
+
+  /* Leftward, for the hero's reason: a spectrogram's newest column arrives at
+     the right edge and the history slides away from it. ±12% of a 200% box is
+     48% of the band's width across the band's entire scroll — atmosphere, not a
+     thing to watch. */
+  @keyframes rail-advance {
+    from {
+      transform: translate3d(12%, 0, 0);
+    }
+    to {
+      transform: translate3d(-12%, 0, 0);
+    }
   }
 
   /* The column divider is drawn on the list rather than on the items in the

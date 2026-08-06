@@ -1,11 +1,10 @@
 /* Source detection is scoped to `src/` instead of Tailwind's automatic
-   whole-project scan, because the automatic scan reads this project's own
-   documentation. `README.md` and `DESIGN.md` state the rule "there is no
-   `text-ink/60` anywhere" — and Tailwind, scanning them, found `text-ink/60`
-   and generated it. The prohibition was minting the
-   very utility it forbids, which also means the ban could never be verified
-   against the built stylesheet. Markup is the only thing that gets to decide
-   what CSS exists. */
+   whole-project scan. Keep it that way: any prose file in this directory that
+   names a forbidden utility — a doc stating the rule "there is no `text-ink/60`
+   anywhere", say — is read by the automatic scan as a use of it, and Tailwind
+   generates the very class the sentence forbids. That has already happened here.
+   It also means such a ban can never be verified against the built stylesheet.
+   Markup is the only thing that gets to decide what CSS exists. */
 @import 'tailwindcss' source(none);
 @source '..';
 
@@ -162,6 +161,49 @@
       animation-iteration-count: 1 !important;
       transition-duration: 0.01ms !important;
     }
+  }
+
+  /* ---- Viewport entrance -------------------------------------------------
+     Elements marked `data-reveal` fade and travel a short distance into place
+     the first time they cross into the viewport, once, and then stay.
+
+     `html.reveal-armed` is the whole safety mechanism. The pre-reveal state
+     lives *only* under that class, and the class is added by a one-line inline
+     script in the head that runs before first paint. So the failure mode of
+     every path that matters — JavaScript blocked, script error, no
+     IntersectionObserver, reduced motion — is the fully visible page, not a page
+     of invisible content waiting for a callback that never comes. A reveal that
+     can hide the product's own copy is not worth having.
+
+     `translate`, not `transform`: the display ramp already puts
+     `transform: scaleX(var(--squeeze-*))` on every heading and label, and a
+     transform here would silently overwrite the compression that the whole type
+     system depends on. `translate` is its own property and composes with it.
+
+     The transition sits on the base rule rather than on `.is-in`, so it is
+     already in place when the arrived values arrive. Declared only in the
+     armed state, it cannot add a transition to a page that never armed. */
+  html.reveal-armed [data-reveal] {
+    opacity: 0;
+    translate: var(--reveal-x, 0) var(--reveal-y, 1.5rem);
+    /* Distinct durations: opacity is the thing that reads, and travel that
+       outlasts its own fade looks like the element is still settling after it
+       has arrived. `--reveal-i` is the element's index inside a
+       `data-reveal-stagger` group, set by the observer script, and it is 0 for
+       everything else — so an ungrouped element has no delay at all. */
+    transition:
+      opacity 620ms cubic-bezier(0.22, 0.61, 0.36, 1),
+      translate 760ms cubic-bezier(0.22, 0.61, 0.36, 1);
+    transition-delay: calc(var(--reveal-i, 0) * 100ms);
+    /* The travelling elements are large blocks of type; without this the
+       compositor re-rasterises the squeezed display face every frame. */
+    will-change: opacity, translate;
+  }
+
+  html.reveal-armed [data-reveal].is-in {
+    opacity: 1;
+    translate: none;
+    will-change: auto;
   }
 }
 

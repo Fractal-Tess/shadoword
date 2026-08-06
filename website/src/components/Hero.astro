@@ -138,7 +138,7 @@ const headline = ['Speech to text', 'local by default', 'connected by choice']
           comp loses this one to the plate it was drawn against.
         */
       }
-      <p class="mono-legend text-ink mt-7 max-w-[40ch] tracking-[0.02em] uppercase">
+      <p class="hero-legend mono-legend text-ink mt-7 max-w-[40ch] tracking-[0.02em] uppercase">
         {subLegend}
       </p>
 
@@ -159,10 +159,10 @@ const headline = ['Speech to text', 'local by default', 'connected by choice']
         */
       }
       <div class="mt-7 flex flex-col items-start gap-y-6">
-        <p class="mono-caption text-ink-soft uppercase">
+        <p class="hero-note mono-caption text-ink-soft uppercase">
           Linux releases published · source available.
         </p>
-        <a class="cta-solid" href={repoUrl} rel="noopener">Read the source</a>
+        <a class="hero-cta cta-solid" href={repoUrl} rel="noopener">Read the source</a>
       </div>
     </div>
   </div>
@@ -512,6 +512,79 @@ const headline = ['Speech to text', 'local by default', 'connected by choice']
     .lamp-c {
       animation: none;
       opacity: 0.2;
+    }
+  }
+
+  /* ---- The first viewport arrives ------------------------------------------
+     The rest of the page waits to be scrolled to; this is already on screen, so
+     it plays once on load and needs no observer and no JavaScript at all. It
+     reads down the way the argument does: the three headline lines in order, then
+     the sub-legend, then the release note, then the button, then the plate.
+
+     Not the raster. The image is the world the type sits in, and a world that
+     fades up arrives *with* the copy instead of already being there — the type
+     should read as printed onto a spectrum that was burning before the reader
+     showed up.
+
+     One real cost, accepted deliberately: the headline is the LCP element, so
+     fading it in delays LCP by its own delay plus duration. That is why the ramp
+     is 480ms and starts at 0 rather than the 620ms the scroll entrances use, and
+     why nothing here waits on a network round trip — the face is preloaded. */
+  @media (prefers-reduced-motion: no-preference) {
+    .hl-line,
+    .hero-legend,
+    .hero-note,
+    .hero-cta,
+    .hero-plate {
+      animation: hero-rise 480ms cubic-bezier(0.22, 0.61, 0.36, 1) both;
+    }
+
+    /* `.hl-line` already carries `transform: scaleX(var(--squeeze-display))`, so
+       the keyframes below move it with `translate` and never touch `transform`.
+       The lines are close together — 90ms, not the 100ms of the scroll groups,
+       because three lines of one sentence should read as one gesture. */
+    .hl-line:nth-child(2) {
+      animation-delay: 90ms;
+    }
+
+    .hl-line:nth-child(3) {
+      animation-delay: 180ms;
+    }
+
+    .hero-legend {
+      animation-delay: 300ms;
+    }
+
+    .hero-note {
+      animation-delay: 390ms;
+    }
+
+    .hero-cta {
+      animation-delay: 450ms;
+    }
+
+    /* Last and on its own: it is the one physical object in the frame, so it is
+       set down after the printed matter rather than among it. Scale rather than
+       travel, from just under full size — a plate is placed, not slid. */
+    .hero-plate {
+      animation-name: hero-plate-set;
+      animation-duration: 560ms;
+      animation-delay: 560ms;
+    }
+  }
+
+  /* Only a `from`, so the resting state is the element's ordinary CSS. */
+  @keyframes hero-rise {
+    from {
+      opacity: 0;
+      translate: 0 1.25rem;
+    }
+  }
+
+  @keyframes hero-plate-set {
+    from {
+      opacity: 0;
+      scale: 0.96;
     }
   }
 </style>

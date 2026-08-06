@@ -1,7 +1,8 @@
 /**
  * Every fact in this file is traceable to the workspace source it names below.
- * Nothing here may be invented. Figures the project has not measured are marked
- * `PLACEHOLDER` and listed in README.md under "Before publishing".
+ * Nothing here may be invented. Figures the project has not measured carry a
+ * `placeholder` flag, and the page renders an explicit "Not yet measured" plate
+ * naming the corpus and the harness rather than a number nobody ran.
  */
 
 export const repoUrl = 'https://github.com/Fractal-Tess/shadoword'

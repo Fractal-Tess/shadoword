@@ -11,12 +11,20 @@ import { modelCatalog, accelerators } from '../data/site'
 
 <section class="band-top bg-night" aria-labelledby="choices-heading">
   <div class="mx-auto max-w-[1536px] px-5 py-14 sm:px-8 lg:py-16">
-    <h2 id="choices-heading" class="display-section text-ink">
+    <h2 id="choices-heading" class="display-section text-ink" data-reveal>
       You choose the model and the silicon
     </h2>
 
-    <div class="mt-10 grid grid-cols-1 gap-6 lg:grid-cols-[1.35fr_1fr] lg:gap-8">
-      <div class="plate">
+    {
+      /* The two plates are a group, so the catalog arrives and the accelerator
+        table follows it. Side by side they cross the line together and the delay
+        supplies the order; stacked, the order is already the reading order. */
+    }
+    <div
+      class="mt-10 grid grid-cols-1 gap-6 lg:grid-cols-[1.35fr_1fr] lg:gap-8"
+      data-reveal-stagger
+    >
+      <div class="plate" data-reveal>
         <h3 class="display-label text-ink border-rule border-b px-5 py-3.5">Model catalog</h3>
         <table class="w-full border-collapse text-left">
           <caption class="sr-only">
@@ -78,7 +86,7 @@ import { modelCatalog, accelerators } from '../data/site'
           bottom edges aligned at the price of ~150px of empty bordered box, and
           an empty box reads as a table that failed to load. */
       }
-      <div class="plate lg:self-start">
+      <div class="plate lg:self-start" data-reveal>
         <h3 class="display-label text-ink border-rule border-b px-5 py-3.5">Accelerator</h3>
         <table class="w-full border-collapse text-left">
           <caption class="sr-only">

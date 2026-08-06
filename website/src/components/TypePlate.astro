@@ -17,6 +17,7 @@ import { typePlate, repoUrl } from '../data/site'
 <footer class="band-top bg-night" aria-labelledby="project-status-heading">
   <div
     class="mx-auto grid max-w-[1536px] grid-cols-1 gap-y-10 px-5 py-14 sm:px-8 lg:grid-cols-[1fr_auto] lg:items-start lg:gap-x-16"
+    data-reveal-stagger
   >
     {
       /*
@@ -33,7 +34,7 @@ import { typePlate, repoUrl } from '../data/site'
         flatter it. The one at the top of the page says what the machine does.
       */
     }
-    <div class="status-plate rivet-plate">
+    <div class="status-plate rivet-plate" data-reveal>
       <h2 id="project-status-heading" class="display-label text-ink">Project status</h2>
       <dl class="mt-5 grid grid-cols-1 sm:grid-cols-[10rem_1fr]">
         {
@@ -61,7 +62,7 @@ import { typePlate, repoUrl } from '../data/site'
       </dl>
     </div>
 
-    <div class="lg:text-right">
+    <div class="lg:text-right" data-reveal>
       <Wordmark class="lg:justify-end" />
       <p class="mono-caption text-ink-soft mt-4 max-w-[34ch] lg:ml-auto">
         Linux speech to text, offline by default. Self-host or use OpenRouter when you choose.

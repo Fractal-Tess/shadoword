@@ -22,7 +22,7 @@ import { instructionPlates, latencyBench } from '../data/site'
         an earlier release state and made absence the product's emphasis.
       */
     }
-    <h2 id="operation-heading" class="display-section text-ink">Build it and run it</h2>
+    <h2 id="operation-heading" class="display-section text-ink" data-reveal>Build it and run it</h2>
 
     {
       /*
@@ -33,10 +33,10 @@ import { instructionPlates, latencyBench } from '../data/site'
         content's actual measure.
       */
     }
-    <div class="mt-10 grid grid-cols-1 gap-6 md:grid-cols-2">
+    <div class="mt-10 grid grid-cols-1 gap-6 md:grid-cols-2" data-reveal-stagger>
       {
         instructionPlates.map((p) => (
-          <div class="plate flex flex-col">
+          <div class="plate flex flex-col" data-reveal>
             <h3 class="mono-micro text-ink-soft border-rule border-b px-5 py-3 uppercase">
               {p.legend}
             </h3>
@@ -68,7 +68,7 @@ import { instructionPlates, latencyBench } from '../data/site'
     }
     {
       latencyBench.placeholder && (
-        <div class="plate mt-6">
+        <div class="plate mt-6" data-reveal>
           <div class="chevron-strip h-1.5 w-full" aria-hidden="true" />
           <div class="px-5 py-4 md:py-5">
             {/* A plate heading, in the same off-white display label the model

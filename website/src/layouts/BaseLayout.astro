@@ -120,6 +120,23 @@ const structuredData = {
 
     <link rel="icon" href="/favicon/favicon-32.png" />
     <link rel="apple-touch-icon" href="/favicon/favicon-128.png" />
+
+    <!-- Arms the viewport entrance, and it is in the head and synchronous for one
+         reason: the pre-reveal state is scoped to `html.reveal-armed`, so if this
+         class landed after first paint the page would paint everything visible and
+         then blink it out. Two lines, inline, no request.
+
+         It arms nothing unless the entrance can actually be completed — reduced
+         motion or a missing IntersectionObserver both leave the class off, and
+         the page then renders exactly as it does with JavaScript disabled.
+         `is:inline` keeps it in the document instead of pulling a bundle in. -->
+    <script is:inline>
+      if (
+        'IntersectionObserver' in window &&
+        !matchMedia('(prefers-reduced-motion: reduce)').matches
+      )
+        document.documentElement.classList.add('reveal-armed')
+    </script>
     {
       !noindex && (
         <script is:inline type="application/ld+json" set:html={JSON.stringify(structuredData)} />
@@ -146,9 +163,50 @@ const structuredData = {
         CTA below, riveted F2 plate lower right. A flat mode strip cuts it off.
       FORM: Neo-Tokyo Neon Night, abstracted from cityscape to spectrum —
         challenger over assigned RED/BLACK, index 3/7; seed 322d3899.
-      FINISH: unreviewed and undocumented is unfinished; this build ends with
-        the finish review, the verdict, and DESIGN.md
+      FINISH: this contract is the design record. It ships in the built page on
+        purpose, so the direction cannot be lost or drift away from what deployed.
+        Read it before changing the visual language.
     -->
     <slot />
+
+    <!-- The observer. It only ever adds a class and unobserves, so an element can
+         arrive once and can never be sent back — scrolling up past a band that has
+         already played does not replay it, which is the difference between an
+         entrance and a scrubbed effect.
+
+         `rootMargin`'s -10% bottom inset is what makes this read as "it animated
+         in as I reached it" rather than "it was already done by the time I looked":
+         an element has to clear the bottom tenth of the viewport before it counts as
+         entered. `threshold: 0` with that inset fires on the first pixel past the
+         line, which is what a tall plate needs — a threshold in the middle would
+         never fire for anything taller than the viewport. -->
+    <script is:inline>
+      ;(() => {
+        const root = document.documentElement
+        if (!root.classList.contains('reveal-armed')) return
+
+        // A group's children arrive in document order, one behind the next. The
+        // index is written as a custom property rather than a per-child class so
+        // a group can hold any number of items.
+        for (const group of document.querySelectorAll('[data-reveal-stagger]')) {
+          let i = 0
+          for (const el of group.querySelectorAll('[data-reveal]'))
+            el.style.setProperty('--reveal-i', i++)
+        }
+
+        const io = new IntersectionObserver(
+          (entries) => {
+            for (const entry of entries) {
+              if (!entry.isIntersecting) continue
+              entry.target.classList.add('is-in')
+              io.unobserve(entry.target)
+            }
+          },
+          { rootMargin: '0px 0px -10% 0px', threshold: 0 }
+        )
+
+        for (const el of document.querySelectorAll('[data-reveal]')) io.observe(el)
+      })()
+    </script>
   </body>
 </html>
