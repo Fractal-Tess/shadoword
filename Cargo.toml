@@ -48,6 +48,13 @@ transcribe-rs = { version = "0.3.8", features = ["whisper-cpp"] }
 tray-icon = "0.21"
 wait-timeout = "0.2.1"
 
+[profile.release]
+codegen-units = 1
+lto = "fat"
+opt-level = 3
+panic = "abort"
+strip = "symbols"
+
 # Temporary Rust 1.88 compatibility patches for upstream rc.25.
 [patch.crates-io]
 specta = { path = "vendor/specta" }

@@ -23,6 +23,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 - Made explicit worker pools the only execution topology and moved CPU/GPU worker targeting into each pool unit.
 - Separated model asset management from execution topology and added runtime, storage, preload, memory, download, selection, and deletion reconciliation.
 - Save discrete desktop settings immediately while retaining a short debounce for text entry and avoiding unrelated runtime refreshes.
+- Build release binaries with fat LTO, one codegen unit, abort-on-panic semantics, and stripped symbols.
 
 ### Fixed
 
