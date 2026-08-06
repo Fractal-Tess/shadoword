@@ -17,6 +17,7 @@
 
       workspaceToml = builtins.fromTOML (builtins.readFile ./Cargo.toml);
       version = workspaceToml.workspace.package.version;
+      minimumRustVersion = workspaceToml.workspace.package."rust-version";
       releaseArtifacts = builtins.fromJSON (builtins.readFile ./nix/release-artifacts.json);
 
       artifactFor =
@@ -28,10 +29,16 @@
 
       mkPkgs =
         system:
-        import nixpkgs {
-          inherit system;
-          config.allowUnfree = true;
-        };
+        let
+          pkgs = import nixpkgs {
+            inherit system;
+            config.allowUnfree = true;
+          };
+        in
+        if pkgs.lib.versionAtLeast pkgs.rustc.version minimumRustVersion then
+          pkgs
+        else
+          throw "Shadoword requires Rust ${minimumRustVersion} or newer; nixpkgs provides ${pkgs.rustc.version}";
 
       commonBuildDeps =
         pkgs: with pkgs; [

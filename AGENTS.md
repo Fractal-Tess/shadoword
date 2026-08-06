@@ -55,6 +55,7 @@ Do not run test suites unless the user explicitly requests them.
 - Keep Local, Shadoword API, and OpenRouter desktop operation at feature parity where the provider supports it.
 - Keep capture, inference, credentials, networking, hotkeys, tray behavior, and output delivery in Rust.
 - Keep backend-specific inference behind the shared model contract.
+- Rust 1.94 is the minimum; keep Cargo, `rust-toolchain.toml`, CI, and the Nix development environment aligned.
 - Keep desktop and daemon configuration separate.
 - Let the desktop application own its mutable settings JSON; do not generate it through NixOS.
 - Use named, hashed API tokens. Do not restore legacy token environment variables or token-file support.

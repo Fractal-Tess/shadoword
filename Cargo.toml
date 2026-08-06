@@ -11,7 +11,7 @@ resolver = "2"
 [workspace.package]
 version = "0.11.0"
 edition = "2021"
-rust-version = "1.88"
+rust-version = "1.94"
 license = "MIT"
 authors = ["Fractal-Tess"]
 repository = "https://github.com/Fractal-Tess/shadoword"
@@ -54,8 +54,3 @@ lto = "fat"
 opt-level = 3
 panic = "abort"
 strip = "symbols"
-
-# Temporary Rust 1.88 compatibility patches for upstream rc.25.
-[patch.crates-io]
-specta = { path = "vendor/specta" }
-specta-serde = { path = "vendor/specta-serde" }

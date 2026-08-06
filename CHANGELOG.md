@@ -26,6 +26,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 - Save discrete desktop settings immediately while retaining a short debounce for text entry and avoiding unrelated runtime refreshes.
 - Build release binaries with fat LTO, one codegen unit, abort-on-panic semantics, and stripped symbols.
 - Replaced the legacy Tauri application icons with the transparent Shadoword waveform mark.
+- Raised the minimum Rust version to 1.94 and removed the temporary vendored Specta compatibility patches.
 
 ### Fixed
 

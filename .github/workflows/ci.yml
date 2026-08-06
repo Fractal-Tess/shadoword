@@ -25,18 +25,18 @@ jobs:
       - name: Enable Nix cache
         uses: DeterminateSystems/magic-nix-cache-action@v13
 
-      - name: Install Rust 1.88 MSRV toolchain
+      - name: Install Rust 1.94 MSRV toolchain
         uses: dtolnay/rust-toolchain@master
         with:
-          toolchain: 1.88.0
+          toolchain: 1.94.0
 
       - name: Validate workspace metadata
         run: nix develop --command cargo metadata --locked --no-deps
 
-      - name: Check Rust 1.88 compatibility
+      - name: Check Rust 1.94 compatibility
         run: |
-          nix develop --command "$HOME/.cargo/bin/rustup" run 1.88.0 cargo check --workspace --all-targets --locked
-          nix develop --command "$HOME/.cargo/bin/rustup" run 1.88.0 cargo check -p shadoword-desktop --locked --no-default-features --features remote-client
+          nix develop --command "$HOME/.cargo/bin/rustup" run 1.94.0 cargo check --workspace --all-targets --locked
+          nix develop --command "$HOME/.cargo/bin/rustup" run 1.94.0 cargo check -p shadoword-desktop --locked --no-default-features --features remote-client
 
       - name: Check formatting
         run: nix develop --command cargo fmt --all -- --check
@@ -66,6 +66,8 @@ jobs:
           nix eval .#packages.x86_64-linux.shadoword-api.drvPath
           nix eval .#packages.x86_64-linux.shadoword-api-cuda.drvPath
           nix eval .#packages.x86_64-linux.shadoword-api-source.drvPath
+          nix eval .#packages.x86_64-linux.shadoword-desktop-cuda-source.drvPath
+          nix eval .#packages.x86_64-linux.shadoword-desktop-vulkan-source.drvPath
           for system in x86_64-linux aarch64-linux; do
             desktop=$(nix eval --raw ".#packages.$system.shadoword-desktop.drvPath")
             desktop_alias=$(nix eval --raw ".#packages.$system.shadoword-desktop-client.drvPath")
