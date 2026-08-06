@@ -1,69 +1,46 @@
 # Shadoword
 
-![Shadoword — private speech to text, local by default](docs/assets/brand/shadoword-readme-splash.png)
+Private speech-to-text for Linux. Hold a shortcut, speak, and send the transcript to the active application.
 
-Linux-first speech-to-text, local by default, with:
+Shadoword supports three execution modes:
 
-- a native Tauri 2 + SvelteKit desktop client with local, Shadoword API, and OpenRouter execution
-- an optional authenticated HTTP/WebSocket daemon
+- **Local** — offline Whisper inference on your machine
+- **Shadoword API** — self-hosted transcription from another machine
+- **OpenRouter** — optional direct, batch-only transcription
 
-The frontend uses Bun exclusively; audio, inference, API, and desktop behavior remain Rust and Whisper-focused.
+The desktop is built with Tauri 2 and SvelteKit. Audio capture, inference, credentials, hotkeys, tray behavior, and text delivery remain in Rust.
 
-## Workspace
+## Install
 
-- `crates/shadoword-core` - shared audio/config/transcription service logic
-- `crates/shadoword-model-whisper` - Whisper model implementation
-- `crates/shadoword-shared` - shared trait/types contracts
-- `crates/shadoword-desktop` - Tauri 2, SvelteKit, and shadcn-svelte desktop client
-- `crates/shadoword-api` - HTTP daemon
+Download the Linux desktop archive from [GitHub Releases](https://github.com/Fractal-Tess/shadoword/releases):
 
-## Backend selection
-
-Plain Cargo builds use the CPU Whisper backend. GPU acceleration is optional:
-
-- `whisper-vulkan`
-- `whisper-cuda`
-
-Desktop examples:
-
-```bash
-cd crates/shadoword-desktop
-bun run tauri dev
-bun run tauri dev -- --features whisper-vulkan
-bun run tauri dev -- --features whisper-cuda
+```text
+shadoword-desktop-x86_64-linux.tar.gz
 ```
 
-### Unified desktop runtime
+The installed command is `shadoword`. Each release includes `SHA256SUMS` and prebuilt CPU, CUDA, and Vulkan API daemon archives.
 
-Every desktop build includes the portable CPU Whisper runtime alongside Shadoword
-API and direct OpenRouter transcription. Local model management, microphone capture,
-VAD streaming, history, hotkeys, tray behavior, and transcript delivery therefore
-remain available from one executable. GPU feature flags add acceleration without
-removing any transcription target.
+Nix source packages are also available:
 
-## Releases
+```bash
+nix build github:Fractal-Tess/shadoword#shadoword-desktop-source
+nix build github:Fractal-Tess/shadoword#shadoword-api-source
+```
 
-Version tags publish changelog-backed GitHub releases with precompiled Linux
-x86_64 archives:
+## Develop
 
-- `shadoword-api-cpu-x86_64-linux.tar.gz`
-- `shadoword-api-cuda-x86_64-linux.tar.gz`
-- `shadoword-api-vulkan-x86_64-linux.tar.gz`
-- `shadoword-desktop-x86_64-linux.tar.gz` — unified desktop with Local CPU, Shadoword API, and OpenRouter transcription
+CPU Whisper is the default backend:
 
-Together these cover API-only and unified desktop installations. Each release also
-includes `SHA256SUMS`. The archives contain the stripped ELF
-executables used by the Nix packages, allowing NixOS deployments to download
-and patch the release binaries without compiling Rust, CUDA, or the desktop
-frontend locally. The installed desktop command is `shadoword`.
+```bash
+cargo build
+cargo run -p shadoword-api
 
-Release notes are sourced from [`CHANGELOG.md`](CHANGELOG.md). To publish a
-release, update the workspace and desktop versions plus the changelog, commit
-the changes, then push the matching `v<version>` tag.
+cd crates/shadoword-desktop
+bun install
+bun run tauri dev
+```
 
-## Development
-
-### Nix
+Vulkan:
 
 ```bash
 nix develop
@@ -71,7 +48,7 @@ cd crates/shadoword-desktop
 bun run tauri dev -- --features whisper-vulkan
 ```
 
-CUDA shell:
+CUDA:
 
 ```bash
 nix develop .#cuda
@@ -79,91 +56,9 @@ cd crates/shadoword-desktop
 bun run tauri dev -- --features whisper-cuda
 ```
 
-### Desktop client
+## Shadoword API
 
-The Tauri desktop supports local Whisper, Shadoword API inference, direct OpenRouter
-speech-to-text, batch and VAD-segmented streaming transcription, global shortcuts,
-tray behavior, and transcript delivery. OpenRouter credentials remain in the
-native desktop configuration and audio is sent only when OpenRouter is selected.
-
-```bash
-cd crates/shadoword-desktop
-bun install
-bun run dev
-bun run tauri dev
-```
-
-Frontend checks use Bun only:
-
-```bash
-bun run check
-bun run lint
-bun run build
-```
-
-### Public marketing website
-
-A dedicated Astro + Nginx website lives in `website/`:
-
-- Landing page with React-powered motion hero section
-- Nginx runtime-ready static output
-- Docker production image in `website/Dockerfile`
-
-```bash
-cd website
-bun install
-bun run dev
-bun run build
-bun run check
-bun run lint
-```
-
-To run in production via Docker:
-
-```bash
-docker build -t shadoword-website ./website
-docker run --rm -p 8080:80 shadoword-website
-```
-
-### Plain Cargo
-
-```bash
-cargo build
-cargo run -p shadoword-api --features whisper-vulkan
-```
-
-## Docker (daemon)
-
-```bash
-./docker/export-rootfs.sh
-docker build -t shadoword-backend .
-```
-
-Run the CPU API image after generating an admin token in the mounted API config:
-
-```bash
-shadoword-api --config "$PWD/docker/config/api.json" token generate admin "docker admin"
-docker run --rm -p 47813:47813 \
-  -e SHADOWORD_API_CONFIG=/config/api.json \
-  -v $PWD/docker/config:/config \
-  -v $HOME/.local/share/shadoword/models:/data/shadoword/models \
-  shadoword-backend
-```
-
-CUDA remains an opt-in Cargo/Nix development feature; the published daemon image uses the portable CPU backend.
-
-The API defaults to preloading the canonical catalog `turbo` model
-(`ggml-large-v3-turbo.bin`). If the selected model file is missing, startup
-fails unless an explicit startup download installs it first:
-
-```bash
-cargo run -p shadoword-api -- \
-  --download-model turbo
-```
-
-Non-loopback binds require at least one named bearer token in the API config.
-Token secrets are generated locally and printed once; only SHA-256 hashes are
-persisted:
+Generate named bearer tokens before exposing the daemon outside localhost:
 
 ```bash
 shadoword-api token generate admin "desktop administrator"
@@ -172,61 +67,60 @@ shadoword-api token list
 shadoword-api token revoke "transcription client"
 ```
 
-For a NixOS service whose settings are owned by the `shadoword` user:
+Token secrets are printed once. Only SHA-256 hashes are stored in the API configuration.
+
+- **Admin tokens** can manage models, downloads, configuration, and transcription.
+- **User tokens** can only submit batch or streaming transcription requests.
+- `GET /health` is public.
+
+Start the daemon and download the default Turbo model when needed:
 
 ```bash
-sudo -u shadoword env XDG_CONFIG_HOME=/var/lib/shadoword/config \
-  shadoword-api token generate admin "desktop administrator"
+shadoword-api --download-model turbo
 ```
 
-Admin tokens can use every API endpoint. User tokens can only submit batch or
-streaming transcription requests. `GET /health` remains public. Restart the
-daemon after generating or revoking a token so it reloads the token registry.
+Main endpoints:
 
-For opt-in debugging, the daemon can archive every accepted batch request and
-every committed WebSocket segment as a WAV file with JSON response metadata:
+```text
+GET  /health
+POST /v1/transcribe-wav
+GET  /v1/stream
+GET  /v1/overview
+GET  /v1/models
+```
+
+Use `shadoword-api --help` for configuration, model, and request-recording options.
+
+## Docker
 
 ```bash
-shadoword-api --request-recording-dir /var/lib/shadoword/requests
-# or: SHADOWORD_REQUEST_RECORDING_DIR=/var/lib/shadoword/requests
+./docker/export-rootfs.sh
+docker build -t shadoword-backend .
 ```
 
-The archive contains microphone audio and transcripts, so keep the directory
-private and apply an appropriate retention policy.
+Mount a persistent API configuration and model directory when running the image. The published daemon image uses the portable CPU backend.
 
-Daemon endpoints:
-
-- Public: `GET /health`
-- Admin: `GET /docs`, `GET /v1/status`, `GET /v1/overview`, `GET /v1/config`,
-  `PUT /v1/config`, model selection/deletion, and model downloads
-- Admin or user: `POST /v1/transcribe-wav`, `GET /v1/stream`
-
-`POST /v1/transcribe-wav` accepts a raw WAV request body capped at 64 MiB.
-The legacy base64 transcription and remote-device endpoints are not part of the API. Runtime configuration uses the restricted daemon DTO described below.
-
-The preferred WebSocket protocol streams PCM immediately from key-down and
-performs segmentation on the daemon:
-
-1. Send text JSON `{"type":"Start","sample_rate":16000,"channels":1,"protocol_version":3,"audio_format":"pcm_f32le"}`. Protocol v3 accepts `pcm_f32le` and `pcm_s16le` on the same endpoint.
-2. Send binary mono PCM messages in the advertised little-endian format as microphone samples arrive.
-3. The daemon runs VAD, commits bounded segments, and emits ordered `Accepted` and
-   `Partial` messages while recording continues.
-4. Send text `Finish` to force-flush remaining speech and receive `Done` after all
-   ordered inference completes.
-
-Protocols v1 and v2 remain available for existing clients that send raw Opus
-packets followed by `CommitSegment`. PCM/Opus packet sizes, accumulated segment
-duration, inference flow credit, sequencer buffers, and stream idle time are
-bounded.
-
-Runtime config is intentionally restricted to daemon-safe fields:
-`model_path`, `whisper_accelerator`, `whisper_gpu_device`, `english_only`, and
-`preload_on_startup`.
-Model downloads are explicit catalog jobs only:
+## Checks
 
 ```bash
-curl -H "Authorization: Bearer $SHADOWORD_ADMIN_TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{"model_id":"turbo"}' \
-  http://127.0.0.1:47813/v1/downloads
+cargo check --workspace --all-targets
+cargo fmt --all -- --check
+cargo clippy --workspace --all-targets -- -D warnings
+
+cd crates/shadoword-desktop
+bun run generate:bindings
+bun run check
+bun run lint
+bun run build
 ```
+
+## Workspace
+
+- `crates/shadoword-core` — audio, configuration, models, and transcription orchestration
+- `crates/shadoword-model-whisper` — Whisper backend
+- `crates/shadoword-shared` — shared model contracts
+- `crates/shadoword-desktop` — Tauri and SvelteKit desktop
+- `crates/shadoword-api` — HTTP and WebSocket daemon
+- `website` — public website
+
+See [`CHANGELOG.md`](CHANGELOG.md) for release history and [`crates/shadoword-desktop/README.md`](crates/shadoword-desktop/README.md) for desktop-specific development notes.

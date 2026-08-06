@@ -1,8 +1,8 @@
 /* Source detection is scoped to `src/` instead of Tailwind's automatic
    whole-project scan, because the automatic scan reads this project's own
-   documentation. `README.md`, `DESIGN.md` and `.impeccable/design.json` each
-   state the rule "there is no `text-ink/60` anywhere" — and Tailwind, scanning
-   them, found `text-ink/60` and generated it. The prohibition was minting the
+   documentation. `README.md` and `DESIGN.md` state the rule "there is no
+   `text-ink/60` anywhere" — and Tailwind, scanning them, found `text-ink/60`
+   and generated it. The prohibition was minting the
    very utility it forbids, which also means the ban could never be verified
    against the built stylesheet. Markup is the only thing that gets to decide
    what CSS exists. */

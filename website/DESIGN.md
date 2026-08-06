@@ -143,12 +143,8 @@ carries no signal at all, and it is the reader's machine. The argument of the
 product — local execution stays silent on the network and remains the default —
 is made as an image before a word is read.
 
-**The imagery is not photographic and does not depict anything.** The
-composition descends from comp A, "Sealed Tower"
-(`.impeccable/mocks/comp-a-sealed-tower.webp`): the argument of that comp — a
-whole field lit, and one slab in it that is not — survives intact, while its
-cityscape does not. The direction was taken as a dealt challenger over an
-assigned RED/BLACK direction (seed `322d3899`, assigned index 3/7), and the
+**The imagery is not photographic and does not depict anything.** Its argument
+is a whole energized field interrupted by one silent black column. The
 authoritative statement of intent is the direction contract recorded as an HTML
 comment at the top of `<body>` in `src/layouts/BaseLayout.astro`, which survives
 into the production build. Read it before changing the visual language.

@@ -1,7 +1,6 @@
 /**
- * Every fact in this file is traceable to the workspace source it names below,
- * and each is recorded in ../../../PRODUCT.md at the repository root. Nothing
- * here may be invented. Figures the project has not measured are marked
+ * Every fact in this file is traceable to the workspace source it names below.
+ * Nothing here may be invented. Figures the project has not measured are marked
  * `PLACEHOLDER` and listed in README.md under "Before publishing".
  */
 

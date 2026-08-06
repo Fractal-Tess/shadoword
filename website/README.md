@@ -92,15 +92,14 @@ photograph of a place that does not exist.
 
 The direction contract is recorded as an HTML comment at the top of `<body>` in
 `src/layouts/BaseLayout.astro` and survives into the production build. Read it
-before changing the visual language. `DESIGN.md` holds the design system, and
-`.impeccable/surfaces/src-pages-index-astro.md` holds the surface brief with the
-measured fidelity inventory and every place the build overruled the comp.
+before changing the visual language. `DESIGN.md` holds the design system and
+visual rationale.
 
 ### Rules the page holds itself to
 
 - **No invented product facts.** Every model size, endpoint, command, flag and
   default in `src/data/site.ts` is traceable to the workspace source named in that
-  file, and the whole set is recorded in `../PRODUCT.md` at the repository root.
+  file and verified against the workspace source.
   The shortcut is the real `f2` push-to-talk default from the desktop client's
   settings, not a plausible-looking one, and the page says "default" because it
   is one. This rule has already been broken once and caught: an earlier
