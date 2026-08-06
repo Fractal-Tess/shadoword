@@ -15,6 +15,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 - Configurable whitespace before and after delivered transcripts, with a trailing space by default so consecutive recordings remain separated.
 - Secure native credential reveal and copy controls that keep bearer tokens and OpenRouter keys masked in the frontend.
 - Authenticated model deletion with active-model and in-progress-download protection.
+- Prebuilt `shadoword-desktop-cuda` and `shadoword-desktop-vulkan` archives and Nix packages for accelerated local inference.
 
 ### Changed
 
@@ -24,6 +25,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 - Separated model asset management from execution topology and added runtime, storage, preload, memory, download, selection, and deletion reconciliation.
 - Save discrete desktop settings immediately while retaining a short debounce for text entry and avoiding unrelated runtime refreshes.
 - Build release binaries with fat LTO, one codegen unit, abort-on-panic semantics, and stripped symbols.
+- Replaced the legacy Tauri application icons with the transparent Shadoword waveform mark.
 
 ### Fixed
 

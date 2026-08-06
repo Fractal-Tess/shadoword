@@ -1,5 +1,9 @@
 # Shadoword
 
+<p align="center">
+  <img src="shadoword-logo.svg" alt="Shadoword waveform mark" width="220">
+</p>
+
 Private speech-to-text for Linux. Hold a shortcut, speak, and send the transcript to the active application.
 
 Shadoword supports three execution modes:
@@ -16,14 +20,18 @@ Download the Linux desktop archive from [GitHub Releases](https://github.com/Fra
 
 ```text
 shadoword-desktop-x86_64-linux.tar.gz
+shadoword-desktop-cuda-x86_64-linux.tar.gz
+shadoword-desktop-vulkan-x86_64-linux.tar.gz
 ```
 
-The installed command is `shadoword`. Each release includes `SHA256SUMS` and prebuilt CPU, CUDA, and Vulkan API daemon archives.
+All desktop archives install the `shadoword` command. Choose the CUDA or Vulkan archive for accelerated local inference. Each release also includes `SHA256SUMS` and matching CPU, CUDA, and Vulkan API daemon archives.
 
 Nix source packages are also available:
 
 ```bash
 nix build github:Fractal-Tess/shadoword#shadoword-desktop-source
+nix build github:Fractal-Tess/shadoword#shadoword-desktop-cuda-source
+nix build github:Fractal-Tess/shadoword#shadoword-desktop-vulkan-source
 nix build github:Fractal-Tess/shadoword#shadoword-api-source
 ```
 

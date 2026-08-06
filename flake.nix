@@ -173,6 +173,7 @@
         let
           packageRuntimeDeps = runtimeDeps ++ pkgs.lib.optionals cudaSupport (cudaRuntimeDeps pkgs);
           packageBuildDeps = packageRuntimeDeps ++ pkgs.lib.optionals cudaSupport (cudaDeps pkgs);
+          desktopWrapperArgs = pkgs.lib.optionalString desktopIntegration "--set GDK_BACKEND x11 --set WEBKIT_DISABLE_DMABUF_RENDERER 1";
         in
         pkgs.rustPlatform.buildRustPackage {
           inherit pname version;
@@ -213,8 +214,7 @@
             strip --strip-unneeded "$out/bin/${executable}"
             wrapProgram "$out/bin/${executable}" \
               --prefix LD_LIBRARY_PATH : "${runtimeLibraryPath pkgs packageRuntimeDeps}" \
-              ${pkgs.lib.optionalString desktopIntegration ''--set GDK_BACKEND x11 \
-              --set WEBKIT_DISABLE_DMABUF_RENDERER 1''}
+              ${desktopWrapperArgs}
             ${pkgs.lib.optionalString desktopIntegration ''
               install -Dm644 ${./nix/shadoword.desktop} "$out/share/applications/shadoword.desktop"
               install -Dm644 ${./crates/shadoword-desktop/src-tauri/icons/128x128.png} \
@@ -314,6 +314,41 @@
               desktopIntegration = true;
             };
 
+            shadoword-desktop-cuda = mkRustPackage {
+              inherit pkgs system;
+              pname = "shadoword-desktop-cuda";
+              cargoPackage = "shadoword-desktop";
+              executable = "shadoword";
+              runtimeDeps = clientRuntimeDeps pkgs;
+              cargoFeatures = [
+                "local-runtime"
+                "custom-protocol"
+                "whisper-cuda"
+              ];
+              cudaSupport = true;
+              noDefaultFeatures = true;
+              frontendNodeModules = desktopNodeModules;
+              extraEnv.GGML_NATIVE = "OFF";
+              desktopIntegration = true;
+            };
+
+            shadoword-desktop-vulkan = mkRustPackage {
+              inherit pkgs system;
+              pname = "shadoword-desktop-vulkan";
+              cargoPackage = "shadoword-desktop";
+              executable = "shadoword";
+              runtimeDeps = clientRuntimeDeps pkgs;
+              cargoFeatures = [
+                "local-runtime"
+                "custom-protocol"
+                "whisper-vulkan"
+              ];
+              noDefaultFeatures = true;
+              frontendNodeModules = desktopNodeModules;
+              extraEnv.GGML_NATIVE = "OFF";
+              desktopIntegration = true;
+            };
+
             # Keep the historical package name as an alias to the unified desktop build.
             shadoword-desktop-client = shadoword-desktop;
           };
@@ -368,6 +403,18 @@
             extraLibraryPath = "/run/opengl-driver/lib";
             desktopIntegration = true;
           };
+          shadoword-desktop-cuda = packageFor "shadoword-desktop-cuda" {
+            executable = "shadoword";
+            runtimeDeps = clientRuntimeDeps pkgs ++ cudaRuntimeDeps pkgs;
+            extraLibraryPath = "/run/opengl-driver/lib";
+            desktopIntegration = true;
+          };
+          shadoword-desktop-vulkan = packageFor "shadoword-desktop-vulkan" {
+            executable = "shadoword";
+            runtimeDeps = clientRuntimeDeps pkgs;
+            extraLibraryPath = "/run/opengl-driver/lib";
+            desktopIntegration = true;
+          };
           # Downstream configurations can keep using the old name without losing local inference.
           shadoword-desktop-client = shadoword-desktop;
 
@@ -375,6 +422,8 @@
           shadoword-api-cuda-source = sourcePackages.shadoword-api-cuda;
           shadoword-api-vulkan-source = sourcePackages.shadoword-api-vulkan;
           shadoword-desktop-source = sourcePackages.shadoword-desktop;
+          shadoword-desktop-cuda-source = sourcePackages.shadoword-desktop-cuda;
+          shadoword-desktop-vulkan-source = sourcePackages.shadoword-desktop-vulkan;
           shadoword-desktop-client-source = shadoword-desktop-source;
         }
       );
