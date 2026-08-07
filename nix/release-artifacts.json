@@ -1,22 +1,30 @@
 {
-  "version": "0.10.6",
+  "version": "0.11.0",
   "systems": {
     "x86_64-linux": {
       "shadoword-api": {
-        "url": "https://github.com/Fractal-Tess/shadoword/releases/download/v0.10.6/shadoword-api-cpu-x86_64-linux.tar.gz",
-        "hash": "sha256-qTSWXBm1qGe5F0Ld+ONPCdEGLA33B4dGcMxMx1aMSWI="
+        "url": "https://github.com/Fractal-Tess/shadoword/releases/download/v0.11.0/shadoword-api-cpu-x86_64-linux.tar.gz",
+        "hash": "sha256-s1K8CXOTYzWLi58v20pv2df+U/pgIiiru4GwlKeaU6Q="
       },
       "shadoword-api-cuda": {
-        "url": "https://github.com/Fractal-Tess/shadoword/releases/download/v0.10.6/shadoword-api-cuda-x86_64-linux.tar.gz",
-        "hash": "sha256-KDJWNFljv/Z+riJbbqS56uwxUe+pX66hXueq+70GSyI="
+        "url": "https://github.com/Fractal-Tess/shadoword/releases/download/v0.11.0/shadoword-api-cuda-x86_64-linux.tar.gz",
+        "hash": "sha256-x0cKPZqk/RwGsEQJvYOPaEQ5LSrmomdzHTzquVpONfk="
       },
       "shadoword-api-vulkan": {
-        "url": "https://github.com/Fractal-Tess/shadoword/releases/download/v0.10.6/shadoword-api-vulkan-x86_64-linux.tar.gz",
-        "hash": "sha256-2R/nj7BziIsVEbzvw7yk68+FCwVcYYbZMe8fnREIKfU="
+        "url": "https://github.com/Fractal-Tess/shadoword/releases/download/v0.11.0/shadoword-api-vulkan-x86_64-linux.tar.gz",
+        "hash": "sha256-yirV63DfSb5puzKt0O55MlHcLAJH1sjnST03VTodilU="
       },
       "shadoword-desktop": {
-        "url": "https://github.com/Fractal-Tess/shadoword/releases/download/v0.10.6/shadoword-desktop-x86_64-linux.tar.gz",
-        "hash": "sha256-z2IPPY6hMqZg0q6to2SC3Oznr8CSTyGq7nxaCkXr1PI="
+        "url": "https://github.com/Fractal-Tess/shadoword/releases/download/v0.11.0/shadoword-desktop-x86_64-linux.tar.gz",
+        "hash": "sha256-lpjUImTB+21Azwp/egB0+EpiHhh1hd/rQwgPZXpQD10="
+      },
+      "shadoword-desktop-cuda": {
+        "url": "https://github.com/Fractal-Tess/shadoword/releases/download/v0.11.0/shadoword-desktop-cuda-x86_64-linux.tar.gz",
+        "hash": "sha256-VazLEsU4nBFSkYju4tuXymgSd3fUi1CbaXvHxjOApgY="
+      },
+      "shadoword-desktop-vulkan": {
+        "url": "https://github.com/Fractal-Tess/shadoword/releases/download/v0.11.0/shadoword-desktop-vulkan-x86_64-linux.tar.gz",
+        "hash": "sha256-lI7B4F1X8b3DWPuaLBHXM2rriSFXkAs52hYLypWq6u4="
       }
     }
   }
