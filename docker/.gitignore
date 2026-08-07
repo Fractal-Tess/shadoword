@@ -1,6 +1,4 @@
-config/shadoword/config.json
+config/shadoword/api.json
 data/*
 !data/.gitkeep
-rootfs/*
-!rootfs/.gitkeep
 

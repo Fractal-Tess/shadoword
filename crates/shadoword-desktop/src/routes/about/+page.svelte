@@ -29,7 +29,7 @@
 			<span class="text-[0.6875rem] font-[680] tracking-[0.08em] text-ink-muted uppercase">
 				Linux desktop
 			</span>
-			<strong class="font-mono text-xl font-[550] text-ink">0.11.0</strong>
+			<strong class="font-mono text-xl font-[550] text-ink">0.12.0</strong>
 			<Badge variant="outline">Production</Badge>
 		</div>
 	</section>

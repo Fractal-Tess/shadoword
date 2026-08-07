@@ -6,6 +6,16 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## [Unreleased]
 
+## [0.12.0] - 2026-08-07
+
+### Added
+
+- Reproducible CPU, CUDA, and Vulkan container images produced as layered Flake outputs from the same Nix API derivations used by versioned binary releases.
+
+### Changed
+
+- Removed the mutable Debian base image, `apt-get` package installation, and generated Docker rootfs staging from container builds.
+
 ## [0.11.0] - 2026-08-06
 
 ### Added
@@ -174,7 +184,8 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 - Prevented duplicate model loads after eager-preload timeouts.
 - Added bounded remote connect, handshake, read, write, and finalization waits.
 
-[Unreleased]: https://github.com/Fractal-Tess/shadoword/compare/v0.11.0...HEAD
+[Unreleased]: https://github.com/Fractal-Tess/shadoword/compare/v0.12.0...HEAD
+[0.12.0]: https://github.com/Fractal-Tess/shadoword/compare/v0.11.0...v0.12.0
 [0.11.0]: https://github.com/Fractal-Tess/shadoword/compare/v0.10.6...v0.11.0
 [0.10.6]: https://github.com/Fractal-Tess/shadoword/compare/v0.10.5...v0.10.6
 [0.10.5]: https://github.com/Fractal-Tess/shadoword/compare/v0.10.4...v0.10.5

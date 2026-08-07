@@ -162,6 +162,79 @@
       runtimeLibraryPath =
         pkgs: runtimeDeps: "/run/opengl-driver/lib:${pkgs.lib.makeLibraryPath runtimeDeps}";
 
+      mkContainerImage =
+        {
+          pkgs,
+          apiPackage,
+          variant,
+        }:
+        pkgs.dockerTools.buildLayeredImage {
+          name = "shadoword-backend";
+          tag = variant;
+          contents = [
+            apiPackage
+            pkgs.cacert
+          ]
+          ++ pkgs.lib.optionals (variant == "vulkan") [ pkgs.mesa ];
+
+          extraCommands = ''
+            mkdir -p config data etc home/shadoword tmp usr/local/bin
+            cat > etc/passwd <<'EOF'
+            root:x:0:0:root:/root:/bin/sh
+            shadoword:x:1000:1000:Shadoword:/home/shadoword:/bin/sh
+            EOF
+            cat > etc/group <<'EOF'
+            root:x:0:
+            shadoword:x:1000:
+            EOF
+            cat > etc/nsswitch.conf <<'EOF'
+            passwd: files
+            group: files
+            hosts: files dns
+            EOF
+            printf '%s\n' '${variant}' > etc/shadoword-container-variant
+            ln -s ${apiPackage}/bin/shadoword-api usr/local/bin/shadoword-api
+            chmod 1777 tmp
+            ${pkgs.lib.optionalString (variant == "vulkan") ''
+              mkdir -p usr/share/vulkan
+              ln -s ${pkgs.mesa}/share/vulkan/icd.d usr/share/vulkan/icd.d
+            ''}
+          '';
+          fakeRootCommands = ''
+            chown -R 1000:1000 config data home/shadoword
+          '';
+
+          config = {
+            Entrypoint = [ "/usr/local/bin/shadoword-api" ];
+            Env = [
+              "HOME=/home/shadoword"
+              "XDG_CONFIG_HOME=/config"
+              "XDG_DATA_HOME=/data"
+              "SHADOWORD_LISTEN_ADDR=0.0.0.0:47813"
+              "SHADOWORD_CONTAINER_VARIANT=${variant}"
+              "SSL_CERT_FILE=/etc/ssl/certs/ca-bundle.crt"
+              "RUST_LOG=info"
+            ];
+            User = "1000:1000";
+            WorkingDir = "/home/shadoword";
+            ExposedPorts."47813/tcp" = { };
+            Labels = {
+              "io.shadoword.inference-variant" = variant;
+              "org.opencontainers.image.description" = "Shadoword ${variant} speech-to-text API";
+              "org.opencontainers.image.licenses" = "MIT";
+              "org.opencontainers.image.revision" = self.rev or self.dirtyRev or "unknown";
+              "org.opencontainers.image.source" = "https://github.com/Fractal-Tess/shadoword";
+              "org.opencontainers.image.title" = "Shadoword API (${variant})";
+              "org.opencontainers.image.version" = version;
+            };
+          };
+
+          meta = {
+            description = "Reproducible Shadoword ${variant} API container image";
+            platforms = supportedSystems;
+          };
+        };
+
       mkRustPackage =
         {
           pkgs,
@@ -428,6 +501,21 @@
           shadoword-api-source = sourcePackages.shadoword-api;
           shadoword-api-cuda-source = sourcePackages.shadoword-api-cuda;
           shadoword-api-vulkan-source = sourcePackages.shadoword-api-vulkan;
+          shadoword-container-cpu = mkContainerImage {
+            inherit pkgs;
+            apiPackage = sourcePackages.shadoword-api;
+            variant = "cpu";
+          };
+          shadoword-container-cuda = mkContainerImage {
+            inherit pkgs;
+            apiPackage = sourcePackages.shadoword-api-cuda;
+            variant = "cuda";
+          };
+          shadoword-container-vulkan = mkContainerImage {
+            inherit pkgs;
+            apiPackage = sourcePackages.shadoword-api-vulkan;
+            variant = "vulkan";
+          };
           shadoword-desktop-source = sourcePackages.shadoword-desktop;
           shadoword-desktop-cuda-source = sourcePackages.shadoword-desktop-cuda;
           shadoword-desktop-vulkan-source = sourcePackages.shadoword-desktop-vulkan;

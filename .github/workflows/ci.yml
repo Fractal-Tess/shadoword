@@ -66,6 +66,9 @@ jobs:
           nix eval .#packages.x86_64-linux.shadoword-api.drvPath
           nix eval .#packages.x86_64-linux.shadoword-api-cuda.drvPath
           nix eval .#packages.x86_64-linux.shadoword-api-source.drvPath
+          nix eval .#packages.x86_64-linux.shadoword-container-cpu.drvPath
+          nix eval .#packages.x86_64-linux.shadoword-container-cuda.drvPath
+          nix eval .#packages.x86_64-linux.shadoword-container-vulkan.drvPath
           nix eval .#packages.x86_64-linux.shadoword-desktop-cuda-source.drvPath
           nix eval .#packages.x86_64-linux.shadoword-desktop-vulkan-source.drvPath
           for system in x86_64-linux aarch64-linux; do

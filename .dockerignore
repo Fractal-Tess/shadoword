@@ -1,9 +1,0 @@
-.git
-.github
-.direnv
-.vscode
-target
-bench_corpus
-crates/shadoword-model-whisper/bench-results
-.codex
-

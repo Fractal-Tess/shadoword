@@ -101,12 +101,26 @@ Use `shadoword-api --help` for configuration, model, and request-recording optio
 
 ## Docker
 
+CPU, CUDA, and Vulkan daemon images are published to both `ghcr.io/fractal-tess/shadoword-backend` and `vgfractal/shadoword-backend` on Docker Hub.
+
+| Backend | Rolling tag | Versioned tag |
+| --- | --- | --- |
+| CPU | `latest` or `cpu` | `<version>` or `<version>-cpu` |
+| CUDA | `cuda` | `<version>-cuda` |
+| Vulkan | `vulkan` | `<version>-vulkan` |
+
+Mount persistent configuration and model directories at `/config` and `/data`. Start from [`docker/config/shadoword/api.json.example`](docker/config/shadoword/api.json.example), using `"cpu"` for the CPU image and `"gpu"` for CUDA or Vulkan.
+
+CUDA requires the NVIDIA Container Toolkit and `--gpus all`. Vulkan on AMD or Intel requires the render device, for example `--device /dev/dri`, plus access to the device's host group.
+
+The container images are reproducible Flake outputs built directly from the Nix package closures without a mutable distribution base image or `apt-get`. To build and load a variant locally:
+
 ```bash
-./docker/export-rootfs.sh
-docker build -t shadoword-backend .
+image=$(nix build .#shadoword-container-cpu --no-link --print-out-paths) # or -cuda / -vulkan
+docker load < "$image"
 ```
 
-Mount a persistent API configuration and model directory when running the image. The published daemon image uses the portable CPU backend.
+Release automation reuses the exact CPU, CUDA, and Vulkan API derivations for the binary archives and their corresponding layered container images.
 
 ## Checks
 

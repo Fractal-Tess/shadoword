@@ -13,6 +13,7 @@ on:
 
 permissions:
   contents: write
+  packages: write
 
 concurrency:
   group: release-${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
@@ -23,7 +24,7 @@ env:
 
 jobs:
   linux-x86_64:
-    name: Build Linux x86_64 binaries
+    name: Build and publish Linux x86_64 release
     runs-on: ubuntu-24.04
     steps:
       - name: Checkout release tag
@@ -138,6 +139,98 @@ jobs:
                 }
               }
             }' > dist/nix-release-artifacts.json
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Extract CPU image metadata
+        id: docker-cpu-meta
+        uses: docker/metadata-action@v5
+        with:
+          images: |
+            ghcr.io/fractal-tess/shadoword-backend
+            docker.io/vgfractal/shadoword-backend
+          flavor: latest=false
+          tags: |
+            type=semver,pattern={{version}},value=${{ env.RELEASE_TAG }}
+            type=semver,pattern={{version}}-cpu,value=${{ env.RELEASE_TAG }}
+            type=raw,value=cpu
+            type=raw,value=latest
+
+      - name: Build and push CPU image
+        shell: bash
+        run: |
+          set -euo pipefail
+          image=$(nix build .#shadoword-container-cpu --no-link --print-out-paths -L)
+          mapfile -t tags <<'TAGS'
+          ${{ steps.docker-cpu-meta.outputs.tags }}
+          TAGS
+          ./nix/publish-container.sh "$image" shadoword-backend:cpu "${tags[@]}"
+
+      - name: Extract CUDA image metadata
+        id: docker-cuda-meta
+        uses: docker/metadata-action@v5
+        with:
+          images: |
+            ghcr.io/fractal-tess/shadoword-backend
+            docker.io/vgfractal/shadoword-backend
+          flavor: latest=false
+          tags: |
+            type=semver,pattern={{version}}-cuda,value=${{ env.RELEASE_TAG }}
+            type=raw,value=cuda
+
+      - name: Build and push CUDA image
+        shell: bash
+        run: |
+          set -euo pipefail
+          image=$(nix build .#shadoword-container-cuda --no-link --print-out-paths -L)
+          mapfile -t tags <<'TAGS'
+          ${{ steps.docker-cuda-meta.outputs.tags }}
+          TAGS
+          ./nix/publish-container.sh "$image" shadoword-backend:cuda "${tags[@]}"
+
+      - name: Extract Vulkan image metadata
+        id: docker-vulkan-meta
+        uses: docker/metadata-action@v5
+        with:
+          images: |
+            ghcr.io/fractal-tess/shadoword-backend
+            docker.io/vgfractal/shadoword-backend
+          flavor: latest=false
+          tags: |
+            type=semver,pattern={{version}}-vulkan,value=${{ env.RELEASE_TAG }}
+            type=raw,value=vulkan
+
+      - name: Build and push Vulkan image
+        shell: bash
+        run: |
+          set -euo pipefail
+          image=$(nix build .#shadoword-container-vulkan --no-link --print-out-paths -L)
+          mapfile -t tags <<'TAGS'
+          ${{ steps.docker-vulkan-meta.outputs.tags }}
+          TAGS
+          ./nix/publish-container.sh "$image" shadoword-backend:vulkan "${tags[@]}"
+
+      - name: Verify published image variants
+        shell: bash
+        run: |
+          set -euo pipefail
+          version=${RELEASE_TAG#v}
+          for image in ghcr.io/fractal-tess/shadoword-backend docker.io/vgfractal/shadoword-backend; do
+            for tag in "$version" "$version-cpu" "$version-cuda" "$version-vulkan"; do
+              docker manifest inspect "$image:$tag" >/dev/null
+            done
+          done
 
       - name: Publish GitHub release
         uses: softprops/action-gh-release@v2
