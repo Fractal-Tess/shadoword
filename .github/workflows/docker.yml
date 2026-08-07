@@ -9,7 +9,7 @@ on:
       - "Cargo.lock"
       - "flake.nix"
       - "flake.lock"
-      - "nix/**"
+      - "nix/publish-container.sh"
       - "crates/**"
       - ".github/workflows/docker.yml"
 
