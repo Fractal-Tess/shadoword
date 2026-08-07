@@ -27,6 +27,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 - Build release binaries with fat LTO, one codegen unit, abort-on-panic semantics, and stripped symbols.
 - Replaced the legacy Tauri application icons with the transparent Shadoword waveform mark.
 - Raised the minimum Rust version to 1.94 and removed the temporary vendored Specta compatibility patches.
+- Updated Rust and Bun dependencies to their newest supported releases, including Astro 7, CPAL 0.18, Reqwest 0.13, Rubato 4, and Tokio Tungstenite 0.30.
 
 ### Fixed
 

@@ -214,7 +214,7 @@ pub fn download_whisper_model_with_progress(
         file.flush().context("failed to flush downloaded model")?;
         file.sync_all().context("failed to sync downloaded model")?;
 
-        let actual = format!("{:x}", hasher.finalize());
+        let actual = hex::encode(hasher.finalize());
         if !actual.eq_ignore_ascii_case(spec.sha256) {
             return Err(anyhow!(
                 "SHA-256 mismatch for {}: expected {}, got {}",
@@ -260,7 +260,7 @@ pub fn verify_model_file(path: &Path, expected_sha256: &str) -> Result<()> {
         hasher.update(&buffer[..read]);
     }
 
-    let actual = format!("{:x}", hasher.finalize());
+    let actual = hex::encode(hasher.finalize());
     if actual.eq_ignore_ascii_case(expected_sha256) {
         Ok(())
     } else {

@@ -23,6 +23,7 @@ whisper-cuda = ["local-whisper", "shadoword-model-whisper/whisper-cuda"]
 anyhow.workspace = true
 cpal = { workspace = true, optional = true }
 directories.workspace = true
+hex.workspace = true
 hound.workspace = true
 log = { workspace = true, optional = true }
 reqwest = { workspace = true, optional = true }

@@ -52,7 +52,7 @@ serde_json.workspace = true
 shadoword-core = { path = "../../shadoword-core", default-features = false, features = ["desktop-audio"] }
 specta.workspace = true
 specta-typescript.workspace = true
-tauri = { version = "2.11.3", features = ["image-png", "tray-icon"] }
+tauri = { version = "2.11.5", features = ["image-png", "tray-icon"] }
 tauri-plugin-log = "2"
 tauri-specta.workspace = true
 tokio.workspace = true

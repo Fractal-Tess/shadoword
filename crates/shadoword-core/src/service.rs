@@ -5,7 +5,8 @@ use crate::contracts::{
 use crate::model_download::default_whisper_model;
 use crate::wav;
 use anyhow::{anyhow, Context, Result};
-use rubato::{FftFixedIn, Resampler};
+use rubato::audioadapter_buffers::direct::InterleavedSlice;
+use rubato::{Fft, FixedSync, Resampler};
 use shadoword_model_whisper::{list_whisper_gpu_devices, WhisperModel};
 use shadoword_shared::AudioInput;
 use shadoword_shared::{Model, ModelAffinity, ModelConfig, TranscriptionOptions};
@@ -220,39 +221,23 @@ impl LocalService {
             return Ok(input.samples);
         }
 
-        let chunk_size = 1024;
-        let mut resampler =
-            FftFixedIn::<f32>::new(input.sample_rate as usize, target_rate, chunk_size, 1, 1)
-                .context("failed to initialize resampler")?;
-
-        let expected_samples = ((input.samples.len() as u128 * target_rate as u128)
-            .div_ceil(input.sample_rate as u128)) as usize;
-        let mut output = Vec::with_capacity(expected_samples);
-        let mut chunks = input.samples.chunks_exact(chunk_size);
-        for chunk in &mut chunks {
-            let processed = resampler
-                .process(&[chunk], None)
-                .context("failed to resample audio")?;
-            output.extend_from_slice(&processed[0]);
+        if input.samples.is_empty() {
+            return Ok(Vec::new());
         }
-        let remainder = chunks.remainder();
-        if !remainder.is_empty() {
-            let processed = resampler
-                .process_partial(Some(&[remainder]), None)
-                .context("failed to resample final audio frames")?;
-            output.extend_from_slice(&processed[0]);
-        }
-        while output.len() < expected_samples {
-            let processed = resampler
-                .process_partial::<&[f32]>(None, None)
-                .context("failed to flush delayed resampler frames")?;
-            if processed[0].is_empty() {
-                break;
-            }
-            output.extend_from_slice(&processed[0]);
-        }
-        output.truncate(expected_samples);
-        Ok(output)
+        let mut resampler = Fft::<f32>::new(
+            input.sample_rate as usize,
+            target_rate,
+            1024,
+            1,
+            FixedSync::Both,
+        )
+        .context("failed to initialize resampler")?;
+        let input_buffer = InterleavedSlice::new(&input.samples, 1, input.samples.len())
+            .context("failed to adapt audio buffer")?;
+        let output = resampler
+            .process_all(&input_buffer, input.samples.len(), None)
+            .context("failed to resample audio")?;
+        Ok(output.take_data())
     }
 
     fn transcribe_audio_internal(

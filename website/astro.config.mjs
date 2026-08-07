@@ -1,5 +1,4 @@
 import { defineConfig } from 'astro/config'
-import react from '@astrojs/react'
 import tailwindcss from '@tailwindcss/vite'
 
 export default defineConfig({
@@ -13,7 +12,6 @@ export default defineConfig({
    */
   site: 'https://shadoword.fractal-tess.xyz',
   trailingSlash: 'never',
-  integrations: [react()],
   vite: {
     plugins: [tailwindcss()],
   },

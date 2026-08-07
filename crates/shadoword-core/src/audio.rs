@@ -88,19 +88,17 @@ pub struct MicrophoneRecorder;
 impl MicrophoneRecorder {
     pub fn list_input_devices() -> Result<Vec<InputDeviceInfo>> {
         let host = cpal::default_host();
-        let default_name = host
-            .default_input_device()
-            .and_then(|device| device.name().ok());
+        let default_name = host.default_input_device().map(|device| device.to_string());
 
         let mut devices = host
             .input_devices()
             .context("failed to list input devices")?
-            .filter_map(|device| {
-                let name = device.name().ok()?;
-                Some(InputDeviceInfo {
+            .map(|device| {
+                let name = device.to_string();
+                InputDeviceInfo {
                     is_default: default_name.as_deref() == Some(name.as_str()),
                     name,
-                })
+                }
             })
             .collect::<Vec<_>>();
 
@@ -114,12 +112,7 @@ impl MicrophoneRecorder {
         let device = if let Some(name) = input_device_name {
             host.input_devices()
                 .context("failed to list input devices")?
-                .find(|device| {
-                    device
-                        .name()
-                        .map(|current| current == name)
-                        .unwrap_or(false)
-                })
+                .find(|device| device.to_string() == name)
                 .with_context(|| format!("input device '{}' not found", name))?
         } else {
             host.default_input_device()
@@ -130,9 +123,9 @@ impl MicrophoneRecorder {
             .default_input_config()
             .context("failed to query default input config")?;
 
-        let sample_rate = supported.sample_rate().0;
+        let sample_rate = supported.sample_rate();
         let channels = usize::from(supported.channels());
-        let config: StreamConfig = supported.clone().into();
+        let config: StreamConfig = supported.into();
         let samples = Arc::new(Mutex::new(Vec::new()));
         let available = Arc::new(Notify::new());
         let writer = Arc::clone(&samples);
@@ -191,14 +184,14 @@ fn build_stream<T>(
     channels: usize,
     samples: Arc<Mutex<Vec<f32>>>,
     available: Arc<Notify>,
-    err_fn: impl FnMut(cpal::StreamError) + Send + 'static,
+    err_fn: impl FnMut(cpal::Error) + Send + 'static,
 ) -> Result<Stream>
 where
     T: cpal::SizedSample,
     f32: cpal::FromSample<T>,
 {
     let stream = device.build_input_stream(
-        config,
+        *config,
         move |data: &[T], _| {
             let wrote_samples = if let Ok(mut buffer) = samples.lock() {
                 for frame in data.chunks(channels.max(1)) {

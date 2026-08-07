@@ -6,7 +6,8 @@ use crate::contracts::{
 };
 use crate::model_download::default_whisper_model;
 use anyhow::{anyhow, Context, Result};
-use rubato::{FftFixedIn, Resampler};
+use rubato::audioadapter_buffers::direct::InterleavedSlice;
+use rubato::{Fft, FixedSync, Resampler};
 use serde::{Deserialize, Serialize};
 use shadoword_model_whisper::{list_whisper_gpu_devices, WhisperModel};
 use shadoword_shared::{
@@ -1617,42 +1618,21 @@ fn resample(input: AudioInput, target_rate: u32) -> Result<Vec<f32>> {
     if input.sample_rate == target_rate {
         return Ok(input.samples);
     }
-    let chunk_size = 1024;
-    let mut resampler = FftFixedIn::<f32>::new(
+    if input.samples.is_empty() {
+        return Ok(Vec::new());
+    }
+    let mut resampler = Fft::<f32>::new(
         input.sample_rate as usize,
         target_rate as usize,
-        chunk_size,
+        1024,
         1,
-        1,
+        FixedSync::Both,
     )
     .context("failed to initialize resampler")?;
-    let expected_samples =
-        predicted_sample_count(input.samples.len(), input.sample_rate, target_rate)
-            .map_err(anyhow::Error::new)?;
-    let mut output = Vec::with_capacity(expected_samples);
-    let mut chunks = input.samples.chunks_exact(chunk_size);
-    for chunk in &mut chunks {
-        let processed = resampler
-            .process(&[chunk], None)
-            .context("failed to resample audio")?;
-        output.extend_from_slice(&processed[0]);
-    }
-    let remainder = chunks.remainder();
-    if !remainder.is_empty() {
-        let processed = resampler
-            .process_partial(Some(&[remainder]), None)
-            .context("failed to resample final audio frames")?;
-        output.extend_from_slice(&processed[0]);
-    }
-    while output.len() < expected_samples {
-        let processed = resampler
-            .process_partial::<&[f32]>(None, None)
-            .context("failed to flush delayed resampler frames")?;
-        if processed[0].is_empty() {
-            break;
-        }
-        output.extend_from_slice(&processed[0]);
-    }
-    output.truncate(expected_samples);
-    Ok(output)
+    let input_buffer = InterleavedSlice::new(&input.samples, 1, input.samples.len())
+        .context("failed to adapt audio buffer")?;
+    let output = resampler
+        .process_all(&input_buffer, input.samples.len(), None)
+        .context("failed to resample audio")?;
+    Ok(output.take_data())
 }
