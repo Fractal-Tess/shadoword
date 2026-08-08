@@ -35,7 +35,7 @@ export class SettingsContextState {
 	}
 
 	get locked() {
-		return this.app.captureLocked || this.persistence.saveState === 'saving';
+		return this.app.captureLocked;
 	}
 
 	get activeRuntime() {

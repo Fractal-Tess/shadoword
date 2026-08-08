@@ -1,4 +1,4 @@
-import type { DownloadJobStatus } from './bindings';
+import type { DownloadJobStatus, ServiceMode } from './bindings';
 
 export function errorMessage(error: unknown) {
 	if (error instanceof Error) return error.message;
@@ -20,6 +20,28 @@ function isErrorPayload(error: unknown): error is { message: string; action?: un
 
 export function formatDuration(milliseconds: number) {
 	return `${(milliseconds / 1000).toFixed(1)}s`;
+}
+
+export function serviceModeLabel(mode: ServiceMode) {
+	if (mode === 'local') return 'Local';
+	if (mode === 'open_router') return 'OpenRouter';
+	return 'Shadoword API';
+}
+
+/** History entries now survive restarts, so a bare clock reading is ambiguous the
+ *  moment the app is reopened the next day. Today stays a clock reading because
+ *  that is the common case and the date would be noise; anything older is dated. */
+export function formatRecordedAt(recordedAt: string) {
+	const recorded = new Date(recordedAt);
+	if (Number.isNaN(recorded.getTime())) return recordedAt;
+	const time = recorded.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
+	const today = new Date();
+	if (recorded.toDateString() === today.toDateString()) return time;
+	const yesterday = new Date(today);
+	yesterday.setDate(today.getDate() - 1);
+	if (recorded.toDateString() === yesterday.toDateString()) return `Yesterday, ${time}`;
+	const date = recorded.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+	return `${date}, ${time}`;
 }
 
 export function formatBytes(bytes: number) {

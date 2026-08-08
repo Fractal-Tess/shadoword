@@ -163,13 +163,13 @@ export class CaptureOperations {
 		if (result.text.trim()) {
 			const record = historyRecordFromCompletion(
 				sessionId,
-				new Intl.DateTimeFormat(undefined, { hour: '2-digit', minute: '2-digit' }).format(now),
+				new Date(now).toISOString(),
 				mode,
 				result,
 				segments
 			);
 			if (!this.app.history.some((item) => item.id === record.id)) {
-				this.app.history = [record, ...this.app.history];
+				this.app.setHistory([record, ...this.app.history]);
 			}
 		}
 		this.app.captureState = 'idle';

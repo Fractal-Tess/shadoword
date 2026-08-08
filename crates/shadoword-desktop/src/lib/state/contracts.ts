@@ -67,6 +67,7 @@ export type DesktopStateContext = {
 	initialize(): Promise<void>;
 	dispose(): void;
 	clearError(): void;
+	setHistory(records: HistoryRecord[]): void;
 	retryError(): Promise<void>;
 	notify(title: string, detail: string, variant?: NotificationVariant): void;
 	refreshOverview(): Promise<void>;

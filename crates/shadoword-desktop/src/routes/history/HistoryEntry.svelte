@@ -2,6 +2,7 @@
 	import { Check, Clock3, Copy, Trash2 } from '@lucide/svelte';
 	import { Badge } from '$lib/components/ui/badge';
 	import { Button } from '$lib/components/ui/button';
+	import { formatDuration, formatRecordedAt, serviceModeLabel } from '$lib/display';
 	import type { HistoryRecord } from '$lib/types';
 
 	let {
@@ -39,7 +40,9 @@
 			class="flex items-center justify-between gap-4 border-b border-line py-[0.55rem] pr-[0.65rem] pl-[0.9rem]"
 		>
 			<div class="flex items-center gap-[0.4rem] font-mono text-[0.6875rem] text-ink-muted">
-				<Clock3 size={13} />{item.timestamp}
+				<Clock3 size={13} /><time datetime={item.recorded_at}
+					>{formatRecordedAt(item.recorded_at)}</time
+				>
 			</div>
 			<div class="flex items-center gap-[0.15rem]">
 				<Button variant="ghost" size="icon-sm" onclick={onCopy} aria-label="Copy transcript">
@@ -60,16 +63,20 @@
 			{item.text}
 		</p>
 		<footer class="flex flex-wrap items-center gap-[0.7rem] px-4 pb-4">
-			<Badge variant="outline">{item.engine}</Badge>
-			<span class="font-mono text-[0.6875rem] text-ink-muted">{item.duration} audio</span>
+			<Badge variant="outline">{serviceModeLabel(item.mode)} · {item.engine}</Badge>
+			<span class="font-mono text-[0.6875rem] text-ink-muted">
+				{formatDuration(item.audio_duration_ms)} audio
+			</span>
 			<span class="font-mono text-[0.6875rem] text-ink-muted">
 				{item.segments}
 				{item.segments === 1 ? 'segment' : 'segments'}
 			</span>
-			<span class="font-mono text-[0.6875rem] text-ink-muted">{item.latency} inference</span>
-			{#if item.costUsd != null}
+			<span class="font-mono text-[0.6875rem] text-ink-muted">
+				{item.elapsed_ms}ms inference
+			</span>
+			{#if item.cost_usd != null}
 				<span class="border-l border-scarlet pl-[0.7rem] font-mono text-[0.6875rem] text-ink">
-					{formatCost(item.costUsd)} request cost
+					{formatCost(item.cost_usd)} request cost
 				</span>
 			{/if}
 		</footer>

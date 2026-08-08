@@ -3,6 +3,7 @@ compile_error!("Shadoword desktop builds must include the local CPU runtime");
 
 mod commands;
 mod contracts;
+mod history;
 mod hotkeys;
 mod openrouter;
 mod output;
@@ -26,6 +27,10 @@ fn bindings() -> tauri_specta::Builder<Wry> {
             commands::load_desktop_state,
             commands::get_recording_state,
             commands::list_input_devices,
+            commands::poll_microphone_level,
+            commands::stop_microphone_level_monitor,
+            commands::load_history,
+            commands::save_history,
             commands::save_desktop_settings,
             commands::reveal_desktop_secret,
             commands::copy_desktop_secret,
@@ -111,9 +116,6 @@ fn setup_tray(app: &tauri::AppHandle) -> tauri::Result<()> {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    #[cfg(debug_assertions)]
-    export_bindings().expect("failed to export TypeScript bindings");
-
     let invoke_bindings = bindings();
     let state = DesktopState::load().expect("failed to initialize Shadoword desktop state");
     tauri::Builder::default()

@@ -46,6 +46,7 @@
 			</div>
 			<Select
 				id="paste-method"
+				class="w-[var(--control-width)] max-w-full"
 				value={form.pasteMethod}
 				onValueChange={(value) => form.setPasteMethod(value)}
 				options={PASTE_METHOD_OPTIONS}
@@ -60,7 +61,9 @@
 					Add whitespace around each delivered transcript so consecutive recordings stay separate.
 				</p>
 			</div>
-			<div class="grid grid-cols-2 gap-2 max-[520px]:grid-cols-1">
+			<div
+				class="grid w-[var(--control-width)] max-w-full grid-cols-2 gap-2 max-[520px]:grid-cols-1"
+			>
 				<label class="grid gap-1 text-[0.6875rem] text-ink-muted" for="output-prefix">
 					Before transcript
 					<Select
@@ -95,9 +98,9 @@
 						Wait for the clipboard owner before sending the shortcut.
 					</p>
 				</div>
-				<div class="flex items-center gap-2">
+				<div class="flex w-[var(--control-width)] max-w-full items-center gap-2">
 					<Input
-						class="w-24"
+						class="min-w-0 flex-1"
 						id="paste-delay"
 						type="number"
 						min="0"

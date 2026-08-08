@@ -1,8 +1,10 @@
 <script lang="ts">
-	import { AlertTriangle, Copy, Eye, EyeOff, RefreshCw, ShieldCheck } from '@lucide/svelte';
+	import { Eye, EyeOff, RefreshCw } from '@lucide/svelte';
 	import { Button } from '$lib/components/ui/button';
 	import { Input } from '$lib/components/ui/input';
 	import { Select } from '$lib/components/ui/select';
+	import { StatusIndicator } from '$lib/components/ui/status-indicator';
+	import type { RuntimeState } from '$lib/types';
 	import SettingsRow from '../SettingsRow.svelte';
 	import { getSettingsContext } from '../_state/context.svelte';
 	import { cn } from '$lib/utils';
@@ -10,7 +12,7 @@
 
 	const settings = getSettingsContext();
 	const openRouter = settings.openRouter;
-	const rowClass = 'grid-cols-[minmax(12rem,0.7fr)_minmax(15rem,1fr)] max-[800px]:grid-cols-1';
+	const rowClass = 'grid-cols-[minmax(0,1fr)_var(--control-width)] max-[800px]:grid-cols-1';
 	let selectedModel = $derived(
 		settings.app.openRouterModels.find((model) => model.id === openRouter.model) ?? null
 	);
@@ -27,10 +29,54 @@
 		];
 	});
 
+	let verifiedReadout = $derived.by(() => {
+		const report = openRouter.keyReport;
+		if (!report) return '';
+		if (report.limit_remaining !== null) return `${formatCredits(report.limit_remaining)} left`;
+		if (report.limit === null) return report.is_free_tier ? 'free' : 'unmetered';
+		return '';
+	});
+
+	function formatCredits(value: number) {
+		return value >= 100 ? `$${Math.round(value)}` : `$${value.toFixed(2)}`;
+	}
+
+	type KeyStatus = { state: RuntimeState; label: string; readout: string; title: string };
+
+	let keyStatus = $derived.by((): KeyStatus | null => {
+		const blank = { readout: '', title: '' };
+		if (openRouter.connectionState === 'testing')
+			return { state: 'loading', label: 'Testing', ...blank };
+		if (openRouter.connectionState === 'success')
+			return { state: 'ready', label: 'Verified', readout: verifiedReadout, title: '' };
+		if (openRouter.connectionState === 'failed')
+			return {
+				state: 'offline',
+				label: 'Rejected',
+				readout: '',
+				title: openRouter.credentialMessage
+			};
+		if (openRouter.credentialMessage)
+			return {
+				state: 'warning',
+				label: 'Unavailable',
+				readout: '',
+				title: openRouter.credentialMessage
+			};
+		if (!openRouter.hasStoredKey) return null;
+		if (settings.app.openRouterCredentialState === 'checking')
+			return { state: 'loading', label: 'Checking', ...blank };
+		if (settings.app.openRouterCredentialState === 'invalid')
+			return { state: 'offline', label: 'Rejected', ...blank };
+		if (settings.app.openRouterReady) return { state: 'ready', label: 'Verified', ...blank };
+		return { state: 'warning', label: 'Not verified', ...blank };
+	});
+
 	onMount(() => {
 		if (settings.app.openRouterModelsState === 'idle') {
 			void settings.app.refreshOpenRouterModels();
 		}
+		void openRouter.loadSavedKey();
 	});
 </script>
 
@@ -41,12 +87,11 @@
 			Use an OpenRouter model with transcription output.
 		</p>
 	</div>
-	<div class="flex min-w-0 flex-wrap items-center gap-2">
+	<div class="flex w-[var(--control-width)] max-w-full min-w-0 flex-wrap items-center gap-2">
 		<Select
 			id="openrouter-model"
-			class="h-12 min-w-0 flex-1 border-line-strong bg-raised px-[0.7rem] py-[0.45rem] text-left hover:border-ink-muted hover:bg-[color-mix(in_srgb,var(--surface-2)_88%,var(--ink)_12%)]"
+			class="min-w-0 flex-1 text-left"
 			contentClass="max-h-[22rem] w-[min(31rem,var(--bits-select-anchor-width))]"
-			itemClass="min-h-12 px-3 py-[0.55rem] pr-9"
 			value={openRouter.model}
 			onValueChange={(value) => openRouter.setModel(value)}
 			options={modelOptions}
@@ -55,33 +100,13 @@
 			ariaBusy={settings.app.openRouterModelsState === 'loading'}
 			menuLabel={`${settings.app.openRouterModels.length} transcription models`}
 		/>
-		<Button
-			variant="outline"
-			size="sm"
-			aria-label="Refresh OpenRouter transcription models"
-			onclick={() => void settings.app.refreshOpenRouterModels()}
-			disabled={settings.locked || settings.app.openRouterModelsState === 'loading'}
-		>
-			<span
-				class={cn(
-					'inline-flex',
-					settings.app.openRouterModelsState === 'loading' &&
-						'animate-spin motion-reduce:animate-none'
-				)}
-			>
-				<RefreshCw size={14} />
-			</span>
-			{settings.app.openRouterModelsState === 'loading' ? 'Syncing…' : 'Sync models'}
-		</Button>
 	</div>
 	{#if selectedModel}
-		<p
-			class="col-start-2 -mt-[0.8rem] text-[0.6875rem] leading-normal text-ink-muted max-[800px]:col-start-1"
-		>
+		<p class="col-span-full text-[0.6875rem] leading-normal text-ink-muted">
 			{selectedModel.description}
 		</p>
 	{:else if settings.app.openRouterModelsError}
-		<p class="col-start-2 text-[0.6875rem] text-scarlet-lamp max-[800px]:col-start-1" role="alert">
+		<p class="col-span-full text-[0.6875rem] text-scarlet-lamp" role="alert">
 			{settings.app.openRouterModelsError}
 		</p>
 	{/if}
@@ -91,121 +116,86 @@
 	<div>
 		<label for="openrouter-key" class="text-xs font-[570] text-ink">OpenRouter API key</label>
 		<p class="mt-[0.2rem] text-[0.6875rem] leading-[1.45] text-ink-muted">
-			Stored only in the native Shadoword desktop configuration after verification.
+			Stored only in the native Shadoword desktop configuration.
 		</p>
 	</div>
-	<div class="flex min-w-0 items-center gap-[0.35rem]">
+	<div class="relative w-[var(--control-width)] max-w-full min-w-0">
 		<Input
-			class="min-w-0 flex-1"
+			class="pr-8"
 			id="openrouter-key"
 			value={openRouter.keyValue}
 			type={openRouter.showKey ? 'text' : 'password'}
-			readonly={openRouter.storedKeyReadonly}
-			placeholder={settings.app.settings?.openrouter_key_configured
-				? 'Stored key unchanged'
-				: 'Enter an OpenRouter API key'}
+			placeholder="Enter an OpenRouter API key"
 			disabled={settings.locked}
 			oninput={(event) => openRouter.setKey(event.currentTarget.value)}
 		/>
 		<Button
 			variant="ghost"
-			size="icon-sm"
+			size="icon-xs"
+			class="absolute top-1/2 right-1 -translate-y-1/2 text-ink-dim hover:text-ink"
 			onclick={() => openRouter.toggleKeyVisibility()}
 			aria-label={openRouter.showKey ? 'Hide OpenRouter key' : 'Show OpenRouter key'}
-			disabled={settings.locked || (!openRouter.hasStoredKey && !openRouter.replacingKey)}
+			disabled={settings.locked || openRouter.keyValue === ''}
 		>
-			{#if openRouter.showKey}<EyeOff size={14} />{:else}<Eye size={14} />{/if}
+			{#if openRouter.showKey}
+				<EyeOff class="size-3.5" />
+			{:else}
+				<Eye class="size-3.5" />
+			{/if}
 		</Button>
-		{#if openRouter.hasStoredKey && !openRouter.replacingKey}
-			<Button
-				variant="ghost"
-				size="icon-sm"
-				onclick={() => void openRouter.copyKey()}
-				aria-label="Copy saved OpenRouter key"
-				disabled={settings.locked}
-			>
-				<Copy size={14} />
-			</Button>
-		{/if}
 	</div>
-	{#if openRouter.hasStoredKey}
+	<div class="col-span-2 flex items-center justify-end gap-3 max-[800px]:col-span-1">
 		<div
-			class="col-start-2 flex flex-wrap items-center justify-end gap-[0.35rem] max-[800px]:col-start-1 max-[800px]:justify-start"
+			class="flex min-h-7 min-w-0 items-center"
+			aria-live="polite"
+			aria-busy={openRouter.connectionState === 'testing'}
 		>
-			<Button
-				variant="ghost"
-				size="sm"
-				disabled={settings.locked}
-				onclick={() => openRouter.beginKeyReplacement()}>Replace saved key</Button
-			>
-			<Button
-				variant="ghost"
-				size="sm"
-				disabled={settings.locked}
-				onclick={() => openRouter.toggleClearKey()}
-			>
-				{openRouter.clearKey ? 'Keep stored key' : 'Clear stored key'}
-			</Button>
+			{#if keyStatus}
+				<span
+					class={cn(
+						'inline-flex min-w-0 items-center gap-[0.45rem] border bg-plate py-[0.2rem] pr-[0.5rem] pl-[0.45rem] uppercase',
+						'[&_.status]:text-[0.625rem] [&_.status]:tracking-[0.09em]',
+						keyStatus.state === 'ready' && 'border-line-strong',
+						keyStatus.state === 'offline' && 'border-scarlet',
+						(keyStatus.state === 'warning' || keyStatus.state === 'loading') && 'border-line'
+					)}
+					title={keyStatus.title || undefined}
+				>
+					<StatusIndicator compact state={keyStatus.state} label={keyStatus.label} />
+					{#if keyStatus.readout}
+						<span
+							class="min-w-0 shrink-0 border-l border-line pl-[0.45rem] font-mono text-[0.625rem] tracking-[0.09em] text-ink-dim tabular-nums"
+						>
+							{keyStatus.readout}
+						</span>
+					{/if}
+				</span>
+			{/if}
 		</div>
-	{/if}
-	<div
-		class={cn(
-			'col-start-2 flex min-h-[1.8rem] items-center gap-2 text-[0.6875rem] text-ink-muted max-[800px]:col-start-1',
-			openRouter.connectionState === 'success' && 'text-ink',
-			(openRouter.connectionState === 'failed' ||
-				settings.app.openRouterCredentialState === 'invalid') &&
-				'text-scarlet-lamp'
-		)}
-		aria-live="polite"
-		aria-busy={openRouter.connectionState === 'testing'}
-	>
-		{#if openRouter.connectionState === 'testing'}
-			<span class="inline-flex animate-spin motion-reduce:animate-none"
-				><RefreshCw size={14} /></span
-			>
-			<span>Checking key with OpenRouter…</span>
-		{:else if openRouter.connectionState === 'success'}
-			<ShieldCheck size={15} />
-			<strong class="text-[inherit] text-ink">API key verified · saving locally</strong>
-		{:else if openRouter.connectionState === 'failed'}
-			<AlertTriangle size={15} />
-			<span>Not saved. OpenRouter rejected this key. {openRouter.credentialMessage}</span>
-		{:else if openRouter.keyDirty && openRouter.key.trim() !== ''}
-			<span>{openRouter.key.trim().length} / 73 characters · not saved until verified</span>
-		{:else if openRouter.credentialMessage}
-			<span>{openRouter.credentialMessage}</span>
-		{:else if openRouter.hasStoredKey && settings.app.openRouterCredentialState === 'checking'}
-			<span class="inline-flex animate-spin motion-reduce:animate-none"
-				><RefreshCw size={14} /></span
-			>
-			<span>Checking the saved API key…</span>
-		{:else if openRouter.hasStoredKey && settings.app.openRouterCredentialState === 'invalid'}
-			<AlertTriangle size={15} />
-			<span>Saved API key rejected · replace it or retry verification</span>
-		{:else if openRouter.hasStoredKey && settings.app.openRouterReady}
-			<ShieldCheck size={15} />
-			<span>Saved API key · verified and ready</span>
-		{:else if openRouter.hasStoredKey}
-			<ShieldCheck size={15} />
-			<span>Saved API key · verification required</span>
-		{:else}
-			<span>Keys are verified automatically when all 73 characters are present.</span>
-		{/if}
-	</div>
-	{#if openRouter.connectionState === 'success' && openRouter.keyReport}
-		<p
-			class="col-start-2 -mt-[0.55rem] text-[0.6875rem] leading-normal text-ink-muted max-[800px]:col-start-1"
+		<Button
+			variant="outline"
+			size="sm"
+			class="shrink-0"
+			onclick={() => void openRouter.testKey()}
+			disabled={settings.locked || !openRouter.canTestKey}
+			aria-busy={openRouter.connectionState === 'testing'}
 		>
-			{openRouter.keyReport.label ?? 'OpenRouter key'} ·
-			{openRouter.keyReport.limit_remaining == null
-				? 'No credit limit reported'
-				: `${openRouter.keyReport.limit_remaining.toFixed(4)} credits remaining`}
-		</p>
-	{/if}
+			<span
+				class={cn(
+					'inline-flex',
+					openRouter.connectionState === 'testing' && 'animate-spin motion-reduce:animate-none'
+				)}
+			>
+				<RefreshCw size={14} />
+			</span>
+			{openRouter.connectionState === 'testing' ? 'Testing…' : 'Test key'}
+		</Button>
+	</div>
 </SettingsRow>
 
 <p
 	class="m-0 border-l border-scarlet bg-plate px-[0.8rem] py-[0.65rem] text-[0.6875rem] leading-[1.55] text-ink-muted"
 >
-	Audio is sent to OpenRouter only after recording stops. OpenRouter mode uses batch transcription.
+	With segmented delivery enabled, OpenRouter receives each pause-separated WAV in order. Otherwise,
+	it receives one WAV after recording stops.
 </p>

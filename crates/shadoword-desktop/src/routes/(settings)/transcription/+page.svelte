@@ -32,40 +32,24 @@
 				aria-label="English recognition"
 			/>
 		</SettingsRow>
-		{#if settings.mode === 'open_router'}
-			<SettingsRow>
-				<div>
-					<span class="text-xs font-[570] text-ink">Transcription delivery</span>
-					<p class="mt-[0.2rem] text-[0.6875rem] leading-[1.45] text-ink-muted">
-						OpenRouter receives one WAV file after recording stops.
-					</p>
-				</div>
-				<div
-					class="grid justify-items-end gap-[0.15rem] text-right text-[0.6875rem] text-ink-muted max-[800px]:justify-items-start max-[800px]:text-left"
-					aria-label="OpenRouter transcription mode: batch only"
-				>
-					<strong class="text-[0.75rem] text-ink">Batch only</strong>
-					<span>Streaming is not available</span>
-				</div>
-			</SettingsRow>
-		{:else}
-			<SettingsRow>
-				<div>
-					<label for="streaming-segments" class="text-xs font-[570] text-ink">
-						Stream pause-separated segments
-					</label>
-					<p class="mt-[0.2rem] text-[0.6875rem] leading-[1.45] text-ink-muted">
-						Commit pause-separated segments while recording, or transcribe once after stop.
-					</p>
-				</div>
-				<Switch
-					id="streaming-segments"
-					checked={form.transcriptionMode === 'streaming'}
-					onCheckedChange={(checked) => form.setTranscriptionMode(checked ? 'streaming' : 'batch')}
-					disabled={settings.locked}
-					aria-label="Stream pause-separated segments"
-				/>
-			</SettingsRow>
-		{/if}
+		<SettingsRow>
+			<div>
+				<label for="streaming-segments" class="text-xs font-[570] text-ink">
+					Submit pause-separated segments
+				</label>
+				<p class="mt-[0.2rem] text-[0.6875rem] leading-[1.45] text-ink-muted">
+					{settings.mode === 'open_router'
+						? 'Use on-device voice activity detection to submit each completed WAV segment in order.'
+						: 'Commit pause-separated segments while recording, or transcribe once after stop.'}
+				</p>
+			</div>
+			<Switch
+				id="streaming-segments"
+				checked={form.transcriptionMode === 'streaming'}
+				onCheckedChange={(checked) => form.setTranscriptionMode(checked ? 'streaming' : 'batch')}
+				disabled={settings.locked}
+				aria-label="Submit pause-separated segments"
+			/>
+		</SettingsRow>
 	</SettingsPanel>
 </SettingsSection>

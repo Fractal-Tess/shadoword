@@ -13,7 +13,9 @@ import type {
 	TranscriptionMode,
 	TranscriptionResult
 } from '$lib/bindings';
+import { commands } from '$lib/bindings';
 import type { TranscriptSegments } from '$lib/desktop-events';
+import { errorMessage } from '$lib/display';
 import type { PoolFieldErrors } from '$lib/inference-pool';
 import type { HistoryRecord } from '$lib/types';
 import { toast } from 'svelte-sonner';
@@ -238,7 +240,24 @@ export class DesktopAppState implements DesktopStateContext {
 		return this.captureOperations.cancel();
 	}
 
+	/** The only writer of `history`. Every mutation — append, delete, undo, clear —
+	 *  goes through here so that none of them can be the one that forgets to
+	 *  persist. The host returns the list it actually stored, which is how the
+	 *  window learns about the entry cap without duplicating it. */
+	setHistory(records: HistoryRecord[]) {
+		this.history = records;
+		if (this.demo) return;
+		void commands
+			.saveHistory(records)
+			.then((stored) => {
+				if (stored.length !== this.history.length) this.history = stored;
+			})
+			.catch((error) =>
+				this.notify('History not saved', errorMessage(error) || 'Could not write to disk.', 'error')
+			);
+	}
+
 	clearHistory() {
-		this.history = [];
+		this.setHistory([]);
 	}
 }

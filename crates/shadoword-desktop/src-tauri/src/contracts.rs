@@ -131,6 +131,14 @@ pub struct RecordingStatus {
     pub sample_rate: u32,
 }
 
+#[derive(Debug, Clone, Serialize, Type)]
+pub struct MicrophoneLevel {
+    /// Peak normalized sample magnitude since the prior poll, in the range 0.0 to 1.0.
+    pub peak: f32,
+    /// False while an active recording exclusively owns the input device.
+    pub monitoring: bool,
+}
+
 #[derive(Debug, Clone, Copy, Serialize, PartialEq, Eq, Type)]
 #[serde(rename_all = "snake_case")]
 pub enum RecordingPhase {

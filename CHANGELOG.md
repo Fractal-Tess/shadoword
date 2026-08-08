@@ -6,6 +6,32 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## [Unreleased]
 
+## [0.13.0] - 2026-08-09
+
+### Added
+
+- OpenRouter streaming transcription. Pause-separated segments upload while you record instead of sending a single WAV after capture stops, and segments are delivered strictly in capture order.
+- Per-recording OpenRouter cost totals, summed across every segment of a streamed transcription.
+- A live input-level meter for the selected microphone in Capture settings, released automatically while recording so it never competes with the recorder for the device.
+- Transcript history stored on disk as `history.json` in the platform data directory, surviving restarts and retaining the most recent 500 entries.
+- A provider, model, last inference time, and clip duration readout at the foot of the sidebar.
+
+### Changed
+
+- **Breaking:** OpenRouter no longer forces batch transcription. A stored streaming preference that was previously coerced to batch under OpenRouter is now honored, which means per-segment requests and per-segment billing. Review the transcription mode in settings after upgrading.
+- History entries store absolute timestamps and unrounded durations instead of preformatted display strings, so entries captured on earlier days are dated rather than showing a bare clock reading.
+- The OpenRouter API key is verified by an explicit test action instead of validating on every keystroke, settings save without requiring verification first, and the key field carries its own visibility toggle beside a compact verification readout.
+- Every operable control in a settings row is cut to one width so each panel's control column reads as a single edge.
+- The capture stage spectrum is centered, drifts continuously, and runs four times faster while recording. Its right-hand bloom rays are cut to a cold aqua so the scarlet accent is spent on the record state rather than on scenery.
+
+### Fixed
+
+- Fall back to another available input when the system default microphone is missing or unusable, and stop listing duplicate device names.
+- Cancelling a recording, or a streaming worker failure, now finalizes and resets runtime state instead of snapping directly to idle.
+- Switching to Local mode with no model file present no longer triggers an unnecessary runtime reload.
+- Moving between settings pages no longer prompts about unsaved changes, and controls stay editable while a save is in flight.
+- Report transport backpressure without describing it in remote-protocol terms that do not apply to every provider.
+
 ## [0.12.0] - 2026-08-07
 
 ### Added
@@ -184,7 +210,8 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 - Prevented duplicate model loads after eager-preload timeouts.
 - Added bounded remote connect, handshake, read, write, and finalization waits.
 
-[Unreleased]: https://github.com/Fractal-Tess/shadoword/compare/v0.12.0...HEAD
+[Unreleased]: https://github.com/Fractal-Tess/shadoword/compare/v0.13.0...HEAD
+[0.13.0]: https://github.com/Fractal-Tess/shadoword/compare/v0.12.0...v0.13.0
 [0.12.0]: https://github.com/Fractal-Tess/shadoword/compare/v0.11.0...v0.12.0
 [0.11.0]: https://github.com/Fractal-Tess/shadoword/compare/v0.10.6...v0.11.0
 [0.10.6]: https://github.com/Fractal-Tess/shadoword/compare/v0.10.5...v0.10.6

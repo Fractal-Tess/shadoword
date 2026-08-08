@@ -10,7 +10,7 @@
 
 	const settings = getSettingsContext();
 	const remote = settings.remote;
-	const rowClass = 'grid-cols-[minmax(12rem,0.7fr)_minmax(15rem,1fr)] max-[800px]:grid-cols-1';
+	const rowClass = 'grid-cols-[minmax(0,1fr)_var(--control-width)] max-[800px]:grid-cols-1';
 </script>
 
 <SettingsRow class={rowClass}>
@@ -20,7 +20,7 @@
 			Use HTTPS outside an encrypted private network.
 		</p>
 	</div>
-	<div class="relative min-w-0">
+	<div class="relative w-[var(--control-width)] max-w-full min-w-0">
 		<Input
 			class="pr-10"
 			id="endpoint"
@@ -57,7 +57,7 @@
 			An admin token is required for desktop management and is stored privately.
 		</p>
 	</div>
-	<div class="flex min-w-0 items-center gap-[0.35rem]">
+	<div class="flex w-[var(--control-width)] max-w-full min-w-0 items-center gap-[0.35rem]">
 		<Input
 			class="min-w-0 flex-1"
 			id="token"

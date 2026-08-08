@@ -17,10 +17,10 @@
 		lines: string[];
 	}>;
 	const environmentButtonClass = cn(
-		'grid min-h-[2.55rem] min-w-0 cursor-pointer place-items-center gap-[0.18rem] border-0 bg-plate px-[0.2rem] py-[0.42rem] font-[inherit] text-ink-muted',
+		'grid min-h-16 min-w-0 cursor-pointer place-items-center gap-1 border-0 bg-plate px-1 py-2 font-[inherit] text-ink-muted',
 		'transition-colors duration-[120ms] ease-linear hover:not-disabled:bg-raised hover:not-disabled:text-ink focus-visible:relative focus-visible:z-[1] focus-visible:-outline-offset-2',
 		'disabled:cursor-not-allowed disabled:opacity-50 aria-checked:bg-raised aria-checked:text-scarlet-lamp aria-checked:shadow-[inset_0_2px_0_var(--scarlet)] aria-checked:hover:not-disabled:text-scarlet-lamp',
-		'max-[999px]:min-h-11'
+		'max-[999px]:min-h-[4.5rem]'
 	);
 
 	const handleKeydown = async (event: KeyboardEvent, current: number) => {
@@ -39,11 +39,9 @@
 	};
 </script>
 
-<div
-	class="grid border-b border-line bg-night px-[0.85rem] py-[0.65rem] max-[999px]:px-[0.45rem] max-[999px]:py-[0.55rem]"
->
+<div class="grid border-b border-line bg-night">
 	<div
-		class="grid grid-cols-3 gap-px border border-line-strong bg-line-strong max-[999px]:grid-cols-1"
+		class="grid w-full grid-cols-3 gap-px border border-line-strong bg-line-strong max-[999px]:grid-cols-1"
 		role="radiogroup"
 		aria-label="Execution target"
 	>
@@ -62,14 +60,14 @@
 				onkeydown={(event) => void handleKeydown(event, index)}
 			>
 				{#if environment.mode === 'local'}
-					<Cpu size={15} strokeWidth={1.9} aria-hidden="true" />
+					<Cpu size={18} strokeWidth={1.9} aria-hidden="true" />
 				{:else if environment.mode === 'remote'}
-					<RadioTower size={15} strokeWidth={1.9} aria-hidden="true" />
+					<RadioTower size={18} strokeWidth={1.9} aria-hidden="true" />
 				{:else}
-					<OpenRouterIcon size={16} title="" />
+					<OpenRouterIcon size={19} title="" />
 				{/if}
 				<span
-					class="grid max-w-full text-center font-mono text-[0.625rem] leading-[1.1] font-[650] tracking-[-0.025em]"
+					class="grid max-w-full text-center font-mono text-[0.6875rem] leading-[1.1] font-[650] tracking-[-0.025em]"
 				>
 					{#each environment.lines as line (line)}<span>{line}</span>{/each}
 				</span>

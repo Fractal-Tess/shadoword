@@ -1,6 +1,5 @@
 import type { ServiceMode, TranscriptionResult } from '$lib/bindings';
 import type { HistoryRecord } from '$lib/types';
-import { formatDuration } from '$lib/display';
 
 export type TranscriptSegments = Readonly<Record<number, TranscriptionResult>>;
 
@@ -24,20 +23,21 @@ export function transcriptFromSegments(segments: TranscriptSegments) {
 
 export function historyRecordFromCompletion(
 	id: string,
-	timestamp: string,
+	recordedAt: string,
 	mode: ServiceMode,
 	result: TranscriptionResult,
 	segments: number
 ): HistoryRecord {
 	return {
 		id,
-		timestamp,
-		engine: `${serviceModeLabel(mode)} · ${result.engine}`,
-		duration: formatDuration(result.audio_duration_ms),
-		latency: `${result.elapsed_ms}ms`,
+		recorded_at: recordedAt,
+		mode,
+		engine: result.engine,
+		elapsed_ms: result.elapsed_ms,
+		audio_duration_ms: result.audio_duration_ms,
 		text: result.text,
 		segments,
-		costUsd: result.cost_usd ?? undefined
+		cost_usd: result.cost_usd
 	};
 }
 
@@ -56,12 +56,6 @@ export function transcriptionFingerprint(
 		result.cost_usd,
 		segments
 	].join('\u001f');
-}
-
-function serviceModeLabel(mode: ServiceMode) {
-	if (mode === 'local') return 'Local';
-	if (mode === 'open_router') return 'OpenRouter';
-	return 'Shadoword API';
 }
 
 function transcriptionResultsEqual(left: TranscriptionResult, right: TranscriptionResult) {

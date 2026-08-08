@@ -213,6 +213,7 @@ export class RuntimeOperations {
 				input.remote_token.action !== 'keep'
 			);
 		}
+		if (input.mode === 'open_router') return input.openrouter_key.action !== 'keep';
 		if (input.mode === 'local') {
 			return (
 				previous.model_path !== input.model_path ||

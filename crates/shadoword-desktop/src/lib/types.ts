@@ -21,13 +21,6 @@ export type ModelRecord = {
 	recommended?: boolean;
 };
 
-export type HistoryRecord = {
-	id: string;
-	timestamp: string;
-	engine: string;
-	duration: string;
-	latency: string;
-	text: string;
-	segments: number;
-	costUsd?: number;
-};
+/** History outlives the process now, so the native host owns its shape and the
+ *  window renders whatever the host stored rather than a display-shaped copy. */
+export type { HistoryEntry as HistoryRecord } from '$lib/bindings';

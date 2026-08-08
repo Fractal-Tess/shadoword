@@ -23,7 +23,7 @@
 		const index = history.findIndex((item) => item.id === id);
 		if (index < 0) return;
 		lastDeleted = { record: history[index], index };
-		app.history = history.filter((item) => item.id !== id);
+		app.setHistory(history.filter((item) => item.id !== id));
 		announcement = 'Transcript deleted. Undo is available.';
 		await tick();
 		undoButton?.focus();
@@ -34,7 +34,7 @@
 		if (!deleted) return;
 		const restored = [...history];
 		restored.splice(deleted.index, 0, deleted.record);
-		app.history = restored;
+		app.setHistory(restored);
 		lastDeleted = null;
 		announcement = 'Transcript restored.';
 		await tick();
@@ -50,8 +50,8 @@
 
 <div class="grid gap-4">
 	<SurfaceHeader
-		title="Words from this session."
-		description="Review, copy, or remove transcripts captured while Shadoword is running."
+		title="Everything you have said."
+		description="Transcripts are kept on this machine across restarts. Review, copy, or remove them."
 	>
 		{#snippet actions()}
 			<span class="font-mono text-[0.625rem] text-ink-muted">
@@ -106,7 +106,7 @@
 		<div
 			class="sticky bottom-4 ml-auto flex w-[min(24rem,100%)] items-center justify-between gap-4 border border-line-strong bg-raised py-[0.65rem] pr-3 pl-[0.9rem] text-[0.6875rem] text-ink-dim shadow-[0_0.65rem_1.5rem_rgb(0_0_0/0.34)]"
 		>
-			<span>Transcript deleted from this session.</span>
+			<span>Transcript deleted.</span>
 			<Button bind:ref={undoButton} variant="outline" size="sm" onclick={undoDelete}>Undo</Button>
 		</div>
 	{/if}

@@ -20,7 +20,7 @@ const CAPABILITIES: Record<ServiceMode, EnvironmentCapabilities> = {
 	},
 	open_router: {
 		managesWhisperRuntime: false,
-		supportsStreaming: false,
+		supportsStreaming: true,
 		supportsPcmSelection: false
 	}
 };

@@ -70,6 +70,16 @@
 	--scarlet-deep: #b80e17;
 	--on-scarlet: #ffffff;
 
+	/* The one exception to "scarlet is the only accent", and it is an exception
+	   precisely because it never means anything. The capture stage's bloom rays are
+	   scenery — they are lit whether or not the machine is recording, so painting
+	   the whole cluster scarlet spends the accent on a decoration and leaves the
+	   record slab competing with its own backdrop. The right-hand pair is cut to a
+	   cold aqua instead, which is inert here: nothing else in the window is this
+	   hue, so it cannot be mistaken for a fifth state. Do not put type, rules or
+	   fills in it. */
+	--aqua: #12b5c6;
+
 	/* Named `--face-*` rather than `--font-*` because `@theme inline` below emits
 	   `--font-mono` onto `:root` as well, and a token that resolves to itself
 	   resolves to nothing. Components go on spelling `var(--font-mono)`; it lands
@@ -123,6 +133,14 @@
 	   own token below, so a stray `rounded-md` cannot quietly reintroduce it. */
 	--radius: 0rem;
 	--plate-radius: 10px;
+
+	/* Every operable control in a settings row — text field, dropdown, shortcut
+	   capture, delay field — is cut to one width, so the panel's control column
+	   reads as a single rule rather than a ragged edge that follows whatever the
+	   longest option label happened to be. Rows holding a *readout* rather than a
+	   control (detected hardware, active model, build support) stay content-sized:
+	   those are prose, not instruments the operator aims at. */
+	--control-width: 20rem;
 
 	--sidebar: var(--surface-1);
 	--sidebar-foreground: var(--ink);
@@ -302,12 +320,18 @@
 	}
 }
 
+/* The rays dim and drift on the same cycle rather than on two: a separate sway
+   keyframe would need a second animation on the same layer, and at this
+   amplitude the two are indistinguishable anyway. Translating a percentage of
+   the layer's own width keeps the throw proportional at any window size. */
 @keyframes bloom-breathe {
 	0%,
 	100% {
 		opacity: 1;
+		transform: translate3d(-0.9%, 0, 0);
 	}
 	50% {
 		opacity: 0.62;
+		transform: translate3d(0.9%, 0, 0);
 	}
 }

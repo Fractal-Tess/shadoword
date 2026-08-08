@@ -809,7 +809,17 @@ pub fn models_dir() -> Result<PathBuf> {
     Ok(models_dir)
 }
 
-fn write_json_atomic(path: &Path, value: &impl Serialize, label: &str) -> Result<()> {
+/// Durable state that is *not* configuration — anything the user produced rather
+/// than chose. It goes to the data dir instead of the config dir so that wiping a
+/// broken config never takes a transcript history with it.
+pub fn data_dir() -> Result<PathBuf> {
+    let dirs = DesktopConfig::project_dirs("shadoword")?;
+    let data_dir = dirs.data_dir().to_path_buf();
+    fs::create_dir_all(&data_dir).context("failed to create data directory")?;
+    Ok(data_dir)
+}
+
+pub fn write_json_atomic(path: &Path, value: &impl Serialize, label: &str) -> Result<()> {
     if let Some(parent) = path.parent() {
         fs::create_dir_all(parent)
             .with_context(|| format!("failed to create {}", parent.display()))?;

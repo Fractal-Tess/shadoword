@@ -8,6 +8,11 @@ export const commands = {
 	loadDesktopState: () => __TAURI_INVOKE<DesktopBootstrap_Serialize>('load_desktop_state'),
 	getRecordingState: () => __TAURI_INVOKE<RecordingState>('get_recording_state'),
 	listInputDevices: () => __TAURI_INVOKE<InputDeviceInfo[]>('list_input_devices'),
+	pollMicrophoneLevel: () => __TAURI_INVOKE<MicrophoneLevel>('poll_microphone_level'),
+	stopMicrophoneLevelMonitor: () => __TAURI_INVOKE<null>('stop_microphone_level_monitor'),
+	loadHistory: () => __TAURI_INVOKE<HistoryEntry[]>('load_history'),
+	saveHistory: (entries: HistoryEntry[]) =>
+		__TAURI_INVOKE<HistoryEntry[]>('save_history', { entries }),
 	saveDesktopSettings: (input: DesktopSettingsInput) =>
 		__TAURI_INVOKE<DesktopSettings>('save_desktop_settings', { input }),
 	revealDesktopSecret: (kind: DesktopSecretKind) =>
@@ -239,6 +244,26 @@ export type ExecutionUnitStatus_Serialize = {
 	failed: number | null;
 };
 
+/**
+ *  Stored raw rather than pre-formatted. The window used to keep history in
+ *  memory and could therefore afford a bare `14:32` timestamp — everything on
+ *  screen was from the session you were looking at. Once entries outlive the
+ *  process that stops being true, so the record carries an absolute instant and
+ *  unrounded durations, and the frontend formats them at render.
+ */
+export type HistoryEntry = {
+	id: string;
+	/**  RFC 3339, UTC. */
+	recorded_at: string;
+	mode: ServiceMode;
+	engine: string;
+	elapsed_ms: number;
+	audio_duration_ms: number;
+	text: string;
+	segments: number;
+	cost_usd: number | null;
+};
+
 export type HotkeyMode = 'push_to_talk' | 'toggle';
 
 export type InferenceLimits = {
@@ -295,6 +320,13 @@ export type InferencePoolStatus_Serialize = {
 export type InputDeviceInfo = {
 	name: string;
 	is_default: boolean;
+};
+
+export type MicrophoneLevel = {
+	/**  Peak normalized sample magnitude since the prior poll, in the range 0.0 to 1.0. */
+	peak: number | null;
+	/**  False while an active recording exclusively owns the input device. */
+	monitoring: boolean;
 };
 
 export type ModelInfoDto = {

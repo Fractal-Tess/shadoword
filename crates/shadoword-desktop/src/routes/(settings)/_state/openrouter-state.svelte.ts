@@ -3,7 +3,6 @@ import { commands, type DesktopSettings, type OpenRouterKeyReport } from '$lib/b
 import { errorMessage } from '$lib/display';
 import type { VerificationState } from './remote-state.svelte';
 
-const OPENROUTER_KEY_PATTERN = /^sk-or-v1-[a-f\d]{64}$/i;
 type ChangeHandler = () => void;
 
 export class OpenRouterSettingsState {
@@ -13,13 +12,11 @@ export class OpenRouterSettingsState {
 	clearKey = $state(false);
 	showKey = $state(false);
 	storedKey = $state('');
-	replacingKey = $state(false);
 	credentialMessage = $state('');
 	connectionState = $state<VerificationState>('idle');
 	keyReport = $state.raw<OpenRouterKeyReport | null>(null);
 	#app: DesktopAppState;
 	#onChange: ChangeHandler = () => {};
-	#validationTimer: ReturnType<typeof setTimeout> | null = null;
 	#validationVersion = 0;
 
 	constructor(app: DesktopAppState, settings: DesktopSettings) {
@@ -36,17 +33,28 @@ export class OpenRouterSettingsState {
 	}
 
 	get saveBlocked() {
-		return this.keyDirty && !this.clearKey && this.connectionState !== 'success';
+		return false;
 	}
 
 	get keyValue() {
-		if (this.keyDirty || this.replacingKey) return this.key;
-		if (this.showKey && this.storedKey) return this.storedKey;
-		return this.hasStoredKey && !this.clearKey ? '••••••••••••••••' : '';
+		return this.keyDirty || this.clearKey ? this.key : this.storedKey;
 	}
 
-	get storedKeyReadonly() {
-		return this.hasStoredKey && !this.replacingKey && !this.clearKey;
+	get canTestKey() {
+		return !this.clearKey && (this.key.trim() !== '' || this.hasStoredKey);
+	}
+
+	toggleKeyVisibility() {
+		this.showKey = !this.showKey;
+	}
+
+	async loadSavedKey() {
+		if (!this.hasStoredKey || this.keyDirty || this.storedKey) return;
+		try {
+			this.storedKey = await commands.revealDesktopSecret('open_router_key');
+		} catch {
+			this.credentialMessage = 'Could not load the saved key.';
+		}
 	}
 
 	setModel(value: string) {
@@ -56,123 +64,75 @@ export class OpenRouterSettingsState {
 	}
 
 	setKey(value: string) {
-		this.#cancelValidation();
+		this.#validationVersion += 1;
 		this.credentialMessage = '';
 		this.key = value;
-		this.keyDirty = true;
-		this.clearKey = false;
 		this.connectionState = 'idle';
 		this.keyReport = null;
 		this.#app.openRouterKeyReport = null;
 
-		const key = value.trim();
-		if (key === '') {
-			this.keyDirty = false;
+		if (value.trim() === '') {
+			this.clearKey = this.hasStoredKey;
+			this.keyDirty = this.clearKey;
 			this.#onChange();
 			return;
 		}
-		if (OPENROUTER_KEY_PATTERN.test(key)) {
-			this.connectionState = 'testing';
-			const version = this.#validationVersion;
-			this.#validationTimer = setTimeout(() => void this.#validateKey(key, version), 250);
-		}
+
+		this.keyDirty = true;
+		this.clearKey = false;
 		this.#onChange();
 	}
 
-	beginKeyReplacement() {
-		this.#cancelValidation();
-		this.storedKey = '';
-		this.showKey = false;
-		this.key = '';
-		this.keyDirty = false;
-		this.replacingKey = true;
-		this.clearKey = false;
-		this.connectionState = 'idle';
-		this.credentialMessage = 'Enter a replacement key. It will save after verification.';
-	}
-
-	async toggleKeyVisibility() {
-		if (this.keyDirty || this.replacingKey) {
-			this.showKey = !this.showKey;
+	async testKey() {
+		const key = this.key.trim();
+		const useSavedKey = key === '' && this.hasStoredKey;
+		if (!key && !useSavedKey) {
+			this.credentialMessage = 'Enter an OpenRouter API key before testing.';
 			return;
 		}
-		if (this.showKey) {
-			this.showKey = false;
-			this.storedKey = '';
-			return;
-		}
-		try {
-			this.storedKey = await commands.revealDesktopSecret('open_router_key');
-			this.showKey = true;
-			this.credentialMessage = 'Saved key revealed.';
-		} catch {
-			this.credentialMessage = 'Could not reveal the saved key.';
-		}
-	}
 
-	async copyKey() {
-		try {
-			await commands.copyDesktopSecret('open_router_key');
-			this.credentialMessage = 'Saved key copied.';
-		} catch {
-			this.credentialMessage = 'Could not copy the saved key.';
-		}
-	}
-
-	hideKey() {
-		this.showKey = false;
-		this.storedKey = '';
-	}
-
-	toggleClearKey() {
-		this.#cancelValidation();
-		this.clearKey = !this.clearKey;
-		this.keyDirty = false;
-		this.key = '';
-		this.connectionState = 'idle';
+		this.#validationVersion += 1;
+		const version = this.#validationVersion;
+		this.credentialMessage = '';
+		this.connectionState = 'testing';
 		this.keyReport = null;
 		this.#app.openRouterKeyReport = null;
-		this.#onChange();
-	}
-
-	commitSecret() {
-		this.key = '';
-		this.storedKey = '';
-		this.keyDirty = false;
-		this.replacingKey = false;
-		this.clearKey = false;
-		this.showKey = false;
-	}
-
-	destroy() {
-		this.#cancelValidation();
-	}
-
-	async #validateKey(key: string, version: number) {
-		this.#validationTimer = null;
 		try {
-			await this.#app.testOpenRouterKey(key, false);
-			if (!this.#isCurrentValidation(key, version)) return;
+			await this.#app.testOpenRouterKey(useSavedKey ? null : key, useSavedKey);
+			if (!this.#isCurrentValidation(useSavedKey ? null : key, version)) return;
 			this.keyReport = this.#app.openRouterKeyReport;
 			this.connectionState = 'success';
 			this.#onChange();
 		} catch (error) {
-			if (!this.#isCurrentValidation(key, version)) return;
-			this.keyReport = null;
+			if (!this.#isCurrentValidation(useSavedKey ? null : key, version)) return;
 			this.credentialMessage = errorMessage(error);
 			this.connectionState = 'failed';
 			this.#onChange();
 		}
 	}
 
-	#isCurrentValidation(key: string, version: number) {
-		return version === this.#validationVersion && this.key.trim() === key;
+	commitSecret() {
+		if (this.clearKey) this.storedKey = '';
+		else if (this.keyDirty) this.storedKey = this.key.trim();
+		this.key = '';
+		this.keyDirty = false;
+		this.clearKey = false;
 	}
 
-	#cancelValidation() {
+	hideKey() {
+		this.showKey = false;
+	}
+
+	destroy() {
 		this.#validationVersion += 1;
-		if (!this.#validationTimer) return;
-		clearTimeout(this.#validationTimer);
-		this.#validationTimer = null;
+	}
+
+	#isCurrentValidation(key: string | null, version: number) {
+		return (
+			version === this.#validationVersion &&
+			(key === null
+				? !this.keyDirty && !this.clearKey
+				: this.key.trim() === key || (!this.keyDirty && this.storedKey === key))
+		);
 	}
 }

@@ -57,6 +57,12 @@ export class LifecycleOperations {
 			const revisionBeforeLoad = this.eventRevision;
 			const bootstrap = await commands.loadDesktopState();
 			if (this.disposed) return;
+			// Assigned directly rather than through `setHistory`: this is the disk
+			// contents arriving, and routing it through the setter would write them
+			// straight back out on every launch. Failure is swallowed because an
+			// unreadable history is not a reason to refuse to start recording.
+			this.app.history = await commands.loadHistory().catch(() => []);
+			if (this.disposed) return;
 			this.app.settings = bootstrap.settings;
 			this.app.inputDevices = bootstrap.input_devices;
 			this.app.inputDevicesError = bootstrap.input_devices_error;

@@ -22,6 +22,7 @@ FORM: Neo-Tokyo Neon Night, abstracted from cityscape to spectrum; seed 322d3899
 	import { inferencePoolSummary } from '$lib/inference-pool';
 	import { DesktopShellState } from '$lib/shell/desktop-shell.svelte';
 	import { provideDesktopShell } from '$lib/shell/desktop-shell-context';
+	import { isSettingsPage, pageIdFromPathname } from '$lib/shell/routes';
 	import { onMount } from 'svelte';
 	import './layout.css';
 
@@ -35,7 +36,17 @@ FORM: Neo-Tokyo Neon Night, abstracted from cityscape to spectrum; seed 322d3899
 
 	beforeNavigate((navigation) => {
 		const target = navigation.to?.url;
-		if (!target || navigation.willUnload || !shell.shouldGuardNavigation(target)) return;
+		const staysWithinSettings =
+			target &&
+			isSettingsPage(pageIdFromPathname(page.url.pathname)) &&
+			isSettingsPage(pageIdFromPathname(target.pathname));
+		if (
+			!target ||
+			navigation.willUnload ||
+			staysWithinSettings ||
+			!shell.shouldGuardNavigation(target)
+		)
+			return;
 		navigation.cancel();
 		void shell.continueGuardedNavigation(
 			target,

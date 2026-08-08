@@ -1,13 +1,15 @@
 use crate::contracts::{
     ConnectionInput, ConnectionReport, DesktopBootstrap, DesktopError, DesktopEvent,
-    DesktopSecretKind, DesktopSettings, DesktopSettingsInput, OpenRouterConnectionInput,
-    OpenRouterKeyReport, OpenRouterModelInfo, RecordingPhase, RecordingState, RecordingStatus,
-    SecretUpdate, TranscriptionResult, DESKTOP_EVENT_NAME,
+    DesktopSecretKind, DesktopSettings, DesktopSettingsInput, MicrophoneLevel,
+    OpenRouterConnectionInput, OpenRouterKeyReport, OpenRouterModelInfo, RecordingPhase,
+    RecordingState, RecordingStatus, SecretUpdate, TranscriptionResult, DESKTOP_EVENT_NAME,
 };
+use crate::history::{HistoryEntry, HistoryStore};
 use crate::hotkeys::{validate_shortcut, HotkeyBackend, HotkeyEventState};
 use crate::openrouter::OpenRouterClient;
 use crate::recording::{
-    emit_error, spawn_streaming_worker, StreamCommand, StreamingWorker, TranscriptionTarget,
+    emit_error, spawn_streaming_worker, OpenRouterStreamTarget, StreamCommand, StreamingWorker,
+    TranscriptionTarget,
 };
 use crate::remote::RemoteClient;
 use anyhow::{anyhow, Context, Result};
@@ -23,8 +25,9 @@ use shadoword_core::{
     InferenceRuntime, TranscriptionService, WhisperModelFactory,
 };
 use shadoword_core::{
-    DesktopConfig, HotkeyMode, MicrophoneRecorder, ModeRecordingPreferences, RecordingSession,
-    ServiceMode, StreamingPcmFormat, TranscriptionConfig, TranscriptionMode,
+    DesktopConfig, HotkeyMode, MicrophoneLevelMonitor, MicrophoneRecorder,
+    ModeRecordingPreferences, RecordingSession, ServiceMode, StreamingPcmFormat,
+    TranscriptionConfig, TranscriptionMode,
 };
 use std::collections::HashMap;
 use std::path::PathBuf;
@@ -59,9 +62,20 @@ struct RecordingController {
     hotkey_down: bool,
 }
 
+struct ActiveMicrophoneLevelMonitor {
+    input_device_name: Option<String>,
+    monitor: MicrophoneLevelMonitor,
+}
+
+#[derive(Default)]
+struct MicrophoneLevelMonitorController {
+    active: Option<ActiveMicrophoneLevelMonitor>,
+}
+
 pub struct DesktopState {
     config: Mutex<DesktopConfig>,
     recording: Mutex<RecordingController>,
+    microphone_level_monitor: Mutex<MicrophoneLevelMonitorController>,
     mutation: tokio::sync::Mutex<()>,
     remote: RemoteClient,
     openrouter: OpenRouterClient,
@@ -74,6 +88,7 @@ pub struct DesktopState {
     next_download_id: AtomicU64,
     hotkey: Mutex<Option<HotkeyBackend>>,
     hotkey_error: Mutex<Option<String>>,
+    history: HistoryStore,
 }
 
 impl DesktopState {
@@ -86,6 +101,7 @@ impl DesktopState {
         Ok(Self {
             config: Mutex::new(config),
             recording: Mutex::new(RecordingController::default()),
+            microphone_level_monitor: Mutex::new(MicrophoneLevelMonitorController::default()),
             mutation: tokio::sync::Mutex::new(()),
             remote: RemoteClient::new()?,
             openrouter: OpenRouterClient::new()?,
@@ -98,6 +114,7 @@ impl DesktopState {
             next_download_id: AtomicU64::new(1),
             hotkey: Mutex::new(None),
             hotkey_error: Mutex::new(None),
+            history: HistoryStore::load().context("failed to load transcript history")?,
         })
     }
 
@@ -113,6 +130,63 @@ impl DesktopState {
             .lock()
             .map_err(|_| internal_error("recording state lock poisoned"))
             .map(|recording| recording.state.clone())
+    }
+
+    fn poll_microphone_level(&self) -> CommandResult<MicrophoneLevel> {
+        let input_device_name = self.config()?.recording.input_device;
+        let mut controller = self
+            .microphone_level_monitor
+            .lock()
+            .map_err(|_| internal_error("microphone level monitor lock poisoned"))?;
+
+        if self.recording_state()?.phase != RecordingPhase::Idle {
+            drop(controller.active.take());
+            return Ok(MicrophoneLevel {
+                peak: 0.0,
+                monitoring: false,
+            });
+        }
+
+        if controller
+            .active
+            .as_ref()
+            .is_some_and(|active| active.input_device_name != input_device_name)
+        {
+            drop(controller.active.take());
+        }
+
+        if controller.active.is_none() {
+            let monitor = MicrophoneRecorder::start_level_monitor(input_device_name.as_deref())
+                .map_err(|error| {
+                    DesktopError::new("microphone_monitor_start_failed", error.to_string())
+                        .with_action("Check the selected input device and microphone permissions.")
+                })?;
+            controller.active = Some(ActiveMicrophoneLevelMonitor {
+                input_device_name,
+                monitor,
+            });
+        }
+
+        Ok(MicrophoneLevel {
+            peak: controller
+                .active
+                .as_ref()
+                .expect("microphone level monitor initialized above")
+                .monitor
+                .peak(),
+            monitoring: true,
+        })
+    }
+
+    fn stop_microphone_level_monitor(&self) -> CommandResult<()> {
+        let active = self
+            .microphone_level_monitor
+            .lock()
+            .map_err(|_| internal_error("microphone level monitor lock poisoned"))?
+            .active
+            .take();
+        drop(active);
+        Ok(())
     }
 
     fn ensure_idle(&self, operation: &str) -> CommandResult<()> {
@@ -212,9 +286,7 @@ fn normalize_mode_scoped_recording(config: &mut DesktopConfig) {
     config.recording.sample_rate = 16_000;
 
     match config.mode {
-        ServiceMode::Local => config.recording.streaming_pcm_format = StreamingPcmFormat::F32le,
-        ServiceMode::OpenRouter => {
-            config.recording.transcription_mode = TranscriptionMode::Batch;
+        ServiceMode::Local | ServiceMode::OpenRouter => {
             config.recording.streaming_pcm_format = StreamingPcmFormat::F32le;
         }
         ServiceMode::Remote => {}
@@ -330,6 +402,7 @@ pub fn setup_native(app: &AppHandle) {
 pub fn shutdown(app: &AppHandle) {
     let state = app.state::<DesktopState>();
     let _ = cancel_recording_inner(app, &state);
+    let _ = state.stop_microphone_level_monitor();
     crate::tray::set_icon_for_phase(app, RecordingPhase::Idle);
     #[cfg(feature = "local-runtime")]
     state.local.begin_shutdown();
@@ -405,6 +478,35 @@ pub fn list_input_devices() -> CommandResult<Vec<shadoword_core::InputDeviceInfo
 
 #[tauri::command]
 #[specta::specta]
+pub fn poll_microphone_level(
+    state: tauri::State<'_, DesktopState>,
+) -> CommandResult<MicrophoneLevel> {
+    state.poll_microphone_level()
+}
+
+#[tauri::command]
+#[specta::specta]
+pub fn stop_microphone_level_monitor(state: tauri::State<'_, DesktopState>) -> CommandResult<()> {
+    state.stop_microphone_level_monitor()
+}
+
+#[tauri::command]
+#[specta::specta]
+pub fn load_history(state: tauri::State<'_, DesktopState>) -> CommandResult<Vec<HistoryEntry>> {
+    state.history.entries().map_err(internal_error_from)
+}
+
+#[tauri::command]
+#[specta::specta]
+pub fn save_history(
+    entries: Vec<HistoryEntry>,
+    state: tauri::State<'_, DesktopState>,
+) -> CommandResult<Vec<HistoryEntry>> {
+    state.history.replace(entries).map_err(internal_error_from)
+}
+
+#[tauri::command]
+#[specta::specta]
 pub async fn save_desktop_settings(
     input: DesktopSettingsInput,
     state: tauri::State<'_, DesktopState>,
@@ -439,6 +541,9 @@ pub async fn save_desktop_settings(
         .config
         .lock()
         .map_err(|_| internal_error("desktop config lock poisoned"))? = next.clone();
+    if current.recording.input_device != next.recording.input_device {
+        state.stop_microphone_level_monitor()?;
+    }
     Ok(DesktopSettings::from_config(&next))
 }
 
@@ -1030,68 +1135,65 @@ async fn start_recording_inner(
     if config.mode == ServiceMode::OpenRouter {
         validate_openrouter_config(&config)?;
     }
-    let session = {
-        let recording = state
+    // Keep the monitor and recording state locked together until recording owns the device.
+    // The polling command uses the same order, preventing two CPAL input streams from racing.
+    let sample_rate = {
+        let mut monitor = state
+            .microphone_level_monitor
+            .lock()
+            .map_err(|_| internal_error("microphone level monitor lock poisoned"))?;
+        let mut recording = state
             .recording
             .lock()
             .map_err(|_| internal_error("recording state lock poisoned"))?;
         if recording.state.phase != RecordingPhase::Idle {
             return Err(busy_recording_error());
         }
-        drop(recording);
-        MicrophoneRecorder::start(config.recording.input_device.as_deref()).map_err(|error| {
-            DesktopError::new("microphone_start_failed", error.to_string())
-                .with_action("Check the selected input device and microphone permissions.")
-        })?
-    };
-    let started_at = Instant::now();
-    let sample_rate = session.snapshot_source().sample_rate();
-    let effective_transcription_mode = if config.mode == ServiceMode::OpenRouter {
-        TranscriptionMode::Batch
-    } else {
-        config.recording.transcription_mode
-    };
-    let target = if effective_transcription_mode == TranscriptionMode::Streaming {
-        Some(transcription_target(state, &config)?)
-    } else {
-        None
-    };
-    let mut recording = state
-        .recording
-        .lock()
-        .map_err(|_| internal_error("recording state lock poisoned"))?;
-    if recording.state.phase != RecordingPhase::Idle {
-        session.stop_without_snapshot();
-        return Err(busy_recording_error());
-    }
-    recording.state = RecordingState {
-        phase: RecordingPhase::Recording,
-        service_mode: Some(config.mode),
-        transcription_mode: Some(effective_transcription_mode),
-        sample_rate: Some(sample_rate),
-        segment_count: 0,
-    };
-    let kind = if let Some(target) = target {
-        let source = session.snapshot_source();
-        ActiveKind::Streaming(spawn_streaming_worker(
-            app.clone(),
-            config.clone(),
-            target,
-            source,
+        drop(monitor.active.take());
+
+        let session = MicrophoneRecorder::start(config.recording.input_device.as_deref()).map_err(
+            |error| {
+                DesktopError::new("microphone_start_failed", error.to_string())
+                    .with_action("Check the selected input device and microphone permissions.")
+            },
+        )?;
+        let started_at = Instant::now();
+        let sample_rate = session.snapshot_source().sample_rate();
+        let effective_transcription_mode = config.recording.transcription_mode;
+        let target = if effective_transcription_mode == TranscriptionMode::Streaming {
+            Some(transcription_target(state, &config)?)
+        } else {
+            None
+        };
+        recording.state = RecordingState {
+            phase: RecordingPhase::Recording,
+            service_mode: Some(config.mode),
+            transcription_mode: Some(effective_transcription_mode),
+            sample_rate: Some(sample_rate),
+            segment_count: 0,
+        };
+        let kind = if let Some(target) = target {
+            let source = session.snapshot_source();
+            ActiveKind::Streaming(spawn_streaming_worker(
+                app.clone(),
+                config.clone(),
+                target,
+                source,
+                started_at,
+            ))
+        } else {
+            ActiveKind::Batch
+        };
+        recording.active = Some(ActiveRecording {
+            session,
             started_at,
-        ))
-    } else {
-        ActiveKind::Batch
+            sample_rate,
+            config,
+            kind,
+        });
+        sample_rate
     };
-    recording.active = Some(ActiveRecording {
-        session,
-        started_at,
-        sample_rate,
-        config,
-        kind,
-    });
     crate::tray::set_icon_for_phase(app, RecordingPhase::Recording);
-    drop(recording);
     let _ = app.emit(
         DESKTOP_EVENT_NAME,
         DesktopEvent::RecordingStarted { sample_rate },
@@ -1312,8 +1414,8 @@ fn cancel_recording_inner(app: &AppHandle, state: &DesktopState) -> CommandResul
             crate::tray::set_icon_for_phase(app, RecordingPhase::Idle);
             return Ok(());
         }
-        recording.state = RecordingState::default();
-        crate::tray::set_icon_for_phase(app, RecordingPhase::Idle);
+        recording.state.phase = RecordingPhase::Finalizing;
+        crate::tray::set_icon_for_phase(app, RecordingPhase::Finalizing);
         recording.active.take()
     };
     if let Some(active) = active {
@@ -1324,6 +1426,8 @@ fn cancel_recording_inner(app: &AppHandle, state: &DesktopState) -> CommandResul
         }
         let _ = app.emit(DESKTOP_EVENT_NAME, DesktopEvent::RecordingCancelled);
     }
+    reset_recording_state(state);
+    crate::tray::set_icon_for_phase(app, RecordingPhase::Idle);
     Ok(())
 }
 
@@ -1337,13 +1441,15 @@ pub fn stream_worker_failed(app: &AppHandle, error: &DesktopError) {
         if recording.state.phase != RecordingPhase::Recording {
             return;
         }
-        recording.state = RecordingState::default();
-        crate::tray::set_icon_for_phase(app, RecordingPhase::Idle);
+        recording.state.phase = RecordingPhase::Finalizing;
+        crate::tray::set_icon_for_phase(app, RecordingPhase::Finalizing);
         recording.active.take()
     };
     if let Some(active) = active {
         active.session.stop_without_snapshot();
     }
+    reset_recording_state(&state);
+    crate::tray::set_icon_for_phase(app, RecordingPhase::Idle);
     emit_error(
         app,
         "streaming",
@@ -1441,11 +1547,16 @@ fn transcription_target(
                 unavailable_local()
             }
         }
-        ServiceMode::OpenRouter => Err(DesktopError::new(
-            "openrouter_streaming_unsupported",
-            "OpenRouter transcription runs after capture completes",
-        )
-        .with_action("Use batch capture for OpenRouter transcription.")),
+        ServiceMode::OpenRouter => Ok(TranscriptionTarget::OpenRouter(OpenRouterStreamTarget {
+            client: state.openrouter.clone(),
+            api_key: config
+                .openrouter
+                .api_key
+                .clone()
+                .ok_or_else(openrouter_key_required)?,
+            model: config.openrouter.model.clone(),
+            english_only: config.recording.english_only,
+        })),
     }
 }
 
@@ -1579,7 +1690,11 @@ where
         }
         let old_runtime = local_transcription_config(current);
         let next_runtime = local_transcription_config(next);
+        let entering_local_without_model = current.mode != ServiceMode::Local
+            && next.mode == ServiceMode::Local
+            && !next.model_path.is_file();
         if next.mode != ServiceMode::Local
+            || entering_local_without_model
             || (current.mode == ServiceMode::Local && old_runtime == next_runtime)
         {
             tokio::task::spawn_blocking(persist)
@@ -1791,6 +1906,10 @@ fn internal_error(message: impl Into<String>) -> DesktopError {
     DesktopError::new("internal_state_error", message)
 }
 
+fn internal_error_from(error: impl std::fmt::Display) -> DesktopError {
+    internal_error(error.to_string())
+}
+
 fn config_error(error: impl std::fmt::Display) -> DesktopError {
     DesktopError::new("invalid_configuration", error.to_string())
         .with_action("Correct the highlighted setting and try again.")
@@ -1836,7 +1955,7 @@ fn openrouter_key_required() -> DesktopError {
     .with_action("Enter an OpenRouter API key in Settings and save the configuration.")
 }
 
-fn openrouter_error(error: impl std::fmt::Display) -> DesktopError {
+pub(crate) fn openrouter_error(error: impl std::fmt::Display) -> DesktopError {
     DesktopError::new("openrouter_transcription_failed", error.to_string()).with_action(
         "Check the OpenRouter API key, transcription model, account credits, and network connection.",
     )
