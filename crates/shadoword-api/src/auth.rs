@@ -7,49 +7,87 @@ use axum::response::{IntoResponse, Response};
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 use base64::Engine;
 use sha2::{Digest, Sha256};
+use shadoword_core::remote_contracts::ApiTokenSummaryDto;
 use shadoword_core::{ApiTokenConfig, ApiTokenRole};
-use std::net::SocketAddr;
-use std::sync::Arc;
+use std::path::Path;
+use std::sync::{Arc, RwLock};
 
 const TOKEN_BYTES: usize = 32;
 const TOKEN_HASH_PREFIX: &str = "sha256:";
+const MIN_INIT_TOKEN_LEN: usize = 16;
 
 #[derive(Clone, Debug)]
 struct StoredToken {
+    name: String,
     role: ApiTokenRole,
+    /// Kept alongside the parsed digest so the token list can be written back to
+    /// `api.json` from memory. Re-encoding the digest would work, but round-tripping
+    /// the operator's own file contents means a token they wrote by hand keeps its
+    /// exact spelling.
+    token_hash: String,
     digest: [u8; 32],
 }
 
+/// The daemon's live token set. Cheap clones share one store, so a token created
+/// or revoked over HTTP takes effect on the very next request rather than at the
+/// next restart — which matters because the caller doing the revoking is usually
+/// revoking a token that is being abused right now.
 #[derive(Clone, Debug, Default)]
 pub struct AuthConfig {
-    tokens: Arc<[StoredToken]>,
+    tokens: Arc<RwLock<Arc<[StoredToken]>>>,
 }
 
 impl AuthConfig {
     pub fn new(configured: &[ApiTokenConfig]) -> Result<Self> {
-        let mut tokens = Vec::with_capacity(configured.len());
-        for token in configured {
-            tokens.push(StoredToken {
-                role: token.role,
-                digest: parse_token_hash(&token.token_hash).with_context(|| {
-                    format!("invalid stored hash for API token {:?}", token.name)
-                })?,
-            });
-        }
         Ok(Self {
-            tokens: Arc::from(tokens),
+            tokens: Arc::new(RwLock::new(parse_tokens(configured)?)),
         })
     }
 
     pub fn is_configured(&self) -> bool {
-        !self.tokens.is_empty()
+        !self.read().is_empty()
+    }
+
+    /// The token list in the shape `api.json` stores it, for handlers that have to
+    /// rewrite the whole config file.
+    pub fn snapshot(&self) -> Vec<ApiTokenConfig> {
+        self.read()
+            .iter()
+            .map(|token| ApiTokenConfig {
+                name: token.name.clone(),
+                role: token.role,
+                token_hash: token.token_hash.clone(),
+            })
+            .collect()
+    }
+
+    pub fn summaries(&self) -> Vec<ApiTokenSummaryDto> {
+        self.read()
+            .iter()
+            .map(|token| ApiTokenSummaryDto {
+                name: token.name.clone(),
+                role: token.role,
+            })
+            .collect()
+    }
+
+    /// Swaps the live token set. Callers validate and persist first: this is the
+    /// last step, so a rejected or unwritable change never becomes visible.
+    pub fn replace(&self, configured: &[ApiTokenConfig]) -> Result<()> {
+        let parsed = parse_tokens(configured)?;
+        *self.tokens.write().expect("auth token lock poisoned") = parsed;
+        Ok(())
+    }
+
+    fn read(&self) -> Arc<[StoredToken]> {
+        Arc::clone(&self.tokens.read().expect("auth token lock poisoned"))
     }
 
     fn authenticate(&self, candidate: &str) -> Option<ApiTokenRole> {
         let candidate = token_digest(candidate);
         let mut admin = false;
         let mut user = false;
-        for token in self.tokens.iter() {
+        for token in self.read().iter() {
             let matched = constant_time_eq(&token.digest, &candidate);
             admin |= matched && token.role == ApiTokenRole::Admin;
             user |= matched && token.role == ApiTokenRole::User;
@@ -64,7 +102,56 @@ impl AuthConfig {
     }
 }
 
+fn parse_tokens(configured: &[ApiTokenConfig]) -> Result<Arc<[StoredToken]>> {
+    let mut tokens = Vec::with_capacity(configured.len());
+    for token in configured {
+        tokens.push(StoredToken {
+            name: token.name.clone(),
+            role: token.role,
+            token_hash: token.token_hash.clone(),
+            digest: parse_token_hash(&token.token_hash)
+                .with_context(|| format!("invalid stored hash for API token {:?}", token.name))?,
+        });
+    }
+    Ok(Arc::from(tokens))
+}
+
 pub fn generate_token(role: ApiTokenRole, name: &str) -> Result<(String, ApiTokenConfig)> {
+    let name = validate_token_name(name)?;
+    let mut random = [0_u8; TOKEN_BYTES];
+    getrandom::fill(&mut random).context("failed to obtain secure randomness for API token")?;
+    let role_name = match role {
+        ApiTokenRole::Admin => "admin",
+        ApiTokenRole::User => "user",
+    };
+    let value = format!("swd_{role_name}_{}", URL_SAFE_NO_PAD.encode(random));
+    let token = ApiTokenConfig {
+        name,
+        role,
+        token_hash: hash_secret(&value),
+    };
+    Ok((value, token))
+}
+
+/// Records a secret the operator chose, for the bootstrap path where the value
+/// has to be known before the daemon first runs. `generate_token` guarantees its
+/// own entropy; here the only thing that can be checked is length.
+pub fn adopt_token(role: ApiTokenRole, name: &str, secret: &str) -> Result<ApiTokenConfig> {
+    let name = validate_token_name(name)?;
+    let secret = secret.trim();
+    if secret.len() < MIN_INIT_TOKEN_LEN {
+        return Err(anyhow!(
+            "the supplied API token must be at least {MIN_INIT_TOKEN_LEN} characters"
+        ));
+    }
+    Ok(ApiTokenConfig {
+        name,
+        role,
+        token_hash: hash_secret(secret),
+    })
+}
+
+fn validate_token_name(name: &str) -> Result<String> {
     let name = name.trim();
     if name.is_empty() {
         return Err(anyhow!("token name cannot be empty"));
@@ -74,38 +161,33 @@ pub fn generate_token(role: ApiTokenRole, name: &str) -> Result<(String, ApiToke
             "token name must be at most 64 characters and contain no control characters"
         ));
     }
+    Ok(name.to_string())
+}
 
-    let mut random = [0_u8; TOKEN_BYTES];
-    getrandom::fill(&mut random).context("failed to obtain secure randomness for API token")?;
-    let role_name = match role {
-        ApiTokenRole::Admin => "admin",
-        ApiTokenRole::User => "user",
-    };
-    let value = format!("swd_{role_name}_{}", URL_SAFE_NO_PAD.encode(random));
-    let token_hash = format!(
+fn hash_secret(secret: &str) -> String {
+    format!(
         "{TOKEN_HASH_PREFIX}{}",
-        URL_SAFE_NO_PAD.encode(token_digest(&value))
-    );
-    Ok((
-        value,
-        ApiTokenConfig {
-            name: name.to_string(),
-            role,
-            token_hash,
-        },
+        URL_SAFE_NO_PAD.encode(token_digest(secret))
+    )
+}
+
+/// A daemon with no tokens can answer nothing, so it refuses to start instead of
+/// listening and rejecting every caller. Failing here also keeps the "is this
+/// daemon open?" question from existing at all: there is no such state to reason
+/// about, on loopback or anywhere else.
+pub fn enforce_token_requirement(auth: &AuthConfig, config_path: &Path) -> Result<()> {
+    if auth.is_configured() {
+        return Ok(());
+    }
+    Err(anyhow!(
+        "no API tokens are configured in {}; issue one with `shadoword-api token generate admin <name>` \
+         or set SHADOWORD_INIT_TOKEN_FILE to a file holding the first admin token",
+        config_path.display()
     ))
 }
 
-pub fn enforce_bind_auth(addr: &SocketAddr, auth: &AuthConfig) -> Result<()> {
-    if addr.ip().is_loopback() || auth.is_configured() {
-        Ok(())
-    } else {
-        Err(anyhow!(
-            "an API admin or user token is required for non-loopback binds"
-        ))
-    }
-}
-
+/// Both guards are always mounted and decide per request, so a token created or
+/// revoked over HTTP takes effect immediately rather than at the next restart.
 pub async fn require_admin(
     State(auth): State<AuthConfig>,
     request: Request,

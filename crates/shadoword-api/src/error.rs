@@ -84,6 +84,18 @@ impl ApiError {
         }
     }
 
+    /// Also a 409, but carries its own code: `stale_generation` tells a client to
+    /// refetch and retry, which is exactly the wrong advice for a duplicate token
+    /// name or a last-admin revoke, where retrying will fail identically forever.
+    pub fn token_conflict(message: impl Into<String>) -> Self {
+        Self {
+            status: StatusCode::CONFLICT,
+            code: "token_conflict",
+            message: message.into(),
+            retry_after: None,
+        }
+    }
+
     pub fn not_found(message: impl Into<String>) -> Self {
         Self {
             status: StatusCode::NOT_FOUND,

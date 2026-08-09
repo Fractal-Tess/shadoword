@@ -4,7 +4,32 @@ All notable changes to Shadoword are documented in this file.
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and Shadoword uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.14.0] - 2026-08-09
+
+### Breaking
+
+- Shadoword API now requires a token for every request, including on loopback binds. A daemon with no tokens refuses to start rather than listening and rejecting every caller, so there is no longer an "open daemon" state to reason about. Existing tokenless deployments must issue a token before upgrading:
+
+  ```bash
+  shadoword-api token generate admin "desktop administrator"
+  ```
+
+  Desktop clients pointed at a local daemon must now set an API token under Settings → Runtime.
+
+### Added
+
+- A public `GET /v1/version` endpoint reporting the daemon's own version, and a daemon version readout in the desktop's connection test result.
+- Admin-only token management over HTTP: `GET /v1/tokens`, `POST /v1/tokens`, and `DELETE /v1/tokens/{name}`. Issued secrets are returned exactly once and stored only as SHA-256 hashes.
+- A Daemon tokens panel under Settings → Runtime for listing, issuing, and revoking tokens on a connected daemon.
+- `SHADOWORD_INIT_TOKEN` and `SHADOWORD_INIT_TOKEN_FILE` install an operator-supplied admin token on a daemon that has none yet, for first boots that cannot run the token CLI beforehand. The token is adopted only while the token list is empty, so restarts do not resurrect a revoked secret.
+- A `nixosModules.default` output providing `services.shadoword-api`, with a `variant` option selecting the cpu, cuda, or vulkan build, systemd-credential delivery of the initial token, and the `shadoword-api` CLI on the system path pinned to the service's config file.
+- An `overlays.default` output exposing the API and desktop packages as `pkgs.shadoword-*`.
+
+### Changed
+
+- Token changes made over HTTP apply immediately instead of at the next daemon restart. The `shadoword-api token` CLI still edits the config file, so its changes still require a restart.
+- The last remaining admin token cannot be revoked, so a daemon can no longer be talked out of its own administrative access.
+- The container images declare `/config` and `/data` as volumes, so hashed token records survive a container being replaced.
 
 ## [0.13.0] - 2026-08-09
 

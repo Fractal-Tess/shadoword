@@ -1,10 +1,41 @@
-use crate::{InferencePoolConfig, ServiceStatus, WhisperAccelerator};
+use crate::{ApiTokenRole, InferencePoolConfig, ServiceStatus, WhisperAccelerator};
 use serde::{Deserialize, Serialize};
 use specta::Type;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Type)]
 pub struct HealthDto {
     pub ok: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Type)]
+pub struct VersionDto {
+    /// The daemon's own crate version, so a client can tell whether an endpoint
+    /// it wants to call exists before it tries and reads a 404 as a network fault.
+    pub version: String,
+}
+
+/// What an admin is allowed to see about a token that already exists. The stored
+/// hash never leaves the daemon: it is not a secret a client can use, but it is
+/// an offline-guessable one, and nothing here needs it.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Type)]
+pub struct ApiTokenSummaryDto {
+    pub name: String,
+    pub role: ApiTokenRole,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Type)]
+pub struct CreateApiTokenRequest {
+    pub name: String,
+    pub role: ApiTokenRole,
+}
+
+/// The only time the secret is ever transmitted. The daemon keeps a hash, so a
+/// caller that loses this value has to revoke the token and issue another one.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Type)]
+pub struct CreatedApiTokenDto {
+    pub name: String,
+    pub role: ApiTokenRole,
+    pub token: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Type)]

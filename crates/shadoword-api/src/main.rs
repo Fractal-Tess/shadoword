@@ -1,10 +1,10 @@
 use anyhow::{anyhow, Context};
 use clap::{Parser, Subcommand, ValueEnum};
-use shadoword_api::auth::{enforce_bind_auth, generate_token, AuthConfig};
+use shadoword_api::auth::{adopt_token, enforce_token_requirement, generate_token, AuthConfig};
 use shadoword_api::downloads::DownloadJobs;
 use shadoword_api::request_recording::RequestRecorder;
 use shadoword_api::router::{
-    build_router, resolved_model_path, runtime_transcription_config, AppState, RouterConfig,
+    build_router, resolved_model_path, runtime_transcription_config, AppState,
 };
 use shadoword_core::{
     default_whisper_model, download_whisper_model, parse_requested_models, resolve_download_dir,
@@ -56,7 +56,19 @@ struct Cli {
         env = "SHADOWORD_REQUEST_RECORDING_DIR"
     )]
     request_recording_dir: Option<PathBuf>,
+
+    /// Admin token to install when the daemon has none yet, for first boots that
+    /// cannot run the token CLI first.
+    #[arg(long = "init-token", env = "SHADOWORD_INIT_TOKEN")]
+    init_token: Option<String>,
+
+    /// File holding the initial admin token. Preferred over `--init-token`, which
+    /// exposes the secret to anything that can read the process environment.
+    #[arg(long = "init-token-file", env = "SHADOWORD_INIT_TOKEN_FILE")]
+    init_token_file: Option<PathBuf>,
 }
+
+const INIT_TOKEN_NAME: &str = "init";
 
 #[derive(Debug, Subcommand)]
 enum Command {
@@ -113,8 +125,9 @@ async fn main() -> anyhow::Result<()> {
         .listen_addr
         .parse()
         .with_context(|| format!("invalid listen address '{}'", config.listen_addr))?;
+    install_init_token(&config_path, &mut config, &cli)?;
     let auth = AuthConfig::new(&config.tokens)?;
-    enforce_bind_auth(&addr, &auth)?;
+    enforce_token_requirement(&auth, &config_path)?;
 
     let download_dir = resolve_download_dir(
         cli.download_dir
@@ -174,14 +187,51 @@ async fn main() -> anyhow::Result<()> {
         download_dir,
         listen_addr: addr,
         queue_capacity: config.queue_capacity,
-        tokens: Arc::from(config.tokens.clone()),
+        auth,
         config_update_lock: Arc::new(tokio::sync::Mutex::new(())),
     };
-    let app = build_router(state, RouterConfig { auth });
+    let app = build_router(state);
 
     tracing::info!("shadoword-api listening on http://{}", addr);
     let listener = tokio::net::TcpListener::bind(addr).await?;
     axum::serve(listener, app).await?;
+    Ok(())
+}
+
+/// Adopts an operator-supplied admin token, but only while the daemon has none of
+/// its own. Seeding unconditionally would make the secret impossible to rotate
+/// without editing the deployment, and would resurrect a token that had been
+/// deliberately revoked on the next restart.
+fn install_init_token(
+    config_path: &std::path::Path,
+    config: &mut ApiConfig,
+    cli: &Cli,
+) -> anyhow::Result<()> {
+    let secret = match (&cli.init_token_file, &cli.init_token) {
+        (Some(path), _) => Some(
+            std::fs::read_to_string(path)
+                .with_context(|| format!("failed to read init token file {}", path.display()))?,
+        ),
+        (None, Some(secret)) => Some(secret.clone()),
+        (None, None) => None,
+    };
+    let Some(secret) = secret else {
+        return Ok(());
+    };
+    if !config.tokens.is_empty() {
+        tracing::debug!("ignoring the supplied init token; this daemon already has tokens");
+        return Ok(());
+    }
+
+    config
+        .tokens
+        .push(adopt_token(ApiTokenRole::Admin, INIT_TOKEN_NAME, &secret)?);
+    config.save_to_path(config_path)?;
+    tracing::info!(
+        name = INIT_TOKEN_NAME,
+        path = %config_path.display(),
+        "installed the supplied admin token as this daemon's first token"
+    );
     Ok(())
 }
 
@@ -205,7 +255,7 @@ fn manage_tokens(
             config.save_to_path(config_path)?;
             println!("{value}");
             eprintln!(
-                "Generated {role} token {name:?}. Its hash was saved to {}. Restart shadoword-api to load it.",
+                "Generated {role} token {name:?}. Its hash was saved to {}. Restart shadoword-api to load it, or use POST /v1/tokens on a running daemon to skip the restart.",
                 config_path.display()
             );
         }
@@ -223,7 +273,7 @@ fn manage_tokens(
             }
             config.save_to_path(config_path)?;
             eprintln!(
-                "Revoked token {name:?} in {}. Restart shadoword-api to apply the change.",
+                "Revoked token {name:?} in {}. Restart shadoword-api to apply the change, or use DELETE /v1/tokens/{name} on a running daemon to revoke it immediately.",
                 config_path.display()
             );
         }

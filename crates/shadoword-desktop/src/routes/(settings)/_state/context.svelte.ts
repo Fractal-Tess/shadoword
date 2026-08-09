@@ -6,11 +6,13 @@ import { SettingsFormState } from './form-state.svelte';
 import { OpenRouterSettingsState } from './openrouter-state.svelte';
 import { SettingsPersistenceState } from './persistence-state.svelte';
 import { RemoteSettingsState } from './remote-state.svelte';
+import { RemoteTokenSettingsState } from './token-state.svelte';
 
 export class SettingsContextState {
 	readonly app: DesktopAppState;
 	readonly form: SettingsFormState;
 	readonly remote: RemoteSettingsState;
+	readonly remoteTokens: RemoteTokenSettingsState;
 	readonly openRouter: OpenRouterSettingsState;
 	readonly persistence: SettingsPersistenceState;
 	#navigate: (page: PageId) => void;
@@ -22,6 +24,7 @@ export class SettingsContextState {
 		this.#navigate = navigate;
 		this.form = new SettingsFormState(settings, app.overview?.runtime.english_only);
 		this.remote = new RemoteSettingsState(app, settings);
+		this.remoteTokens = new RemoteTokenSettingsState(app);
 		this.openRouter = new OpenRouterSettingsState(app, settings);
 		this.persistence = new SettingsPersistenceState(app, this.form, this.remote, this.openRouter);
 		const schedule = (immediate = false) => this.persistence.schedule(immediate);

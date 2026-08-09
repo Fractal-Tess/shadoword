@@ -218,6 +218,12 @@
             User = "1000:1000";
             WorkingDir = "/home/shadoword";
             ExposedPorts."47813/tcp" = { };
+            # Hashed token records live in /config. Without a mount the daemon
+            # loses every token it was given the moment the container is replaced.
+            Volumes = {
+              "/config" = { };
+              "/data" = { };
+            };
             Labels = {
               "io.shadoword.inference-variant" = variant;
               "org.opencontainers.image.description" = "Shadoword ${variant} speech-to-text API";
@@ -522,6 +528,30 @@
           shadoword-desktop-client-source = shadoword-desktop-source;
         }
       );
+
+      nixosModules = rec {
+        shadoword-api = import ./nix/nixos-module.nix self;
+        default = shadoword-api;
+      };
+
+      # The packages are taken from this flake's own nixpkgs rather than rebuilt
+      # against the consumer's, so that pulling in the CUDA daemon does not make
+      # the host's nixpkgs config carry `allowUnfree`.
+      overlays.default =
+        _final: prev:
+        let
+          flakePackages = self.packages.${prev.stdenv.hostPlatform.system};
+        in
+        {
+          inherit (flakePackages)
+            shadoword-api
+            shadoword-api-cuda
+            shadoword-api-vulkan
+            shadoword-desktop
+            shadoword-desktop-cuda
+            shadoword-desktop-vulkan
+            ;
+        };
 
       devShells = forAllSystems (
         system:

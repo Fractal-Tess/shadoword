@@ -248,3 +248,35 @@ jobs:
             dist/shadoword-desktop-vulkan-x86_64-linux.tar.gz
             dist/SHA256SUMS
             dist/nix-release-artifacts.json
+
+      # Nix consumers only get prebuilt binaries while nix/release-artifacts.json
+      # matches the workspace version, so every version bump silently drops them
+      # back to source builds until the pin lands. That makes this a release step
+      # rather than something a human is expected to remember afterwards.
+      - name: Pin release artifacts on the default branch
+        shell: bash
+        env:
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+        run: |
+          set -euo pipefail
+          version=${RELEASE_TAG#v}
+          git fetch --depth=1 origin "$DEFAULT_BRANCH"
+          git checkout -B "$DEFAULT_BRANCH" "origin/$DEFAULT_BRANCH"
+
+          branch_version=$(nix eval --impure --raw --expr '(builtins.fromTOML (builtins.readFile ./Cargo.toml)).workspace.package.version')
+          if [ "$branch_version" != "$version" ]; then
+            echo "::warning::$DEFAULT_BRANCH is at $branch_version, not $version; leaving the artifact pin alone"
+            exit 0
+          fi
+
+          cp dist/nix-release-artifacts.json nix/release-artifacts.json
+          if git diff --quiet -- nix/release-artifacts.json; then
+            echo "nix/release-artifacts.json already pins $version"
+            exit 0
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add nix/release-artifacts.json
+          git commit -m "build: pin $RELEASE_TAG release artifacts"
+          git push origin "HEAD:$DEFAULT_BRANCH"

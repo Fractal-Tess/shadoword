@@ -99,6 +99,9 @@ pub struct DesktopBootstrap {
 pub struct ConnectionReport {
     pub health_ok: bool,
     pub status_model_loaded: bool,
+    /// `None` when the daemon is old enough to have no version route, which the
+    /// window shows as an unknown version rather than as a failed connection.
+    pub daemon_version: Option<String>,
     pub overview: OverviewDto,
     pub runtime_config: RuntimeConfigDto,
 }

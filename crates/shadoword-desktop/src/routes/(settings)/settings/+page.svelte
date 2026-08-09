@@ -6,6 +6,7 @@
 	import { getSettingsContext } from '../_state/context.svelte';
 	import OpenRouterExecutionSettings from './OpenRouterExecutionSettings.svelte';
 	import RemoteExecutionSettings from './RemoteExecutionSettings.svelte';
+	import RemoteTokenSettings from './RemoteTokenSettings.svelte';
 	import ExecutionRuntimeSettings from './ExecutionRuntimeSettings.svelte';
 
 	const settings = getSettingsContext();
@@ -40,6 +41,9 @@
 	{:else if settings.mode === 'remote'}
 		<SettingsPanel class="mb-4">
 			<RemoteExecutionSettings />
+		</SettingsPanel>
+		<SettingsPanel class="mb-4">
+			<RemoteTokenSettings />
 		</SettingsPanel>
 		<ExecutionRuntimeSettings />
 	{:else}

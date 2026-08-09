@@ -88,7 +88,11 @@ export class ProviderOperations {
 		try {
 			const report = await commands.testRemoteConnection(input);
 			this.app.overview = report.overview;
-			this.app.connectionMessage = `Connected · health ${report.health_ok ? 'ok' : 'failed'} · ${report.status_model_loaded ? 'model ready' : 'model unloaded'}`;
+			// A daemon with no version route is old enough that saying so is more
+			// useful than omitting the field, because that is the case where a
+			// missing feature is about to be mistaken for a broken connection.
+			const daemon = report.daemon_version ? `daemon ${report.daemon_version}` : 'daemon pre-0.14';
+			this.app.connectionMessage = `Connected · ${daemon} · health ${report.health_ok ? 'ok' : 'failed'} · ${report.status_model_loaded ? 'model ready' : 'model unloaded'}`;
 			this.app.activity = 'ready';
 		} catch (error) {
 			this.app.activity = this.app.overview ? 'ready' : 'offline';

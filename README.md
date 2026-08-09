@@ -35,6 +35,40 @@ nix build github:Fractal-Tess/shadoword#shadoword-desktop-vulkan-source
 nix build github:Fractal-Tess/shadoword#shadoword-api-source
 ```
 
+## NixOS
+
+The flake exposes `nixosModules.default`, which runs the daemon and puts the
+`shadoword-api` CLI on the system path pointed at the service's own config file:
+
+```nix
+{
+  inputs.shadoword.url = "github:Fractal-Tess/shadoword";
+
+  # in your nixosSystem modules:
+  imports = [ inputs.shadoword.nixosModules.default ];
+
+  services.shadoword-api = {
+    enable = true;
+    variant = "cuda";                              # "cpu" (default), "cuda", or "vulkan"
+    listenAddress = "0.0.0.0";
+    initTokenFile = config.sops.secrets.shadoword_admin_token.path;
+  };
+}
+```
+
+`variant` picks the matching prebuilt release archive, so enabling the CUDA build
+does not compile it locally and does not push `allowUnfree` onto the host's
+nixpkgs. `package` overrides the choice outright. Without `initTokenFile`, issue
+the first token by hand:
+
+```bash
+sudo -u shadoword shadoword-api token generate admin "desktop administrator"
+sudo systemctl restart shadoword-api
+```
+
+`overlays.default` is also available if you would rather reach the builds as
+`pkgs.shadoword-api`, `pkgs.shadoword-api-cuda`, or `pkgs.shadoword-desktop`.
+
 ## Develop
 
 CPU Whisper is the default backend:
@@ -66,7 +100,8 @@ bun run tauri dev -- --features whisper-cuda
 
 ## Shadoword API
 
-Generate named bearer tokens before exposing the daemon outside localhost:
+Every request needs a token, on loopback as much as anywhere else. A daemon with
+no tokens refuses to start, so generate the first one before the first run:
 
 ```bash
 shadoword-api token generate admin "desktop administrator"
@@ -77,9 +112,32 @@ shadoword-api token revoke "transcription client"
 
 Token secrets are printed once. Only SHA-256 hashes are stored in the API configuration.
 
-- **Admin tokens** can manage models, downloads, configuration, and transcription.
+Where running the CLI first is awkward — containers, or a NixOS unit fed by a
+secret manager — set `SHADOWORD_INIT_TOKEN_FILE` to a file holding an admin token,
+or `SHADOWORD_INIT_TOKEN` to the value itself. Prefer the file: an environment
+variable is readable by anything that can see the process. Either one is adopted
+only while the daemon has no tokens, so a restart never resurrects a token you
+revoked on purpose.
+
+The CLI edits the config file, so a running daemon has to be restarted to pick up its
+changes. An admin token can instead manage tokens over HTTP, which takes effect
+immediately and needs no restart:
+
+```bash
+curl -H "Authorization: Bearer $ADMIN_TOKEN" http://127.0.0.1:47813/v1/tokens
+curl -H "Authorization: Bearer $ADMIN_TOKEN" -H 'content-type: application/json' \
+  -d '{"name":"transcription client","role":"user"}' http://127.0.0.1:47813/v1/tokens
+curl -X DELETE -H "Authorization: Bearer $ADMIN_TOKEN" \
+  "http://127.0.0.1:47813/v1/tokens/transcription%20client"
+```
+
+Shadoword Desktop exposes the same three operations under Settings → Runtime when it is
+connected to a daemon with an admin token.
+
+- **Admin tokens** can manage tokens, models, downloads, configuration, and transcription.
 - **User tokens** can only submit batch or streaming transcription requests.
-- `GET /health` is public.
+- The last remaining admin token cannot be revoked, so a daemon cannot lock itself out.
+- `GET /health` and `GET /v1/version` are public.
 
 Start the daemon and download the default Turbo model when needed:
 
@@ -90,11 +148,15 @@ shadoword-api --download-model turbo
 Main endpoints:
 
 ```text
-GET  /health
-POST /v1/transcribe-wav
-GET  /v1/stream
-GET  /v1/overview
-GET  /v1/models
+GET    /health
+GET    /v1/version
+POST   /v1/transcribe-wav
+GET    /v1/stream
+GET    /v1/overview
+GET    /v1/models
+GET    /v1/tokens
+POST   /v1/tokens
+DELETE /v1/tokens/{name}
 ```
 
 Use `shadoword-api --help` for configuration, model, and request-recording options.
@@ -109,7 +171,22 @@ CPU, CUDA, and Vulkan daemon images are published to both `ghcr.io/fractal-tess/
 | CUDA | `cuda` | `<version>-cuda` |
 | Vulkan | `vulkan` | `<version>-vulkan` |
 
-Mount persistent configuration and model directories at `/config` and `/data`. Start from [`docker/config/shadoword/api.json.example`](docker/config/shadoword/api.json.example), using `"cpu"` for the CPU image and `"gpu"` for CUDA or Vulkan.
+Mount persistent configuration and model directories at `/config` and `/data`; both are declared volumes, and an unmounted `/config` loses every token the daemon was given when the container is replaced. Start from [`docker/config/shadoword/api.json.example`](docker/config/shadoword/api.json.example), using `"cpu"` for the CPU image and `"gpu"` for CUDA or Vulkan.
+
+Seed the first admin token with a Docker secret:
+
+```yaml
+services:
+  shadoword-api:
+    image: ghcr.io/fractal-tess/shadoword-backend:cuda
+    environment:
+      SHADOWORD_INIT_TOKEN_FILE: /run/secrets/shadoword_admin_token
+    secrets: [shadoword_admin_token]
+    volumes:
+      - ./config:/config
+      - ./data:/data
+    ports: ["47813:47813"]
+```
 
 CUDA requires the NVIDIA Container Toolkit and `--gpus all`. Vulkan on AMD or Intel requires the render device, for example `--device /dev/dri`, plus access to the device's host group.
 

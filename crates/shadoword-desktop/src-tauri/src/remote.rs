@@ -3,8 +3,8 @@ use reqwest::{Client, Method, Response, Url};
 use serde::de::DeserializeOwned;
 use serde::Deserialize;
 use shadoword_core::remote_contracts::{
-    DaemonStatusDto, DownloadJobStatus, HealthDto, OverviewDto, RuntimeConfigDto,
-    StartDownloadRequest,
+    ApiTokenSummaryDto, CreateApiTokenRequest, CreatedApiTokenDto, DaemonStatusDto,
+    DownloadJobStatus, HealthDto, OverviewDto, RuntimeConfigDto, StartDownloadRequest, VersionDto,
 };
 use shadoword_core::TranscriptResponse;
 use std::time::Duration;
@@ -26,6 +26,14 @@ pub(crate) struct RemoteApiError {
 }
 
 impl RemoteApiError {
+    fn unsupported(code: &str, message: &str) -> Self {
+        Self {
+            status: reqwest::StatusCode::NOT_FOUND,
+            code: code.to_string(),
+            message: message.to_string(),
+        }
+    }
+
     pub(crate) fn code(&self) -> &str {
         &self.code
     }
@@ -75,6 +83,66 @@ impl RemoteClient {
 
     pub async fn health(&self, endpoint: &str, token: Option<&str>) -> Result<HealthDto> {
         self.get(endpoint, token, &["health"]).await
+    }
+
+    /// `None` when the daemon predates the version route, which is itself the
+    /// answer: it is older than the first release that could report a version.
+    pub async fn version(&self, endpoint: &str, token: Option<&str>) -> Result<Option<VersionDto>> {
+        let response = self
+            .request(endpoint, token, Method::GET, &["v1", "version"])?
+            .timeout(REMOTE_TIMEOUT)
+            .send()
+            .await
+            .context("failed to reach the remote API")?;
+        if response.status() == reqwest::StatusCode::NOT_FOUND {
+            return Ok(None);
+        }
+        decode(response).await.map(Some)
+    }
+
+    pub async fn list_tokens(
+        &self,
+        endpoint: &str,
+        token: Option<&str>,
+    ) -> Result<Vec<ApiTokenSummaryDto>> {
+        let response = self
+            .request(endpoint, token, Method::GET, &["v1", "tokens"])?
+            .timeout(REMOTE_TIMEOUT)
+            .send()
+            .await
+            .context("failed to reach the remote API")?;
+        decode_supported(response, token_management_unsupported()).await
+    }
+
+    pub async fn create_token(
+        &self,
+        endpoint: &str,
+        token: Option<&str>,
+        request: &CreateApiTokenRequest,
+    ) -> Result<CreatedApiTokenDto> {
+        let response = self
+            .request(endpoint, token, Method::POST, &["v1", "tokens"])?
+            .json(request)
+            .timeout(REMOTE_TIMEOUT)
+            .send()
+            .await
+            .context("failed to reach the remote API")?;
+        decode_supported(response, token_management_unsupported()).await
+    }
+
+    pub async fn revoke_token(
+        &self,
+        endpoint: &str,
+        token: Option<&str>,
+        name: &str,
+    ) -> Result<()> {
+        let response = self
+            .request(endpoint, token, Method::DELETE, &["v1", "tokens", name])?
+            .timeout(REMOTE_TIMEOUT)
+            .send()
+            .await
+            .context("failed to reach the remote API")?;
+        decode_empty(response, token_management_unsupported()).await
     }
 
     pub async fn status(&self, endpoint: &str, token: Option<&str>) -> Result<DaemonStatusDto> {
@@ -141,7 +209,14 @@ impl RemoteClient {
             .send()
             .await
             .context("failed to reach the remote API")?;
-        decode_empty(response).await
+        decode_empty(
+            response,
+            RemoteApiError::unsupported(
+                "model_deletion_unsupported",
+                "this daemon does not expose remote model deletion",
+            ),
+        )
+        .await
     }
 
     pub async fn start_download(
@@ -228,7 +303,10 @@ impl RemoteClient {
     }
 }
 
-async fn decode_empty(response: Response) -> Result<()> {
+/// `missing` names what an unstructured 404 means for this route. The daemon
+/// answers its own failures with a JSON error body, so a bare 404 is the router
+/// saying the route does not exist — that is, the daemon predates the feature.
+async fn decode_empty(response: Response, missing: RemoteApiError) -> Result<()> {
     let status = response.status();
     if status.is_success() {
         return Ok(());
@@ -239,13 +317,24 @@ async fn decode_empty(response: Response) -> Result<()> {
         return Err(error);
     }
     if status == reqwest::StatusCode::NOT_FOUND {
-        return Err(anyhow::Error::new(RemoteApiError {
-            status,
-            code: "model_deletion_unsupported".to_string(),
-            message: "this daemon does not expose remote model deletion".to_string(),
-        }));
+        return Err(anyhow::Error::new(missing));
     }
     Err(anyhow!("Shadoword API returned {status}"))
+}
+
+/// `decode` for routes that may simply not exist on an older daemon, so that the
+/// caller can tell "you are talking to a daemon without this feature" apart from
+/// "the daemon rejected what you asked for".
+async fn decode_supported<T: DeserializeOwned>(
+    response: Response,
+    missing: RemoteApiError,
+) -> Result<T> {
+    if response.status() == reqwest::StatusCode::NOT_FOUND {
+        let body = response.text().await.unwrap_or_default();
+        return Err(structured_api_error(reqwest::StatusCode::NOT_FOUND, &body)
+            .unwrap_or_else(|| anyhow::Error::new(missing)));
+    }
+    decode(response).await
 }
 
 async fn decode<T: DeserializeOwned>(response: Response) -> Result<T> {
@@ -267,6 +356,13 @@ async fn decode_error<T>(response: Response) -> Result<T> {
         return Err(error);
     }
     Err(anyhow!("Shadoword API returned {status}"))
+}
+
+fn token_management_unsupported() -> RemoteApiError {
+    RemoteApiError::unsupported(
+        "token_management_unsupported",
+        "this daemon does not expose remote token management",
+    )
 }
 
 fn structured_api_error(status: reqwest::StatusCode, body: &str) -> Option<anyhow::Error> {

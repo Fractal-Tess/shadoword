@@ -24,6 +24,15 @@ export const commands = {
 	listOpenrouterModels: () => __TAURI_INVOKE<OpenRouterModelInfo[]>('list_openrouter_models'),
 	testOpenrouterKey: (input: OpenRouterConnectionInput) =>
 		__TAURI_INVOKE<OpenRouterKeyReport>('test_openrouter_key', { input }),
+	listRemoteTokens: () => __TAURI_INVOKE<ApiTokenSummaryDto[]>('list_remote_tokens'),
+	/**
+	 *  The secret comes back here and nowhere else — the daemon keeps only a hash —
+	 *  so the caller has to surface it to the operator before the value is dropped.
+	 */
+	createRemoteToken: (request: CreateApiTokenRequest) =>
+		__TAURI_INVOKE<CreatedApiTokenDto>('create_remote_token', { request }),
+	revokeRemoteToken: (name: string) =>
+		__TAURI_INVOKE<ApiTokenSummaryDto[]>('revoke_remote_token', { name }),
 	refreshRemoteOverview: () => __TAURI_INVOKE<OverviewDto_Serialize>('refresh_remote_overview'),
 	updateRemoteRuntime: (runtime: RuntimeConfigDto_Deserialize) =>
 		__TAURI_INVOKE<OverviewDto_Serialize>('update_remote_runtime', { runtime }),
@@ -60,6 +69,18 @@ export const events = {
 };
 
 /* Types */
+export type ApiTokenRole = 'admin' | 'user';
+
+/**
+ *  What an admin is allowed to see about a token that already exists. The stored
+ *  hash never leaves the daemon: it is not a secret a client can use, but it is
+ *  an offline-guessable one, and nothing here needs it.
+ */
+export type ApiTokenSummaryDto = {
+	name: string;
+	role: ApiTokenRole;
+};
+
 export type ConnectionInput = {
 	endpoint: string;
 	token: string | null;
@@ -71,6 +92,11 @@ export type ConnectionReport = ConnectionReport_Serialize | ConnectionReport_Des
 export type ConnectionReport_Deserialize = {
 	health_ok: boolean;
 	status_model_loaded: boolean;
+	/**
+	 *  `None` when the daemon is old enough to have no version route, which the
+	 *  window shows as an unknown version rather than as a failed connection.
+	 */
+	daemon_version: string | null;
 	overview: OverviewDto_Deserialize;
 	runtime_config: RuntimeConfigDto_Deserialize;
 };
@@ -78,8 +104,28 @@ export type ConnectionReport_Deserialize = {
 export type ConnectionReport_Serialize = {
 	health_ok: boolean;
 	status_model_loaded: boolean;
+	/**
+	 *  `None` when the daemon is old enough to have no version route, which the
+	 *  window shows as an unknown version rather than as a failed connection.
+	 */
+	daemon_version: string | null;
 	overview: OverviewDto_Serialize;
 	runtime_config: RuntimeConfigDto_Serialize;
+};
+
+export type CreateApiTokenRequest = {
+	name: string;
+	role: ApiTokenRole;
+};
+
+/**
+ *  The only time the secret is ever transmitted. The daemon keeps a hash, so a
+ *  caller that loses this value has to revoke the token and issue another one.
+ */
+export type CreatedApiTokenDto = {
+	name: string;
+	role: ApiTokenRole;
+	token: string;
 };
 
 export type DaemonStatusDto = DaemonStatusDto_Serialize | DaemonStatusDto_Deserialize;

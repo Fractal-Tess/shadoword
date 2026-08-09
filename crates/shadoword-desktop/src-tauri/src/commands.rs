@@ -13,11 +13,14 @@ use crate::recording::{
 };
 use crate::remote::RemoteClient;
 use anyhow::{anyhow, Context, Result};
+use shadoword_core::remote_contracts::{
+    ApiTokenSummaryDto, CreateApiTokenRequest, CreatedApiTokenDto, DownloadJobStatus, OverviewDto,
+    RuntimeConfigDto,
+};
 #[cfg(feature = "local-runtime")]
 use shadoword_core::remote_contracts::{
     DaemonStatusDto, DownloadJobState, ModelInfoDto, ModelStorageDto,
 };
-use shadoword_core::remote_contracts::{DownloadJobStatus, OverviewDto, RuntimeConfigDto};
 #[cfg(feature = "local-runtime")]
 use shadoword_core::{
     default_whisper_model, download_whisper_model_with_progress, list_whisper_gpu_devices,
@@ -593,6 +596,11 @@ pub async fn test_remote_connection(
         .health(&endpoint, token)
         .await
         .map_err(remote_error)?;
+    let version = state
+        .remote
+        .version(&endpoint, token)
+        .await
+        .map_err(remote_error)?;
     let status = state
         .remote
         .status(&endpoint, token)
@@ -611,6 +619,7 @@ pub async fn test_remote_connection(
     Ok(ConnectionReport {
         health_ok: health.ok,
         status_model_loaded: status.service.model_loaded,
+        daemon_version: version.map(|version| version.version),
         overview,
         runtime_config,
     })
@@ -662,6 +671,62 @@ pub async fn test_openrouter_key(
         limit_remaining: report.limit_remaining,
         usage: report.usage,
     })
+}
+
+#[tauri::command]
+#[specta::specta]
+pub async fn list_remote_tokens(
+    state: tauri::State<'_, DesktopState>,
+) -> CommandResult<Vec<ApiTokenSummaryDto>> {
+    let config = state.config()?;
+    ensure_mode(&config, ServiceMode::Remote)?;
+    state
+        .remote
+        .list_tokens(&config.remote.endpoint, config.remote.api_token.as_deref())
+        .await
+        .map_err(remote_error)
+}
+
+/// The secret comes back here and nowhere else — the daemon keeps only a hash —
+/// so the caller has to surface it to the operator before the value is dropped.
+#[tauri::command]
+#[specta::specta]
+pub async fn create_remote_token(
+    request: CreateApiTokenRequest,
+    state: tauri::State<'_, DesktopState>,
+) -> CommandResult<CreatedApiTokenDto> {
+    let config = state.config()?;
+    ensure_mode(&config, ServiceMode::Remote)?;
+    state
+        .remote
+        .create_token(
+            &config.remote.endpoint,
+            config.remote.api_token.as_deref(),
+            &request,
+        )
+        .await
+        .map_err(remote_error)
+}
+
+#[tauri::command]
+#[specta::specta]
+pub async fn revoke_remote_token(
+    name: String,
+    state: tauri::State<'_, DesktopState>,
+) -> CommandResult<Vec<ApiTokenSummaryDto>> {
+    let config = state.config()?;
+    ensure_mode(&config, ServiceMode::Remote)?;
+    let token = config.remote.api_token.as_deref();
+    state
+        .remote
+        .revoke_token(&config.remote.endpoint, token, &name)
+        .await
+        .map_err(remote_error)?;
+    state
+        .remote
+        .list_tokens(&config.remote.endpoint, token)
+        .await
+        .map_err(remote_error)
 }
 
 #[tauri::command]
@@ -1973,9 +2038,27 @@ fn remote_error(error: anyhow::Error) -> DesktopError {
                     "Update and restart the Shadoword API daemon before deleting remote models.",
                 );
         }
+        if remote.code() == "token_management_unsupported" {
+            return DesktopError::new("remote_token_management_unsupported", error.to_string())
+                .with_action(
+                    "Update and restart the Shadoword API daemon, or manage tokens with the shadoword-api token command.",
+                );
+        }
+        if remote.code() == "token_conflict" {
+            return DesktopError::new("remote_token_conflict", error.to_string()).with_action(
+                "Choose a different token name, or issue a replacement before revoking this one.",
+            );
+        }
         if remote.code() == "forbidden" {
             return DesktopError::new("remote_permission_denied", error.to_string()).with_action(
                 "Use an admin token for desktop management; user tokens can only transcribe audio.",
+            );
+        }
+        // Every daemon requires a token now, including on loopback, so this is the
+        // expected failure for a configuration that predates that rule.
+        if remote.code() == "unauthorized" {
+            return DesktopError::new("remote_unauthorized", error.to_string()).with_action(
+                "Set an API token for this daemon. Issue one with `shadoword-api token generate admin <name>` on the machine running it.",
             );
         }
     }

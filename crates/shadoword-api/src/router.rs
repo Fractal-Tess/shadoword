@@ -1,4 +1,4 @@
-use crate::auth::{require_admin, require_transcription, AuthConfig};
+use crate::auth::{generate_token, require_admin, require_transcription, AuthConfig};
 use crate::downloads::DownloadJobs;
 use crate::error::{ApiError, ApiResult};
 use crate::request_recording::RequestRecorder;
@@ -13,13 +13,14 @@ use axum::routing::{delete, get, post};
 use axum::{Json, Router};
 use serde::Serialize;
 use shadoword_core::remote_contracts::{
-    DaemonStatusDto, DownloadJobStatus, HealthDto, ModelInfoDto, ModelStorageDto, OverviewDto,
-    RuntimeConfigDto, StartDownloadRequest,
+    ApiTokenSummaryDto, CreateApiTokenRequest, CreatedApiTokenDto, DaemonStatusDto,
+    DownloadJobStatus, HealthDto, ModelInfoDto, ModelStorageDto, OverviewDto, RuntimeConfigDto,
+    StartDownloadRequest, VersionDto,
 };
 use shadoword_core::{
     default_whisper_model, list_whisper_gpu_devices, list_whisper_models, resolve_whisper_model,
-    unknown_model_error, wav, ApiConfig, ApiTokenConfig, InferenceJob, InferenceRuntime,
-    TranscriptResponse, TranscriptionConfig, TranscriptionService,
+    unknown_model_error, wav, ApiConfig, ApiTokenConfig, ApiTokenRole, InferenceJob,
+    InferenceRuntime, TranscriptResponse, TranscriptionConfig, TranscriptionService,
 };
 use std::net::SocketAddr;
 use std::path::PathBuf;
@@ -39,13 +40,10 @@ pub struct AppState {
     pub download_dir: PathBuf,
     pub listen_addr: SocketAddr,
     pub queue_capacity: usize,
-    pub tokens: Arc<[ApiTokenConfig]>,
-    pub config_update_lock: Arc<tokio::sync::Mutex<()>>,
-}
-
-#[derive(Clone)]
-pub struct RouterConfig {
+    /// Also the token store: handlers read it to rewrite `api.json` and mutate it
+    /// to add or revoke tokens, so there is no second copy to keep in step.
     pub auth: AuthConfig,
+    pub config_update_lock: Arc<tokio::sync::Mutex<()>>,
 }
 
 struct CancelOnDrop {
@@ -117,7 +115,8 @@ struct DocsLimits {
     stream_idle_seconds: u64,
 }
 
-pub fn build_router(state: AppState, config: RouterConfig) -> Router {
+pub fn build_router(state: AppState) -> Router {
+    let auth = state.auth.clone();
     let admin = Router::new()
         .route("/", get(docs))
         .route("/docs", get(docs))
@@ -129,24 +128,23 @@ pub fn build_router(state: AppState, config: RouterConfig) -> Router {
         .route("/v1/models/{id}/select", post(select_model))
         .route("/v1/downloads", post(start_download))
         .route("/v1/downloads/{id}", get(download_status))
+        .route("/v1/tokens", get(list_tokens).post(create_token))
+        .route("/v1/tokens/{name}", delete(revoke_token))
+        .layer(from_fn_with_state(auth.clone(), require_admin))
         .with_state(state.clone());
     let transcription = Router::new()
         .route("/v1/transcribe-wav", post(transcribe_wav))
         .route("/v1/stream", get(stream_socket))
         .layer(DefaultBodyLimit::max(MAX_RAW_WAV_BYTES))
+        .layer(from_fn_with_state(auth, require_transcription))
         .with_state(state.clone());
 
-    let (admin, transcription) = if config.auth.is_configured() {
-        (
-            admin.layer(from_fn_with_state(config.auth.clone(), require_admin)),
-            transcription.layer(from_fn_with_state(config.auth, require_transcription)),
-        )
-    } else {
-        (admin, transcription)
-    };
-
     Router::new()
+        // Unauthenticated on purpose: a client comparing its own build against the
+        // daemon's needs an answer before it knows whether its token is any good,
+        // so that a stale token and a stale daemon are distinguishable failures.
         .route("/health", get(health))
+        .route("/v1/version", get(version))
         .merge(admin)
         .merge(transcription)
         .with_state(state)
@@ -226,6 +224,26 @@ async fn docs() -> Json<DaemonDocs> {
                 method: "GET",
                 path: "/health",
                 description: "Public health check.",
+            },
+            DocEndpoint {
+                method: "GET",
+                path: "/v1/version",
+                description: "Public daemon version, for clients checking which endpoints they can expect.",
+            },
+            DocEndpoint {
+                method: "GET",
+                path: "/v1/tokens",
+                description: "Admin-only list of token names and roles. Token hashes are never returned.",
+            },
+            DocEndpoint {
+                method: "POST",
+                path: "/v1/tokens",
+                description: "Admin-only token issue. Returns the secret exactly once; it is stored only as a SHA-256 hash and takes effect immediately.",
+            },
+            DocEndpoint {
+                method: "DELETE",
+                path: "/v1/tokens/{name}",
+                description: "Admin-only token revoke, effective immediately. The last remaining admin token cannot be revoked.",
             },
             DocEndpoint {
                 method: "GET",
@@ -346,6 +364,84 @@ async fn health() -> Json<HealthDto> {
     Json(HealthDto { ok: true })
 }
 
+async fn version() -> Json<VersionDto> {
+    Json(VersionDto {
+        version: env!("CARGO_PKG_VERSION").to_string(),
+    })
+}
+
+async fn list_tokens(State(state): State<AppState>) -> Json<Vec<ApiTokenSummaryDto>> {
+    Json(state.auth.summaries())
+}
+
+async fn create_token(
+    State(state): State<AppState>,
+    Json(request): Json<CreateApiTokenRequest>,
+) -> ApiResult<Json<CreatedApiTokenDto>> {
+    let _update = state.config_update_lock.lock().await;
+    let (secret, token) = generate_token(request.role, &request.name)
+        .map_err(|error| ApiError::bad_request(error.to_string()))?;
+    let mut tokens = state.auth.snapshot();
+    if tokens.iter().any(|existing| existing.name == token.name) {
+        return Err(ApiError::token_conflict(format!(
+            "an API token named {:?} already exists; revoke it before issuing a replacement",
+            token.name
+        )));
+    }
+    tokens.push(token.clone());
+    commit_tokens(&state, tokens)?;
+    Ok(Json(CreatedApiTokenDto {
+        name: token.name,
+        role: token.role,
+        token: secret,
+    }))
+}
+
+async fn revoke_token(
+    State(state): State<AppState>,
+    Path(name): Path<String>,
+) -> ApiResult<StatusCode> {
+    let _update = state.config_update_lock.lock().await;
+    let name = name.trim();
+    let mut tokens = state.auth.snapshot();
+    let Some(index) = tokens.iter().position(|token| token.name == name) else {
+        return Err(ApiError::not_found(format!(
+            "no API token named {name:?} exists"
+        )));
+    };
+    // Without this the daemon can be talked out of its own admin access: revoking
+    // the last admin token leaves nobody who can issue another one, and the daemon
+    // would refuse to start again once the token list emptied out.
+    let admins = tokens
+        .iter()
+        .filter(|token| token.role == ApiTokenRole::Admin)
+        .count();
+    if tokens[index].role == ApiTokenRole::Admin && admins == 1 {
+        return Err(ApiError::token_conflict(
+            "issue another admin token before revoking the last one",
+        ));
+    }
+    tokens.remove(index);
+    commit_tokens(&state, tokens)?;
+    Ok(StatusCode::NO_CONTENT)
+}
+
+/// Writes the token list to disk and only then swaps it into the live auth store,
+/// so a failed write leaves the daemon enforcing exactly what a restart would.
+/// Callers must already hold `config_update_lock`, because this rewrites the same
+/// file that runtime and model changes do.
+fn commit_tokens(state: &AppState, tokens: Vec<ApiTokenConfig>) -> ApiResult<()> {
+    ApiConfig {
+        listen_addr: state.listen_addr.to_string(),
+        transcription: state.runtime.transcription_config(),
+        queue_capacity: state.queue_capacity,
+        tokens: tokens.clone(),
+    }
+    .save_to_path(&state.config_path)
+    .map_err(ApiError::internal)?;
+    state.auth.replace(&tokens).map_err(ApiError::internal)
+}
+
 async fn status(State(state): State<AppState>) -> ApiResult<Json<DaemonStatusDto>> {
     let service =
         TranscriptionService::status(state.runtime.as_ref()).map_err(ApiError::internal)?;
@@ -432,7 +528,7 @@ async fn update_config(
     let config_path = state.config_path.clone();
     let listen_addr = state.listen_addr;
     let queue_capacity = state.queue_capacity;
-    let tokens = state.tokens.to_vec();
+    let tokens = state.auth.snapshot();
 
     tokio::task::spawn_blocking(move || {
         runtime.reload_transactional(Some(generation), next, move || {
@@ -618,7 +714,7 @@ async fn select_model(
     let config_path = state.config_path.clone();
     let listen_addr = state.listen_addr;
     let queue_capacity = state.queue_capacity;
-    let tokens = state.tokens.to_vec();
+    let tokens = state.auth.snapshot();
 
     tokio::task::spawn_blocking(move || {
         runtime.reload_transactional(Some(generation), next, move || {
