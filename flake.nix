@@ -265,7 +265,12 @@
           inherit pname version;
           src = self;
 
-          cargoLock.lockFile = ./Cargo.lock;
+          cargoLock = {
+            lockFile = ./Cargo.lock;
+            extraRegistries = {
+              "https://github.com/rust-lang/crates.io-index" = "https://static.crates.io/crates";
+            };
+          };
 
           cargoBuildFlags = [
             "-p"
