@@ -4218,7 +4218,7 @@ dependencies = [
 
 [[package]]
 name = "shadoword-api"
-version = "0.14.0"
+version = "0.14.1"
 dependencies = [
  "anyhow",
  "axum",
@@ -4238,7 +4238,7 @@ dependencies = [
 
 [[package]]
 name = "shadoword-core"
-version = "0.14.0"
+version = "0.14.1"
 dependencies = [
  "anyhow",
  "cpal",
@@ -4260,7 +4260,7 @@ dependencies = [
 
 [[package]]
 name = "shadoword-desktop"
-version = "0.14.0"
+version = "0.14.1"
 dependencies = [
  "anyhow",
  "arboard",
@@ -4289,7 +4289,7 @@ dependencies = [
 
 [[package]]
 name = "shadoword-model-whisper"
-version = "0.14.0"
+version = "0.14.1"
 dependencies = [
  "shadoword-shared",
  "transcribe-rs",
@@ -4297,7 +4297,7 @@ dependencies = [
 
 [[package]]
 name = "shadoword-shared"
-version = "0.14.0"
+version = "0.14.1"
 dependencies = [
  "serde",
  "specta",

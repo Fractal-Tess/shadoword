@@ -2,7 +2,7 @@
 	import { AlertTriangle, RefreshCw } from '@lucide/svelte';
 	import { Button } from '$lib/components/ui/button';
 	import { cn } from '$lib/utils';
-	import { getModelsContext } from './context';
+	import { getModelsContext } from './state.svelte';
 
 	const context = getModelsContext();
 

@@ -29,7 +29,8 @@
 					"size-6 rounded-[min(var(--radius-md),10px)] in-data-[slot=button-group]:rounded-lg [&_svg:not([class*='size-'])]:size-3",
 				'icon-sm':
 					'size-7 rounded-[min(var(--radius-md),12px)] in-data-[slot=button-group]:rounded-lg',
-				'icon-lg': 'size-9'
+				'icon-lg': 'size-9',
+				capture: "size-20 [&_svg:not([class*='size-'])]:size-8"
 			}
 		},
 		defaultVariants: {

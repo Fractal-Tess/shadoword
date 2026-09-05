@@ -2,6 +2,7 @@
 	import { Cpu, RadioTower } from '@lucide/svelte';
 	import type { ServiceMode } from '$lib/bindings';
 	import OpenRouterIcon from '$lib/components/icons/OpenRouterIcon.svelte';
+	import { Button } from '$lib/components/ui/button';
 	import { useDesktopShell } from '$lib/shell/desktop-shell-context';
 	import { cn } from '$lib/utils';
 	import { tick } from 'svelte';
@@ -17,7 +18,7 @@
 		lines: string[];
 	}>;
 	const environmentButtonClass = cn(
-		'grid min-h-16 min-w-0 cursor-pointer place-items-center gap-1 border-0 bg-plate px-1 py-2 font-[inherit] text-ink-muted',
+		'grid min-h-16 min-w-0 cursor-pointer place-items-center gap-1 rounded-none border-0 bg-plate px-1 py-2 font-[inherit] text-ink-muted',
 		'transition-colors duration-[120ms] ease-linear hover:not-disabled:bg-raised hover:not-disabled:text-ink focus-visible:relative focus-visible:z-[1] focus-visible:-outline-offset-2',
 		'disabled:cursor-not-allowed disabled:opacity-50 aria-checked:bg-raised aria-checked:text-scarlet-lamp aria-checked:shadow-[inset_0_2px_0_var(--scarlet)] aria-checked:hover:not-disabled:text-scarlet-lamp',
 		'max-[999px]:min-h-[4.5rem]'
@@ -46,8 +47,8 @@
 		aria-label="Execution target"
 	>
 		{#each environments as environment, index (environment.mode)}
-			<button
-				type="button"
+			<Button
+				variant="ghost"
 				role="radio"
 				class={environmentButtonClass}
 				aria-checked={shell.mode === environment.mode}
@@ -71,7 +72,7 @@
 				>
 					{#each environment.lines as line (line)}<span>{line}</span>{/each}
 				</span>
-			</button>
+			</Button>
 		{/each}
 	</div>
 	<span class="sr-only" aria-live="polite">

@@ -7,7 +7,7 @@
 	import { Progress } from '$lib/components/ui/progress';
 	import { downloadPercent, formatBytes } from '$lib/display';
 	import { cn } from '$lib/utils';
-	import { getModelsContext } from './context';
+	import { getModelsContext } from './state.svelte';
 
 	let { model }: { model: ModelInfoDto } = $props();
 	const context = getModelsContext();

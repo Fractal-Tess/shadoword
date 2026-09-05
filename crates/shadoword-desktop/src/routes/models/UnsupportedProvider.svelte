@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { Cloud } from '@lucide/svelte';
 	import { Badge } from '$lib/components/ui/badge';
-	import { getModelsContext } from './context';
+	import { getModelsContext } from './state.svelte';
 
 	const context = getModelsContext();
 </script>

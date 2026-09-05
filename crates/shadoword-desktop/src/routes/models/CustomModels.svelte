@@ -3,7 +3,7 @@
 	import { Badge } from '$lib/components/ui/badge';
 	import { Button } from '$lib/components/ui/button';
 	import { Input } from '$lib/components/ui/input';
-	import { getModelsContext } from './context';
+	import { getModelsContext } from './state.svelte';
 
 	const context = getModelsContext();
 </script>

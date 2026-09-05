@@ -12,17 +12,7 @@
 				class="text-scarlet-lamp">{state.localActionError}</small
 			>{/if}
 	</div>
-	<Button
-		variant="outline"
-		size="sm"
-		disabled={state.locked || state.app.poolValidationState === 'validating'}
-		onclick={() => state.validate()}
-		>{state.app.poolValidationState === 'validating' ? 'Validating…' : 'Validate pool'}</Button
-	>
-	<Button
-		size="sm"
-		disabled={state.locked || state.app.poolValidationState !== 'valid'}
-		onclick={() => state.applyPool()}
+	<Button size="sm" disabled={state.locked} onclick={() => state.applyPool()}
 		>{state.app.poolApplyState === 'applying' ? 'Applying…' : 'Apply & reload'}</Button
 	>
 </div>

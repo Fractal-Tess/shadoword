@@ -7,6 +7,8 @@ import type {
 	WhisperGpuDeviceInfo
 } from '$lib/bindings';
 
+export const DEFAULT_GPU_HOST_THREADS = 4;
+
 export const DEFAULT_INFERENCE_POOL: {
 	limits: Required<InferenceLimits>;
 	preload_timeout_ms: number;
@@ -45,7 +47,7 @@ export function legacyRuntimeToExplicitPool(
 				id: `gpu-${explicitDevice}`,
 				enabled: true,
 				required: true,
-				target: { kind: 'gpu', device: explicitDevice, host_threads: 1 }
+				target: { kind: 'gpu', device: explicitDevice, host_threads: DEFAULT_GPU_HOST_THREADS }
 			}
 		: {
 				id: 'cpu-0',
@@ -145,7 +147,7 @@ export function validateInferencePoolCandidate(pool: InferencePoolConfig): PoolV
 		return {
 			pool: normalized,
 			fieldErrors,
-			globalError: 'Enable at least one execution unit before validation.'
+			globalError: 'Enable at least one execution unit.'
 		};
 	}
 	if ((normalized.preload_timeout_ms ?? 0) > 30 * 60 * 1000) {
@@ -159,9 +161,7 @@ export function validateInferencePoolCandidate(pool: InferencePoolConfig): PoolV
 		pool: normalized,
 		fieldErrors,
 		globalError:
-			Object.keys(fieldErrors).length > 0
-				? 'Resolve the marked pool fields and validate again.'
-				: null
+			Object.keys(fieldErrors).length > 0 ? 'Resolve the marked pool fields before applying.' : null
 	};
 }
 

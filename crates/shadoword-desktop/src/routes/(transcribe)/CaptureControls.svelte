@@ -2,7 +2,7 @@
 	import { Mic2, Square } from '@lucide/svelte';
 	import { Button } from '$lib/components/ui/button';
 	import { cn } from '$lib/utils';
-	import { getTranscribeContext, modeLabel } from './context';
+	import { getTranscribeContext, modeLabel } from './state.svelte';
 
 	const context = getTranscribeContext();
 
@@ -25,14 +25,10 @@
 				? `${modeLabel(context.mode)} ${context.transcriptionMode}`
 				: 'Capture'}
 		</p>
-		<button
-			type="button"
-			class={cn(
-				'relative grid size-20 cursor-pointer place-items-center border-0 transition-[background-color,transform] duration-150 ease-linear active:not-disabled:translate-y-px disabled:cursor-not-allowed disabled:bg-raised disabled:text-ink-muted disabled:shadow-[inset_0_0_0_1px_var(--line-strong)] motion-reduce:transition-colors motion-reduce:active:not-disabled:translate-y-0',
-				context.app.recording
-					? 'bg-scarlet text-on-scarlet hover:bg-scarlet-deep'
-					: 'bg-ink text-night hover:not-disabled:bg-on-scarlet'
-			)}
+		<Button
+			variant={context.app.recording ? 'default' : 'secondary'}
+			size="capture"
+			class="relative rounded-none"
 			onclick={setRecording}
 			aria-label={context.app.recording ? 'Stop recording' : 'Start recording'}
 			aria-pressed={context.app.recording}
@@ -47,11 +43,11 @@
 				aria-hidden="true"
 			></span>
 			{#if context.app.recording}
-				<Square size={27} fill="currentColor" strokeWidth={0} aria-hidden="true" />
+				<Square fill="currentColor" strokeWidth={0} aria-hidden="true" />
 			{:else}
-				<Mic2 size={32} strokeWidth={1.8} aria-hidden="true" />
+				<Mic2 strokeWidth={1.8} aria-hidden="true" />
 			{/if}
-		</button>
+		</Button>
 		<strong
 			class="mt-[1.1rem] mr-[calc((var(--squeeze-label)-1)*100%)] origin-left [transform:scaleX(var(--squeeze-label))] font-display text-[1.375rem] leading-none font-normal tracking-[0.01em] text-ink uppercase"
 		>

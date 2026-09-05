@@ -243,7 +243,6 @@ export class RuntimeOperations {
 		this.app.openRouterCredentialState = this.app.settings?.openrouter_key_configured
 			? 'checking'
 			: 'missing';
-		this.app.poolValidationState = 'idle';
 		this.app.poolApplyState = 'idle';
 		this.app.poolFieldErrors = {};
 		this.app.poolFeedback = null;

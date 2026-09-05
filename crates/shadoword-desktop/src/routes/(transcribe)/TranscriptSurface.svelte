@@ -2,7 +2,7 @@
 	import { Check, Copy, Trash2 } from '@lucide/svelte';
 	import { Button } from '$lib/components/ui/button';
 	import { Textarea } from '$lib/components/ui/textarea';
-	import { getTranscribeContext, modeLabel } from './context';
+	import { getTranscribeContext, modeLabel } from './state.svelte';
 
 	const context = getTranscribeContext();
 

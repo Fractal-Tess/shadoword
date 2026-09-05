@@ -11,41 +11,9 @@ export class PoolOperations {
 	constructor(private app: DesktopStateContext) {}
 
 	clearDraftFeedback() {
-		this.app.poolValidationState = 'idle';
 		this.app.poolApplyState = 'idle';
 		this.app.poolFieldErrors = {};
 		this.app.poolFeedback = null;
-	}
-
-	async validateDraft(pool: InferencePoolConfig) {
-		if (this.app.captureLocked) throw new Error('Finish the active recording before validation.');
-		const local = validateInferencePoolCandidate(pool);
-		this.app.poolFieldErrors = local.fieldErrors;
-		if (local.globalError) {
-			this.app.poolValidationState = 'invalid';
-			this.app.poolFeedback = local.globalError;
-			throw new Error(local.globalError);
-		}
-
-		this.app.poolValidationState = 'validating';
-		this.app.poolApplyState = 'idle';
-		this.app.poolFeedback = 'Checking execution targets and resource limits…';
-		try {
-			const effective =
-				this.app.demo || this.app.settings?.mode === 'remote'
-					? local.pool
-					: await commands.validateLocalInferencePool(local.pool);
-			this.app.poolValidationState = 'valid';
-			this.app.poolFeedback =
-				this.app.settings?.mode === 'local'
-					? 'Pool is valid for the detected local hardware.'
-					: 'Pool shape is valid. The remote host will verify hardware during apply.';
-			return effective;
-		} catch (error) {
-			this.app.poolValidationState = 'invalid';
-			this.app.poolFeedback = errorMessage(error);
-			throw error;
-		}
 	}
 
 	async applyDraft(pool: InferencePoolConfig) {
@@ -61,11 +29,9 @@ export class PoolOperations {
 		this.app.poolApplyState = 'applying';
 		this.app.poolFeedback = 'Validating, loading units, and preparing the next generation…';
 		try {
-			const effective = await this.validateDraft(pool);
-			this.app.poolApplyState = 'applying';
+			const effective = await this.#validatedDraft(pool);
 			await this.app.updateRuntime(runtimeWithInferencePool(runtime, effective));
 			this.app.poolApplyState = 'applied';
-			this.app.poolValidationState = 'valid';
 			this.app.poolFeedback = `Generation ${this.app.overview?.runtime.generation ?? 'updated'} is active.`;
 			return this.app.overview;
 		} catch (error) {
@@ -80,5 +46,17 @@ export class PoolOperations {
 			}
 			throw error;
 		}
+	}
+
+	async #validatedDraft(pool: InferencePoolConfig) {
+		const local = validateInferencePoolCandidate(pool);
+		this.app.poolFieldErrors = local.fieldErrors;
+		if (local.globalError) {
+			this.app.poolFeedback = local.globalError;
+			throw new Error(local.globalError);
+		}
+		return this.app.demo || this.app.settings?.mode === 'remote'
+			? local.pool
+			: await commands.validateLocalInferencePool(local.pool);
 	}
 }

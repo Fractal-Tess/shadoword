@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { Minus, Square, X } from '@lucide/svelte';
+	import { Button } from '$lib/components/ui/button';
 	import { useDesktopShell } from '$lib/shell/desktop-shell-context';
 
 	const shell = useDesktopShell();
@@ -11,32 +12,35 @@
 >
 	<div data-tauri-drag-region class="min-w-0 flex-1"></div>
 	<div class="flex shrink-0" aria-label="Window controls">
-		<button
-			type="button"
-			class="grid w-10 cursor-pointer place-items-center border-0 bg-transparent text-ink-muted transition-colors hover:bg-raised hover:text-ink focus-visible:relative focus-visible:z-1 focus-visible:-outline-offset-2"
+		<Button
+			variant="ghost"
+			size="icon"
+			class="h-full w-10 rounded-none"
 			onclick={() => void shell.minimizeWindow()}
 			aria-label="Minimize window"
 			title="Minimize"
 		>
-			<Minus size={14} strokeWidth={1.8} aria-hidden="true" />
-		</button>
-		<button
-			type="button"
-			class="grid w-10 cursor-pointer place-items-center border-0 bg-transparent text-ink-muted transition-colors hover:bg-raised hover:text-ink focus-visible:relative focus-visible:z-1 focus-visible:-outline-offset-2"
+			<Minus strokeWidth={1.8} aria-hidden="true" />
+		</Button>
+		<Button
+			variant="ghost"
+			size="icon"
+			class="h-full w-10 rounded-none"
 			onclick={() => void shell.toggleMaximizeWindow()}
 			aria-label="Maximize or restore window"
 			title="Maximize or restore"
 		>
-			<Square size={11} strokeWidth={1.8} aria-hidden="true" />
-		</button>
-		<button
-			type="button"
-			class="grid w-10 cursor-pointer place-items-center border-0 bg-transparent text-ink-muted transition-colors hover:bg-scarlet hover:text-on-scarlet focus-visible:relative focus-visible:z-1 focus-visible:-outline-offset-2"
+			<Square strokeWidth={1.8} aria-hidden="true" />
+		</Button>
+		<Button
+			variant="destructive"
+			size="icon"
+			class="h-full w-10 rounded-none"
 			onclick={() => void shell.requestWindowClose()}
 			aria-label="Close window"
 			title="Close"
 		>
-			<X size={14} strokeWidth={1.8} aria-hidden="true" />
-		</button>
+			<X strokeWidth={1.8} aria-hidden="true" />
+		</Button>
 	</div>
 </header>

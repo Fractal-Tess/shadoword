@@ -27,8 +27,7 @@ import type {
 	NotificationVariant,
 	OpenRouterCredentialState,
 	OpenRouterModelsState,
-	PoolApplyState,
-	PoolValidationState
+	PoolApplyState
 } from '$lib/state/contracts';
 import { DownloadOperations } from '$lib/state/download-operations';
 import { LifecycleOperations } from '$lib/state/lifecycle-operations';
@@ -36,12 +35,7 @@ import { PoolOperations } from '$lib/state/pool-operations';
 import { ProviderOperations } from '$lib/state/provider-operations';
 import { RuntimeOperations } from '$lib/state/runtime-operations';
 
-export type {
-	ActivityState,
-	CaptureState,
-	PoolApplyState,
-	PoolValidationState
-} from '$lib/state/contracts';
+export type { ActivityState, CaptureState, PoolApplyState } from '$lib/state/contracts';
 
 export class DesktopAppState implements DesktopStateContext {
 	readonly demo: boolean;
@@ -70,7 +64,6 @@ export class DesktopAppState implements DesktopStateContext {
 	segmentResults = $state.raw<TranscriptSegments>({});
 	downloads = $state.raw<Record<string, DownloadJobStatus>>({});
 	downloadWatching = $state.raw<Record<string, boolean>>({});
-	poolValidationState = $state<PoolValidationState>('idle');
 	poolApplyState = $state<PoolApplyState>('idle');
 	poolFieldErrors = $state.raw<PoolFieldErrors>({});
 	poolFeedback = $state<string | null>(null);
@@ -126,7 +119,6 @@ export class DesktopAppState implements DesktopStateContext {
 		return (
 			this.captureLocked ||
 			this.activity === 'busy' ||
-			this.poolValidationState === 'validating' ||
 			this.poolApplyState === 'applying' ||
 			this.drainingPool
 		);
@@ -198,10 +190,6 @@ export class DesktopAppState implements DesktopStateContext {
 
 	clearPoolDraftFeedback() {
 		this.poolOperations.clearDraftFeedback();
-	}
-
-	validateInferencePoolDraft(pool: InferencePoolConfig) {
-		return this.poolOperations.validateDraft(pool);
 	}
 
 	applyInferencePoolDraft(pool: InferencePoolConfig) {

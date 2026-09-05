@@ -3,7 +3,7 @@
 	import CaptureControls from './CaptureControls.svelte';
 	import StageReadout from './StageReadout.svelte';
 	import { cn } from '$lib/utils';
-	import { getTranscribeContext } from './context';
+	import { getTranscribeContext } from './state.svelte';
 
 	const context = getTranscribeContext();
 </script>

@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { getTranscribeContext } from './context';
+	import { getTranscribeContext } from './state.svelte';
 
 	const context = getTranscribeContext();
 </script>

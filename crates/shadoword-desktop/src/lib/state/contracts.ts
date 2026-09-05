@@ -19,7 +19,6 @@ import type { TranscriptSegments } from '$lib/desktop-events';
 
 export type ActivityState = 'booting' | 'ready' | 'busy' | 'offline';
 export type CaptureState = 'idle' | 'recording' | 'finalizing' | 'error';
-export type PoolValidationState = 'idle' | 'validating' | 'valid' | 'invalid';
 export type PoolApplyState = 'idle' | 'applying' | 'applied' | 'failed' | 'stale';
 export type OpenRouterModelsState = 'idle' | 'loading' | 'ready' | 'failed';
 export type OpenRouterCredentialState = 'missing' | 'checking' | 'verified' | 'invalid';
@@ -52,7 +51,6 @@ export type DesktopStateContext = {
 	segmentResults: TranscriptSegments;
 	downloads: Record<string, DownloadJobStatus>;
 	downloadWatching: Record<string, boolean>;
-	poolValidationState: PoolValidationState;
 	poolApplyState: PoolApplyState;
 	poolFieldErrors: PoolFieldErrors;
 	poolFeedback: string | null;
@@ -79,7 +77,6 @@ export type DesktopStateContext = {
 	refreshInputDevices(): Promise<void>;
 	updateRuntime(runtime: RuntimeConfigDto): Promise<void>;
 	clearPoolDraftFeedback(): void;
-	validateInferencePoolDraft(pool: InferencePoolConfig): Promise<InferencePoolConfig>;
 	applyInferencePoolDraft(pool: InferencePoolConfig): Promise<OverviewDto | null>;
 	preloadLocalModel(): Promise<void>;
 	selectModel(modelId: string): Promise<void>;

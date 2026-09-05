@@ -4,11 +4,14 @@ use enigo::{Direction, Enigo, Key, Keyboard, Settings};
 use shadoword_core::{OutputConfig, PasteMethod};
 use std::borrow::Cow;
 use std::process::{Command, Stdio};
+use std::sync::Mutex;
 use std::thread;
 use std::time::Duration;
 use wait_timeout::ChildExt;
 
 const COMMAND_TIMEOUT: Duration = Duration::from_secs(5);
+
+static OUTPUT_DELIVERY: Mutex<()> = Mutex::new(());
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum SessionKind {
@@ -59,10 +62,13 @@ pub fn apply_streaming_segment_output(config: &OutputConfig, text: &str) -> Resu
 }
 
 pub fn apply_final_clipboard(config: &OutputConfig, text: &str) -> Result<()> {
-    if config.copy_to_clipboard {
-        write_clipboard(&format_transcript(config, text))?;
+    if !config.copy_to_clipboard {
+        return Ok(());
     }
-    Ok(())
+    let _delivery = OUTPUT_DELIVERY
+        .lock()
+        .map_err(|_| anyhow!("output delivery lock poisoned"))?;
+    write_clipboard(&format_transcript(config, text))
 }
 
 fn format_transcript(config: &OutputConfig, text: &str) -> String {
@@ -115,6 +121,12 @@ fn active_backend(environment: OutputEnvironment) -> OutputBackend {
 }
 
 fn apply_plan(plan: &OutputPlan, config: &OutputConfig, text: &str) -> Result<()> {
+    if plan.actions.is_empty() {
+        return Ok(());
+    }
+    let _delivery = OUTPUT_DELIVERY
+        .lock()
+        .map_err(|_| anyhow!("output delivery lock poisoned"))?;
     for action in &plan.actions {
         match *action {
             OutputAction::Clipboard => write_clipboard(text)?,

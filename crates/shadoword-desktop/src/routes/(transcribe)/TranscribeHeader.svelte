@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { StatusIndicator } from '$lib/components/ui/status-indicator';
 	import { SurfaceHeader } from '$lib/components/ui/surface-header';
-	import { getTranscribeContext } from './context';
+	import { getTranscribeContext } from './state.svelte';
 
 	const context = getTranscribeContext();
 </script>

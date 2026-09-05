@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { AlertTriangle } from '@lucide/svelte';
 	import ModelRow from './ModelRow.svelte';
-	import { getModelsContext } from './context';
+	import { getModelsContext } from './state.svelte';
 
 	const context = getModelsContext();
 </script>

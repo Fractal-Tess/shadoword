@@ -83,7 +83,7 @@ impl HotkeyBackend {
             .name("shadoword-hotkey-listener".to_string())
             .spawn(move || {
                 while let Ok(event) = event_rx.recv() {
-                    crate::commands::handle_hotkey_event(&app, event);
+                    crate::commands::recording::handle_hotkey_event(&app, event);
                 }
             })
             .map_err(|error| format!("failed to spawn global shortcut listener: {error}"))?;

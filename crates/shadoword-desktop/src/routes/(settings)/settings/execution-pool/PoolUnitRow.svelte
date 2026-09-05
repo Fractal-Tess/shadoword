@@ -6,6 +6,7 @@
 	import { Input } from '$lib/components/ui/input';
 	import { Switch } from '$lib/components/ui/switch';
 	import { formatBytes } from '$lib/display';
+	import { DEFAULT_GPU_HOST_THREADS } from '$lib/inference-pool';
 	import { cn } from '$lib/utils';
 	import { getPoolDraftContext } from './context.svelte';
 
@@ -24,40 +25,50 @@
 		Unit {index + 1}
 	</legend>
 	<div
-		class="grid grid-cols-[minmax(8rem,0.8fr)_minmax(5rem,0.45fr)_minmax(7rem,1.6fr)_minmax(5.5rem,0.45fr)] gap-[0.55rem] max-[1050px]:grid-cols-2 max-[760px]:grid-cols-[repeat(2,minmax(6rem,1fr))]"
+		class="grid grid-cols-[minmax(8rem,0.8fr)_minmax(12rem,1.6fr)_minmax(8rem,0.65fr)] gap-[0.55rem] max-[1050px]:grid-cols-2 max-[760px]:grid-cols-1"
 	>
-		<label class={controlClass}>
+		<div class={controlClass}>
 			<span class={labelClass}>Stable ID</span>
-			<Input
-				value={unit.id}
+			<div
+				class="bg-void/35 flex h-8 items-center border border-line px-3 font-mono text-[0.72rem] text-ink-dim"
 				aria-label={`Execution unit ${index + 1} stable ID`}
-				aria-invalid={Boolean(state.fieldError(index, 'id'))}
-				oninput={(event) => state.replaceUnit(index, { ...unit, id: event.currentTarget.value })}
-			/>
+			>
+				{unit.id}
+			</div>
 			{#if state.fieldError(index, 'id')}
 				<small class={cn(hintClass, 'text-scarlet-lamp')}>{state.fieldError(index, 'id')}</small>
+			{:else}
+				<small class={hintClass}>Fixed for this worker and kept across reloads.</small>
 			{/if}
-		</label>
+		</div>
 		<label class={controlClass}>
-			<span class={labelClass}>Target</span>
+			<span class={labelClass}>Execution device</span>
 			<Select
-				value={unit.target.kind}
-				options={[
-					{ value: 'cpu', label: 'CPU', detail: 'Host threads' },
-					{
-						value: 'gpu',
-						label: 'GPU',
-						detail: 'Dedicated accelerator',
-						disabled: state.gpuDevices.length === 0
-					}
-				]}
-				ariaLabel={`Execution unit ${index + 1} target`}
-				onValueChange={(value) => state.setUnitTarget(index, value === 'gpu' ? 'gpu' : 'cpu')}
+				value={state.executionDeviceValue(unit)}
+				options={state.executionDeviceOptions(unit)}
+				ariaLabel={`Execution device for ${unit.id || `unit ${index + 1}`}`}
+				ariaInvalid={Boolean(state.fieldError(index, 'device'))}
+				ariaDescribedBy={state.fieldError(index, 'device')
+					? `execution-unit-${index}-device-error`
+					: undefined}
+				onValueChange={(value) => state.setExecutionDevice(index, value)}
 			/>
+			{#if state.fieldError(index, 'device')}
+				<small
+					id={`execution-unit-${index}-device-error`}
+					class={cn(hintClass, 'text-scarlet-lamp')}>{state.fieldError(index, 'device')}</small
+				>
+			{:else if unit.target.kind === 'gpu' && state.gpuName(unit.target.device)}
+				<small class={hintClass}>
+					{formatBytes(state.gpuName(unit.target.device)?.free_vram ?? 0)} free VRAM
+				</small>
+			{:else}
+				<small class={hintClass}>Choose the processor that owns this worker.</small>
+			{/if}
 		</label>
 		{#if unit.target.kind === 'cpu'}
 			<label class={controlClass}>
-				<span class={labelClass}>Threads</span>
+				<span class={labelClass}>Worker threads</span>
 				<Input
 					type="number"
 					min="1"
@@ -70,41 +81,23 @@
 							target: { kind: 'cpu', threads: Number(event.currentTarget.value) }
 						})}
 				/>
+				<small class={hintClass}>CPU threads used by this worker for inference.</small>
 			</label>
 		{:else}
 			<label class={controlClass}>
-				<span class={labelClass}>GPU device</span>
-				<Select
-					value={String(unit.target.device)}
-					options={state.gpuOptions(unit.target.device)}
-					ariaLabel={`GPU device for ${unit.id || `unit ${index + 1}`}`}
-					ariaInvalid={Boolean(state.fieldError(index, 'device'))}
-					ariaDescribedBy={state.fieldError(index, 'device')
-						? `execution-unit-${index}-device-error`
-						: undefined}
-					onValueChange={(value) => state.setGpuDevice(index, Number(value))}
-				/>
-				{#if state.fieldError(index, 'device')}
-					<small
-						id={`execution-unit-${index}-device-error`}
-						class={cn(hintClass, 'text-scarlet-lamp')}>{state.fieldError(index, 'device')}</small
-					>
-				{:else if state.gpuName(unit.target.device)}
-					<small class={hintClass}>
-						{formatBytes(state.gpuName(unit.target.device)?.free_vram ?? 0)} free VRAM
-					</small>
-				{/if}
-			</label>
-			<label class={controlClass}>
-				<span class={labelClass}>Host threads</span>
+				<span class={labelClass}>CPU helper threads</span>
 				<Input
 					type="number"
 					min="1"
 					max="256"
-					value={unit.target.host_threads ?? 1}
-					aria-label={`GPU host threads for ${unit.id || `unit ${index + 1}`}`}
+					value={unit.target.host_threads ?? DEFAULT_GPU_HOST_THREADS}
+					aria-label={`CPU helper threads for ${unit.id || `unit ${index + 1}`}`}
 					oninput={(event) => state.setGpuHostThreads(index, Number(event.currentTarget.value))}
 				/>
+				<small class={hintClass}>
+					CPU threads used for audio preprocessing and operations not handled by the GPU. Four is
+					the upstream default; additional threads may not improve performance.
+				</small>
 			</label>
 		{/if}
 	</div>
@@ -131,20 +124,20 @@
 				size="icon-xs"
 				disabled={index === 0}
 				aria-label={`Move ${unit.id || `unit ${index + 1}`} up`}
-				onclick={() => state.moveUnit(index, -1)}><ArrowUp size={13} /></Button
+				onclick={() => state.moveUnit(index, -1)}><ArrowUp data-icon="inline-start" /></Button
 			>
 			<Button
 				variant="ghost"
 				size="icon-xs"
 				disabled={index === state.units.length - 1}
 				aria-label={`Move ${unit.id || `unit ${index + 1}`} down`}
-				onclick={() => state.moveUnit(index, 1)}><ArrowDown size={13} /></Button
+				onclick={() => state.moveUnit(index, 1)}><ArrowDown data-icon="inline-start" /></Button
 			>
 			<Button
 				variant="ghost"
 				size="icon-xs"
 				aria-label={`Delete ${unit.id || `unit ${index + 1}`}`}
-				onclick={() => state.removeUnit(index)}><Trash2 size={13} /></Button
+				onclick={() => state.removeUnit(index)}><Trash2 data-icon="inline-start" /></Button
 			>
 		</div>
 	</div>

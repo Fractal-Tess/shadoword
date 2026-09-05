@@ -3,7 +3,7 @@
 	import { StatusIndicator } from '$lib/components/ui/status-indicator';
 	import { Switch } from '$lib/components/ui/switch';
 	import { formatBytes } from '$lib/display';
-	import { getModelsContext } from './context';
+	import { getModelsContext } from './state.svelte';
 
 	const context = getModelsContext();
 	let selectedModel = $derived(

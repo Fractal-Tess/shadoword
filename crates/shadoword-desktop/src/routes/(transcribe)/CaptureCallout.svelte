@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { Button } from '$lib/components/ui/button';
-	import { getTranscribeContext, modeLabel } from './context';
+	import { getTranscribeContext, modeLabel } from './state.svelte';
 
 	const context = getTranscribeContext();
 

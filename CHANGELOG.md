@@ -4,6 +4,19 @@ All notable changes to Shadoword are documented in this file.
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and Shadoword uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.14.1] - 2026-09-05
+
+### Changed
+
+- Execution-pool edits now validate as part of **Apply & reload**, removing the separate validation step while retaining field-level errors.
+- Execution units now use one device selector for CPU and detected GPUs; GPU units inferred from legacy settings default to four host helper threads.
+- Transcribe, Models, and microphone-monitor state now live in standalone Svelte stores; capture settings are composed from focused sections and route controls use the shared semantic UI components.
+- Split inference, configuration, API streaming and routing, desktop commands, and recording orchestration into focused modules. No handwritten source file now exceeds 600 lines.
+
+### Fixed
+
+- Serialized clipboard and active-window output delivery so concurrently completed streaming segments cannot interleave or overwrite one another.
+
 ## [0.14.0] - 2026-08-09
 
 ### Breaking
@@ -235,7 +248,9 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 - Prevented duplicate model loads after eager-preload timeouts.
 - Added bounded remote connect, handshake, read, write, and finalization waits.
 
-[Unreleased]: https://github.com/Fractal-Tess/shadoword/compare/v0.13.0...HEAD
+[Unreleased]: https://github.com/Fractal-Tess/shadoword/compare/v0.14.1...HEAD
+[0.14.1]: https://github.com/Fractal-Tess/shadoword/compare/v0.14.0...v0.14.1
+[0.14.0]: https://github.com/Fractal-Tess/shadoword/compare/v0.13.0...v0.14.0
 [0.13.0]: https://github.com/Fractal-Tess/shadoword/compare/v0.12.0...v0.13.0
 [0.12.0]: https://github.com/Fractal-Tess/shadoword/compare/v0.11.0...v0.12.0
 [0.11.0]: https://github.com/Fractal-Tess/shadoword/compare/v0.10.6...v0.11.0

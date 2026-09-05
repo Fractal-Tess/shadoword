@@ -14,6 +14,7 @@ FORM: Neo-Tokyo Neon Night, abstracted from cityscape to spectrum; seed 322d3899
 	import favicon from '$lib/assets/favicon.svg';
 	import BlinkingSquares from './_shell/BlinkingSquares.svelte';
 	import { BrandMark } from '$lib/components/ui/brand-mark';
+	import { Button } from '$lib/components/ui/button';
 	import { Toaster } from '$lib/components/ui/sonner';
 	import EnvironmentSelector from './_shell/EnvironmentSelector.svelte';
 	import PrimaryNavigation from './_shell/PrimaryNavigation.svelte';
@@ -137,13 +138,14 @@ FORM: Neo-Tokyo Neon Night, abstracted from cityscape to spectrum; seed 322d3899
 						role="alert"
 					>
 						<span>{app.error}</span>
-						<button
-							type="button"
-							class="shrink-0 cursor-pointer border border-scarlet bg-transparent px-[0.7rem] py-[0.3rem] font-[inherit] tracking-[0.1em] text-scarlet-lamp uppercase transition-colors duration-[120ms] ease-linear hover:bg-scarlet hover:text-on-scarlet"
+						<Button
+							variant="destructive"
+							size="sm"
+							class="shrink-0 font-mono tracking-[0.1em] uppercase"
 							onclick={() => void app.retryError()}
 						>
 							{app.errorRetry ? 'Retry' : 'Dismiss'}
-						</button>
+						</Button>
 					</div>
 				{/if}
 				<div class="sr-only" aria-live="polite">

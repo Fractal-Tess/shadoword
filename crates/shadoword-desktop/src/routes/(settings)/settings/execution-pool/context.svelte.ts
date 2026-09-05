@@ -9,6 +9,7 @@ import type {
 } from '$lib/bindings';
 import { errorMessage, formatBytes } from '$lib/display';
 import {
+	DEFAULT_GPU_HOST_THREADS,
 	legacyRuntimeToExplicitPool,
 	nextUnitId,
 	normalizeInferencePool
@@ -91,27 +92,47 @@ export class PoolDraftState {
 		this.markChanged();
 	}
 
-	setUnitTarget(index: number, kind: ExecutionTarget['kind']) {
+	setExecutionDevice(index: number, value: string) {
 		const unit = this.units[index];
 		if (!unit) return;
-		const target: ExecutionTarget =
-			kind === 'cpu'
-				? { kind: 'cpu', threads: 4 }
-				: {
-						kind: 'gpu',
-						device: this.availableGpu?.id ?? this.gpuDevices[0]?.id ?? -1,
-						host_threads: 1
-					};
-		this.replaceUnit(index, { ...unit, target });
-	}
-
-	setGpuDevice(index: number, device: number) {
-		const unit = this.units[index];
-		if (!unit || unit.target.kind !== 'gpu') return;
+		if (value === 'cpu') {
+			this.replaceUnit(index, {
+				...unit,
+				target: {
+					kind: 'cpu',
+					threads: unit.target.kind === 'cpu' ? unit.target.threads : 4
+				}
+			});
+			return;
+		}
+		const device = Number(value.replace(/^gpu:/, ''));
+		if (!Number.isInteger(device)) return;
 		this.replaceUnit(index, {
 			...unit,
-			target: { kind: 'gpu', device, host_threads: unit.target.host_threads }
+			target: {
+				kind: 'gpu',
+				device,
+				host_threads:
+					unit.target.kind === 'gpu' ? unit.target.host_threads : DEFAULT_GPU_HOST_THREADS
+			}
 		});
+	}
+
+	executionDeviceValue(unit: ExecutionUnitConfig) {
+		return unit.target.kind === 'cpu' ? 'cpu' : `gpu:${unit.target.device}`;
+	}
+
+	executionDeviceOptions(current: ExecutionUnitConfig) {
+		const currentDevice = current.target.kind === 'gpu' ? current.target.device : null;
+		return [
+			{ value: 'cpu', label: 'CPU', detail: 'Host processor' },
+			...this.gpuDevices.map((device) => ({
+				value: `gpu:${device.id}`,
+				label: `GPU ${device.id} · ${device.name}`,
+				detail: `${formatBytes(device.total_vram)} VRAM`,
+				disabled: device.id !== currentDevice && this.assignedGpuDevices.has(device.id)
+			}))
+		];
 	}
 
 	setGpuHostThreads(index: number, hostThreads: number) {
@@ -150,7 +171,11 @@ export class PoolDraftState {
 					id: nextUnitId(this.units, 'gpu'),
 					enabled: true,
 					required: true,
-					target: { kind: 'gpu', device: this.availableGpu.id, host_threads: 1 }
+					target: {
+						kind: 'gpu',
+						device: this.availableGpu.id,
+						host_threads: DEFAULT_GPU_HOST_THREADS
+					}
 				}
 			]
 		};
@@ -204,15 +229,6 @@ export class PoolDraftState {
 		this.markChanged();
 	}
 
-	async validate() {
-		this.localActionError = '';
-		try {
-			await this.app.validateInferencePoolDraft(this.draft);
-		} catch (error) {
-			this.localActionError = errorMessage(error);
-		}
-	}
-
 	async applyPool() {
 		this.localActionError = '';
 		try {
@@ -226,19 +242,10 @@ export class PoolDraftState {
 		return this.gpuDevices.find((device) => device.id === deviceId);
 	}
 
-	gpuOptions(currentDevice: number) {
-		return this.gpuDevices.map((device) => ({
-			value: String(device.id),
-			label: `GPU ${device.id} · ${device.name}`,
-			detail: formatBytes(device.total_vram),
-			disabled: device.id !== currentDevice && this.assignedGpuDevices.has(device.id)
-		}));
-	}
-
 	targetLabel(target: ExecutionTarget) {
 		if (target.kind === 'cpu') return `CPU · ${target.threads ?? 'auto'} threads`;
 		const device = this.gpuName(target.device);
-		return `GPU ${target.device}${device ? ` · ${device.name}` : ''} · ${target.host_threads ?? 'auto'} host threads`;
+		return `GPU ${target.device}${device ? ` · ${device.name}` : ''} · ${target.host_threads ?? DEFAULT_GPU_HOST_THREADS} CPU helper threads`;
 	}
 
 	statusState(state: ExecutionUnitState): RuntimeState {

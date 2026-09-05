@@ -71,7 +71,7 @@ export const demoOverview: OverviewDto = {
 				{
 					id: 'gpu-main',
 					required: true,
-					target: { kind: 'gpu', device: 0, host_threads: 1 },
+					target: { kind: 'gpu', device: 0, host_threads: 4 },
 					state: 'ready',
 					completed: 1124,
 					failed: 2
@@ -79,7 +79,7 @@ export const demoOverview: OverviewDto = {
 				{
 					id: 'gpu-batch',
 					required: true,
-					target: { kind: 'gpu', device: 1, host_threads: 1 },
+					target: { kind: 'gpu', device: 1, host_threads: 4 },
 					state: 'busy',
 					completed: 718,
 					failed: 3
@@ -120,13 +120,13 @@ export const demoOverview: OverviewDto = {
 					id: 'gpu-main',
 					enabled: true,
 					required: true,
-					target: { kind: 'gpu', device: 0, host_threads: 1 }
+					target: { kind: 'gpu', device: 0, host_threads: 4 }
 				},
 				{
 					id: 'gpu-batch',
 					enabled: true,
 					required: true,
-					target: { kind: 'gpu', device: 1, host_threads: 1 }
+					target: { kind: 'gpu', device: 1, host_threads: 4 }
 				},
 				{
 					id: 'cpu-spare',

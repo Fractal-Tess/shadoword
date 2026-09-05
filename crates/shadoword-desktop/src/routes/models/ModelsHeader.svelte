@@ -2,7 +2,7 @@
 	import { RefreshCw } from '@lucide/svelte';
 	import { SurfaceHeader } from '$lib/components/ui/surface-header';
 	import { Button } from '$lib/components/ui/button';
-	import { getModelsContext } from './context';
+	import { getModelsContext } from './state.svelte';
 
 	const context = getModelsContext();
 </script>
