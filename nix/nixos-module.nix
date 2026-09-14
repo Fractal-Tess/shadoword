@@ -53,6 +53,12 @@ in
   options.services.shadoword-api = {
     enable = lib.mkEnableOption "the Shadoword speech-to-text daemon";
 
+    autoStart = mkOption {
+      type = types.bool;
+      default = true;
+      description = "Whether enabling the service adds multi-user.target as a startup dependency.";
+    };
+
     variant = mkOption {
       type = types.enum [
         "cpu"
@@ -196,7 +202,7 @@ in
 
     systemd.services.shadoword-api = {
       description = "Shadoword speech-to-text daemon (${cfg.variant})";
-      wantedBy = [ "multi-user.target" ];
+      wantedBy = optional cfg.autoStart "multi-user.target";
       after = [ "network-online.target" ];
       wants = [ "network-online.target" ];
 

@@ -529,9 +529,33 @@
         }
       );
 
+      apps = forAllSystems (
+        system:
+        let
+          packages = self.packages.${system};
+        in
+        {
+          default = {
+            type = "app";
+            program = "${packages.shadoword-api}/bin/shadoword-api";
+            meta.description = "Shadoword transcription API";
+          };
+          shadoword-desktop = {
+            type = "app";
+            program = "${packages.shadoword-desktop}/bin/shadoword";
+            meta.description = "Shadoword desktop transcription client";
+          };
+        }
+      );
+
       nixosModules = rec {
         shadoword-api = import ./nix/nixos-module.nix self;
         default = shadoword-api;
+      };
+
+      homeManagerModules = rec {
+        shadoword-desktop = import ./nix/home-manager-module.nix { inherit self; };
+        default = shadoword-desktop;
       };
 
       # The packages are taken from this flake's own nixpkgs rather than rebuilt

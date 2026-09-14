@@ -4,6 +4,17 @@ All notable changes to Shadoword are documented in this file.
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and Shadoword uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- Added `apps.<system>.default` for the CPU API, `apps.<system>.shadoword-desktop` for the CPU desktop, and a Home Manager module for `services.shadoword-desktop`.
+
+### Changed
+
+- Added `autoStart` to the NixOS API service and Home Manager desktop service. `false` retains the unit for manual starts without adding target startup edges.
+- Desktop and API service modules now document explicit package overrides, user/system scopes, environment handling, and supported extra arguments.
+
 ## [0.14.1] - 2026-09-05
 
 ### Changed

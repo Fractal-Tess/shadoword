@@ -66,8 +66,46 @@ sudo -u shadoword shadoword-api token generate admin "desktop administrator"
 sudo systemctl restart shadoword-api
 ```
 
+`services.shadoword-api.autoStart` defaults to `true`; set it to `false` to
+keep the hardened system unit available for manual starts without adding the
+`multi-user.target` startup edge. The service's `environment` and `extraArgs`
+options are passed to the daemon, while `package` defaults to the flake's
+tested `packages.<system>.shadoword-api` output selected by `variant`.
+
+For a per-user graphical client, import
+`inputs.shadoword.homeManagerModules.default`. It exposes
+`services.shadoword-desktop` with `enable`, `package`, `autoStart`,
+`environment`, and `extraArgs`. The package defaults to the tested CPU desktop
+output, and the module installs it with Home Manager and starts it after the
+graphical session has initialized:
+
+```nix
+{
+  imports = [ inputs.shadoword.homeManagerModules.default ];
+
+  services.shadoword-desktop = {
+    enable = true;
+    autoStart = true;
+    package = inputs.shadoword.packages.${pkgs.system}.shadoword-desktop;
+    environment = {
+      # User-session overrides belong here when needed.
+    };
+  };
+}
+```
+
+Use `services.shadoword-api` through NixOS for the system daemon, its
+`shadoword` service account, firewall and GPU-group integration. Use
+`services.shadoword-desktop` through Home Manager for a user's desktop
+session; neither module generates or overwrites the desktop's mutable
+settings. Override `package` explicitly to pin a different release or local
+derivation rather than selecting an unsupported version option.
+
 `overlays.default` is also available if you would rather reach the builds as
 `pkgs.shadoword-api`, `pkgs.shadoword-api-cuda`, or `pkgs.shadoword-desktop`.
+
+Runnable flake apps are available as `apps.<system>.default` (the CPU
+`shadoword-api`) and `apps.<system>.shadoword-desktop` (the CPU desktop).
 
 ## Develop
 
