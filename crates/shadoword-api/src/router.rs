@@ -116,6 +116,7 @@ pub fn runtime_config_from_transcription(
         whisper_accelerator: config.whisper_accelerator,
         whisper_gpu_device: config.whisper_gpu_device,
         english_only: config.english_only,
+        custom_vocabulary: config.custom_vocabulary.clone(),
         preload_on_startup: config.preload_on_startup,
         inference_pool: config.effective_inference_pool().ok(),
         inference_pool_explicit: Some(config.inference_pool.is_some()),
@@ -138,6 +139,7 @@ pub fn apply_runtime_config(
     next.whisper_accelerator = dto.whisper_accelerator;
     next.whisper_gpu_device = dto.whisper_gpu_device;
     next.english_only = dto.english_only;
+    next.custom_vocabulary = dto.custom_vocabulary;
     next.preload_on_startup = dto.preload_on_startup;
     match dto.inference_pool_explicit {
         Some(false) => next.inference_pool = None,
@@ -308,6 +310,11 @@ async fn update_config(
                 "runtime generation changed from {expected} to {generation}; fetch /v1/config and retry"
             )));
         }
+    }
+    if dto.custom_vocabulary.contains('\0') {
+        return Err(ApiError::bad_request(
+            "custom vocabulary cannot contain null characters",
+        ));
     }
     if dto.whisper_gpu_device < -1 {
         return Err(ApiError::bad_request(

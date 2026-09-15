@@ -141,10 +141,13 @@ async fn transcribe_openrouter_segment(
 ) -> Result<OpenRouterTranscription, DesktopError> {
     let wav = shadoword_core::wav::encode_wav(&segment.audio)
         .map_err(|error| stream_error("openrouter_stream", error))?;
-    let request =
-        target
-            .client
-            .transcribe_wav(&target.api_key, &target.model, wav, target.english_only);
+    let request = target.client.transcribe_wav(
+        &target.api_key,
+        &target.model,
+        wav,
+        target.english_only,
+        &target.custom_vocabulary,
+    );
     tokio::pin!(request);
 
     loop {

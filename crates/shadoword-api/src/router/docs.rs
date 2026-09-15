@@ -86,12 +86,12 @@ pub(super) async fn docs() -> Json<DaemonDocs> {
         DocEndpoint {
             method: "GET",
             path: "/v1/config",
-            description: "Admin-only runtime config with effective inference_pool and generation. Units preload eagerly only when preload_on_startup is true; otherwise they load on first dispatch.",
+            description: "Admin-only runtime config with effective inference_pool, generation, and custom_vocabulary recognition hints. Vocabulary applies to all daemon clients. Units preload eagerly only when preload_on_startup is true; otherwise they load on first dispatch.",
         },
         DocEndpoint {
             method: "PUT",
             path: "/v1/config",
-            description: "Admin-only atomic runtime update. Accepts inference_pool and an optional generation revision; eager candidates prepare before commit and lazy candidates activate unloaded.",
+            description: "Admin-only atomic runtime update. Accepts custom_vocabulary (comma- or newline-separated correct spellings; empty disables hints), inference_pool, and an optional generation revision; eager candidates prepare before commit and lazy candidates activate unloaded.",
         },
         DocEndpoint {
             method: "POST",

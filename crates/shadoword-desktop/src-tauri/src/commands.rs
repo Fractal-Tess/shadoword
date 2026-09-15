@@ -293,6 +293,7 @@ fn normalize_mode_scoped_recording(config: &mut DesktopConfig) {
     config.recording.transcription_mode = preferences.transcription_mode;
     config.recording.streaming_pcm_format = preferences.streaming_pcm_format;
     config.recording.english_only = preferences.english_only;
+    config.recording.custom_vocabulary = preferences.custom_vocabulary.clone();
     config.recording.sample_rate = 16_000;
 
     match config.mode {
@@ -337,6 +338,7 @@ impl DesktopSettings {
             transcription_mode: config.recording.transcription_mode,
             streaming_pcm_format: config.recording.streaming_pcm_format,
             english_only: config.recording.english_only,
+            custom_vocabulary: config.recording.custom_vocabulary.clone(),
             copy_to_clipboard: config.output.copy_to_clipboard,
             paste_method: config.output.paste_method,
             paste_delay_ms: config.output.paste_delay_ms,

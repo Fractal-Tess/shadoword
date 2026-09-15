@@ -5,6 +5,7 @@
     "preload_on_startup": true,
     "sample_rate": 16000,
     "english_only": false,
+    "custom_vocabulary": "",
     "whisper_accelerator": "cpu"
   },
   "queue_capacity": 4

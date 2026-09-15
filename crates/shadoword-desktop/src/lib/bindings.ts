@@ -194,6 +194,7 @@ export type DesktopSettings = {
 	transcription_mode: TranscriptionMode;
 	streaming_pcm_format: StreamingPcmFormat;
 	english_only: boolean;
+	custom_vocabulary: string;
 	copy_to_clipboard: boolean;
 	paste_method: PasteMethod;
 	paste_delay_ms: number;
@@ -220,6 +221,7 @@ export type DesktopSettingsInput = {
 	transcription_mode: TranscriptionMode;
 	streaming_pcm_format: StreamingPcmFormat;
 	english_only: boolean;
+	custom_vocabulary?: string;
 	copy_to_clipboard: boolean;
 	paste_method: PasteMethod;
 	paste_delay_ms: number;
@@ -450,6 +452,7 @@ export type RuntimeConfigDto_Deserialize = {
 	whisper_accelerator: WhisperAccelerator;
 	whisper_gpu_device: number;
 	english_only: boolean;
+	custom_vocabulary?: string;
 	preload_on_startup: boolean;
 	inference_pool?: InferencePoolConfig | null;
 	/**
@@ -465,6 +468,7 @@ export type RuntimeConfigDto_Serialize = {
 	whisper_accelerator: WhisperAccelerator;
 	whisper_gpu_device: number;
 	english_only: boolean;
+	custom_vocabulary: string;
 	preload_on_startup: boolean;
 	inference_pool?: InferencePoolConfig | null;
 	/**

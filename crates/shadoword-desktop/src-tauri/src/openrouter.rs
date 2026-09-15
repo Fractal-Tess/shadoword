@@ -161,6 +161,7 @@ impl OpenRouterClient {
         model: &str,
         wav: Vec<u8>,
         english_only: bool,
+        custom_vocabulary: &str,
     ) -> Result<OpenRouterTranscription, OpenRouterError> {
         validate_api_key(api_key)?;
         validate_model(model)?;
@@ -168,6 +169,7 @@ impl OpenRouterClient {
 
         let authorization = authorization_header(api_key)?;
 
+        let vocabulary = custom_vocabulary.trim();
         let request = TranscriptionRequest {
             model,
             input_audio: InputAudio {
@@ -175,6 +177,16 @@ impl OpenRouterClient {
                 format: "wav",
             },
             language: english_only.then_some("en"),
+            // OpenRouter ignores top-level `prompt`; hints use provider-native options.
+            provider: (!vocabulary.is_empty()).then_some(TranscriptionProvider {
+                options: VocabularyOptions {
+                    groq: VocabularyPrompt { prompt: vocabulary },
+                    openai: VocabularyPrompt { prompt: vocabulary },
+                    deepinfra: VocabularyInitialPrompt {
+                        initial_prompt: vocabulary,
+                    },
+                },
+            }),
         };
         let started_at = Instant::now();
         let response = self
@@ -203,6 +215,30 @@ struct TranscriptionRequest<'a> {
     input_audio: InputAudio,
     #[serde(skip_serializing_if = "Option::is_none")]
     language: Option<&'static str>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    provider: Option<TranscriptionProvider<'a>>,
+}
+
+#[derive(Serialize)]
+struct TranscriptionProvider<'a> {
+    options: VocabularyOptions<'a>,
+}
+
+#[derive(Serialize)]
+struct VocabularyOptions<'a> {
+    groq: VocabularyPrompt<'a>,
+    openai: VocabularyPrompt<'a>,
+    deepinfra: VocabularyInitialPrompt<'a>,
+}
+
+#[derive(Serialize)]
+struct VocabularyPrompt<'a> {
+    prompt: &'a str,
+}
+
+#[derive(Serialize)]
+struct VocabularyInitialPrompt<'a> {
+    initial_prompt: &'a str,
 }
 
 #[derive(Serialize)]

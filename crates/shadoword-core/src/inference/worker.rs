@@ -329,12 +329,14 @@ fn execute_job(
         samples,
         sample_rate: config.sample_rate,
     };
+    let vocabulary = config.custom_vocabulary.trim();
     let transcription = model
         .transcribe(
             &input,
             &TranscriptionOptions {
                 language: config.english_only.then(|| "en".to_string()),
                 translate_to_english: false,
+                initial_prompt: (!vocabulary.is_empty()).then(|| vocabulary.to_string()),
             },
         )
         .map_err(|error| InferenceError::WorkerFailed(error.message))?;

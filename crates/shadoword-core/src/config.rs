@@ -89,6 +89,7 @@ pub struct RecordingConfig {
     pub transcription_mode: TranscriptionMode,
     pub streaming_pcm_format: StreamingPcmFormat,
     pub english_only: bool,
+    pub custom_vocabulary: String,
 }
 
 impl Default for RecordingConfig {
@@ -99,6 +100,7 @@ impl Default for RecordingConfig {
             transcription_mode: TranscriptionMode::Batch,
             streaming_pcm_format: StreamingPcmFormat::F32le,
             english_only: false,
+            custom_vocabulary: String::new(),
         }
     }
 }
@@ -216,6 +218,8 @@ pub struct TranscriptionConfig {
     #[serde(default)]
     pub english_only: bool,
     #[serde(default)]
+    pub custom_vocabulary: String,
+    #[serde(default)]
     pub whisper_accelerator: WhisperAccelerator,
     #[serde(default = "default_whisper_gpu_device")]
     pub whisper_gpu_device: i32,
@@ -234,6 +238,7 @@ impl Default for TranscriptionConfig {
             preload_on_startup: default_preload_on_startup(),
             sample_rate: default_sample_rate(),
             english_only: false,
+            custom_vocabulary: String::new(),
             whisper_accelerator: WhisperAccelerator::Auto,
             whisper_gpu_device: default_whisper_gpu_device(),
             inference_pool: None,
@@ -286,6 +291,8 @@ pub struct ModeRecordingPreferences {
     pub transcription_mode: TranscriptionMode,
     pub streaming_pcm_format: StreamingPcmFormat,
     pub english_only: bool,
+    #[serde(default)]
+    pub custom_vocabulary: String,
 }
 
 impl From<&RecordingConfig> for ModeRecordingPreferences {
@@ -294,6 +301,7 @@ impl From<&RecordingConfig> for ModeRecordingPreferences {
             transcription_mode: recording.transcription_mode,
             streaming_pcm_format: recording.streaming_pcm_format,
             english_only: recording.english_only,
+            custom_vocabulary: recording.custom_vocabulary.clone(),
         }
     }
 }

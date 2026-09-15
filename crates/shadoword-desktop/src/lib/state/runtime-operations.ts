@@ -53,6 +53,7 @@ export class RuntimeOperations {
 			const { remote_token: remoteToken, openrouter_key: openRouterKey, ...settings } = input;
 			const savedSettings: DesktopSettings = {
 				...settings,
+				custom_vocabulary: settings.custom_vocabulary ?? '',
 				remote_token_configured:
 					remoteToken.action === 'set' ||
 					(remoteToken.action === 'keep' && (this.app.settings?.remote_token_configured ?? false)),
@@ -221,7 +222,8 @@ export class RuntimeOperations {
 				previous.whisper_accelerator !== input.whisper_accelerator ||
 				previous.whisper_gpu_device !== input.whisper_gpu_device ||
 				previous.sample_rate !== input.sample_rate ||
-				previous.english_only !== input.english_only
+				previous.english_only !== input.english_only ||
+				previous.custom_vocabulary !== input.custom_vocabulary
 			);
 		}
 		return false;
@@ -256,7 +258,8 @@ export class RuntimeOperations {
 			preload_on_startup: runtime.preload_on_startup,
 			whisper_accelerator: runtime.whisper_accelerator,
 			whisper_gpu_device: runtime.whisper_gpu_device,
-			english_only: runtime.english_only
+			english_only: runtime.english_only,
+			custom_vocabulary: runtime.custom_vocabulary ?? ''
 		};
 	}
 }

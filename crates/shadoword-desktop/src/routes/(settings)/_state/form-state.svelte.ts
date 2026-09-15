@@ -18,6 +18,7 @@ export class SettingsFormState {
 	transcriptionMode = $state<TranscriptionMode>('batch');
 	streamingPcmFormat = $state<StreamingPcmFormat>('f32le');
 	englishOnly = $state(false);
+	customVocabulary = $state('');
 	copyFinal = $state(true);
 	pasteMethod = $state<PasteMethod>('none');
 	pasteDelay = $state('120');
@@ -27,13 +28,18 @@ export class SettingsFormState {
 	showWindowTitleBar = $state(true);
 	#onChange: ChangeHandler = () => {};
 
-	constructor(settings: DesktopSettings, runtimeEnglishOnly?: boolean) {
+	constructor(
+		settings: DesktopSettings,
+		runtimeEnglishOnly?: boolean,
+		runtimeCustomVocabulary?: string
+	) {
 		this.microphone = settings.input_device ?? '';
 		this.shortcutMode = settings.hotkey_mode;
 		this.shortcut = settings.hotkey_shortcut.toUpperCase();
 		this.transcriptionMode = settings.transcription_mode;
 		this.streamingPcmFormat = settings.streaming_pcm_format;
 		this.englishOnly = runtimeEnglishOnly ?? settings.english_only;
+		this.customVocabulary = runtimeCustomVocabulary ?? settings.custom_vocabulary;
 		this.copyFinal = settings.copy_to_clipboard;
 		this.pasteMethod = settings.paste_method;
 		this.pasteDelay = String(settings.paste_delay_ms);
@@ -84,6 +90,12 @@ export class SettingsFormState {
 		if (this.englishOnly === value) return;
 		this.englishOnly = value;
 		this.#onChange(true);
+	}
+
+	setCustomVocabulary(value: string) {
+		if (this.customVocabulary === value) return;
+		this.customVocabulary = value;
+		this.#onChange();
 	}
 
 	setCopyFinal(value: boolean) {

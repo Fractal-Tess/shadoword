@@ -162,6 +162,7 @@ impl From<&DesktopConfig> for TranscriptionConfig {
             preload_on_startup: config.preload_on_startup,
             sample_rate: config.recording.sample_rate,
             english_only: config.recording.english_only,
+            custom_vocabulary: config.recording.custom_vocabulary.clone(),
             whisper_accelerator: config.whisper_accelerator,
             whisper_gpu_device: config.whisper_gpu_device,
             inference_pool: config.inference_pool.clone(),

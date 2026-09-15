@@ -54,6 +54,7 @@ pub struct OpenRouterStreamTarget {
     pub(crate) api_key: String,
     pub(crate) model: String,
     pub(crate) english_only: bool,
+    pub(crate) custom_vocabulary: String,
 }
 
 #[derive(Debug, Clone, Copy)]

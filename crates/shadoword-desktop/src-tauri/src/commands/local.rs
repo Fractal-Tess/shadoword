@@ -74,6 +74,7 @@ fn apply_local_runtime_config(current: &DesktopConfig, runtime: RuntimeConfigDto
     next.whisper_accelerator = runtime.whisper_accelerator;
     next.whisper_gpu_device = runtime.whisper_gpu_device;
     next.recording.english_only = runtime.english_only;
+    next.recording.custom_vocabulary = runtime.custom_vocabulary;
     next.preload_on_startup = runtime.preload_on_startup;
     let unchanged_legacy_pool = runtime.inference_pool_explicit.is_none()
         && current.inference_pool.is_none()
@@ -97,6 +98,7 @@ fn apply_local_runtime_config(current: &DesktopConfig, runtime: RuntimeConfigDto
             }
         }
     }
+    store_mode_recording(&mut next, ServiceMode::Local);
     next
 }
 

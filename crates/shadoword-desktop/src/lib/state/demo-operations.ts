@@ -18,7 +18,8 @@ export function demoOverviewForSettings(settings: DesktopSettings, overview: Ove
 			preload_on_startup: settings.preload_on_startup,
 			whisper_accelerator: settings.whisper_accelerator,
 			whisper_gpu_device: settings.whisper_gpu_device,
-			english_only: settings.english_only
+			english_only: settings.english_only,
+			custom_vocabulary: settings.custom_vocabulary
 		}
 	} satisfies OverviewDto;
 }

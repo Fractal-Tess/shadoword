@@ -22,6 +22,7 @@ pub struct DesktopSettings {
     pub transcription_mode: TranscriptionMode,
     pub streaming_pcm_format: StreamingPcmFormat,
     pub english_only: bool,
+    pub custom_vocabulary: String,
     pub copy_to_clipboard: bool,
     pub paste_method: PasteMethod,
     #[specta(type = u32)]
@@ -50,6 +51,8 @@ pub struct DesktopSettingsInput {
     pub transcription_mode: TranscriptionMode,
     pub streaming_pcm_format: StreamingPcmFormat,
     pub english_only: bool,
+    #[serde(default)]
+    pub custom_vocabulary: String,
     pub copy_to_clipboard: bool,
     pub paste_method: PasteMethod,
     #[specta(type = u32)]

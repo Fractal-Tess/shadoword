@@ -107,6 +107,24 @@ derivation rather than selecting an unsupported version option.
 Runnable flake apps are available as `apps.<system>.default` (the CPU
 `shadoword-api`) and `apps.<system>.shadoword-desktop` (the CPU desktop).
 
+## Custom vocabulary
+
+Open **Transcription → Custom vocabulary**, type a correct spelling such as
+`reranker`, and press **Space** or **Enter** to add it. Each word becomes a chip;
+click its **×** to remove it. Changes save automatically. Remove every word to
+disable hints.
+
+Use **Filter vocabulary** to find saved words. Filtering only changes the view,
+not the hints sent to the model. You can also paste a comma- or newline-separated
+list to add several words at once.
+
+Whisper uses the text as an initial prompt, not a replacement dictionary. Keep
+the list short; prompt context is limited and hints do not guarantee a spelling.
+Local settings stay on the desktop. In Shadoword API mode, vocabulary is saved
+on the daemon and applies to its clients. API administrators can also set
+`custom_vocabulary` through `/v1/config` or `transcription.custom_vocabulary`
+in `api.json`. OpenRouter receives provider-specific hints for Groq, OpenAI,
+and DeepInfra; support depends on the model and provider.
 ## Develop
 
 CPU Whisper is the default backend:

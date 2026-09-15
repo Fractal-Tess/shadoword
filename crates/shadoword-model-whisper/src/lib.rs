@@ -194,6 +194,15 @@ impl Model for WhisperModel {
         input: &AudioInput,
         options: &TranscriptionOptions,
     ) -> SharedResult<Transcription> {
+        if options
+            .initial_prompt
+            .as_deref()
+            .is_some_and(|prompt| prompt.contains('\0'))
+        {
+            return Err(ModelError {
+                message: "Whisper initial prompt cannot contain null characters".to_string(),
+            });
+        }
         let result = self.with_engine_mut(|engine| {
             engine
                 .transcribe_with(
@@ -201,6 +210,7 @@ impl Model for WhisperModel {
                     &WhisperInferenceParams {
                         language: options.language.clone(),
                         translate: options.translate_to_english,
+                        initial_prompt: options.initial_prompt.clone(),
                         n_threads: self
                             .cpu_threads
                             .and_then(|threads| i32::try_from(threads).ok())

@@ -35,6 +35,9 @@ pub struct Transcription {
 pub struct TranscriptionOptions {
     pub language: Option<String>,
     pub translate_to_english: bool,
+    /// Context or vocabulary hints for recognition, not output replacement rules.
+    #[serde(default)]
+    pub initial_prompt: Option<String>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]

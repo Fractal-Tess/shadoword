@@ -269,6 +269,7 @@ async fn finish_batch(
                     &active.config.openrouter.model,
                     wav,
                     active.config.recording.english_only,
+                    &active.config.recording.custom_vocabulary,
                 )
                 .await
                 .map_err(openrouter_error)?;
@@ -481,6 +482,7 @@ fn transcription_target(
                 .ok_or_else(openrouter_key_required)?,
             model: config.openrouter.model.clone(),
             english_only: config.recording.english_only,
+            custom_vocabulary: config.recording.custom_vocabulary.clone(),
         })),
     }
 }

@@ -42,6 +42,7 @@ export function buildDesktopSettingsInput(
 		input_device: settings.input_device,
 		sample_rate: settings.sample_rate,
 		english_only: settings.english_only,
+		custom_vocabulary: settings.custom_vocabulary,
 		copy_to_clipboard: settings.copy_to_clipboard,
 		paste_method: settings.paste_method,
 		paste_delay_ms: settings.paste_delay_ms,

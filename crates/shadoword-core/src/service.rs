@@ -262,9 +262,11 @@ impl LocalService {
         Self::log_backend_request(&config, "transcribe");
         let inference_start = Instant::now();
 
+        let vocabulary = config.custom_vocabulary.trim();
         let options = TranscriptionOptions {
             language: config.english_only.then(|| "en".to_string()),
             translate_to_english: false,
+            initial_prompt: (!vocabulary.is_empty()).then(|| vocabulary.to_string()),
         };
         let model_input = AudioInput {
             samples: audio,

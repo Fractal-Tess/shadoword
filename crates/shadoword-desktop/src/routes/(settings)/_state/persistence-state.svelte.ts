@@ -142,14 +142,20 @@ export class SettingsPersistenceState {
 		this.error = '';
 		const draft = this.#draft();
 		const input = settingsInputFromDraft(settings, draft);
-		const remoteEnglishChanged =
-			input.mode === 'remote' && this.#app.overview?.runtime.english_only !== draft.englishOnly;
+		const remoteRecognitionChanged =
+			input.mode === 'remote' &&
+			(this.#app.overview?.runtime.english_only !== draft.englishOnly ||
+				this.#app.overview?.runtime.custom_vocabulary !== draft.customVocabulary);
 		try {
 			await this.#app.saveSettings(input);
-			if (remoteEnglishChanged && this.#app.overview) {
+			if (remoteRecognitionChanged) {
+				if (!this.#app.overview) {
+					throw new Error('Connect to the Shadoword API to save recognition settings.');
+				}
 				await this.#app.updateRuntime({
 					...this.#app.overview.runtime,
-					english_only: draft.englishOnly
+					english_only: draft.englishOnly,
+					custom_vocabulary: draft.customVocabulary
 				});
 			}
 			this.#savedRevision = revision;
@@ -200,6 +206,7 @@ export class SettingsPersistenceState {
 			transcriptionMode: this.#form.transcriptionMode,
 			streamingPcmFormat: this.#form.streamingPcmFormat,
 			englishOnly: this.#form.englishOnly,
+			customVocabulary: this.#form.customVocabulary,
 			copyFinal: this.#form.copyFinal,
 			pasteMethod: this.#form.pasteMethod,
 			pasteDelay: this.#form.pasteDelay,

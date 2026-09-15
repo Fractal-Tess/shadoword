@@ -22,7 +22,11 @@ export class SettingsContextState {
 		if (!settings) throw new Error('Desktop settings must be loaded before opening settings.');
 		this.app = app;
 		this.#navigate = navigate;
-		this.form = new SettingsFormState(settings, app.overview?.runtime.english_only);
+		this.form = new SettingsFormState(
+			settings,
+			app.overview?.runtime.english_only,
+			settings.mode === 'remote' ? app.overview?.runtime.custom_vocabulary : undefined
+		);
 		this.remote = new RemoteSettingsState(app, settings);
 		this.remoteTokens = new RemoteTokenSettingsState(app);
 		this.openRouter = new OpenRouterSettingsState(app, settings);

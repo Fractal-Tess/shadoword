@@ -54,6 +54,8 @@ pub struct RuntimeConfigDto {
     pub whisper_accelerator: WhisperAccelerator,
     pub whisper_gpu_device: i32,
     pub english_only: bool,
+    #[serde(default)]
+    pub custom_vocabulary: String,
     pub preload_on_startup: bool,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub inference_pool: Option<InferencePoolConfig>,

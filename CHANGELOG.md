@@ -9,11 +9,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 ### Added
 
 - Added `apps.<system>.default` for the CPU API, `apps.<system>.shadoword-desktop` for the CPU desktop, and a Home Manager module for `services.shadoword-desktop`.
-
-### Changed
-
-- Added `autoStart` to the NixOS API service and Home Manager desktop service. `false` retains the unit for manual starts without adding target startup edges.
-- Desktop and API service modules now document explicit package overrides, user/system scopes, environment handling, and supported extra arguments.
+- Custom vocabulary in Transcription settings, with removable word chips and case-insensitive filtering. Space or Enter adds a word. Correct spellings are saved automatically and supplied as recognition hints to local Whisper, the Shadoword API daemon, and supported OpenRouter providers for batch and segmented transcription. Removing all words disables hints; filtering does not change the hints sent to the model, and no text replacement rules are applied.
 
 ## [0.14.1] - 2026-09-05
 

@@ -13,6 +13,9 @@ pub(super) fn apply_settings(
             "GPU device must be -1 (automatic) or a non-negative device id"
         ));
     }
+    if input.custom_vocabulary.contains('\0') {
+        return Err(anyhow!("custom vocabulary cannot contain null characters"));
+    }
     let previous_mode = config.mode;
     config.model_path = PathBuf::from(input.model_path.trim());
     config.preload_on_startup = input.preload_on_startup;
@@ -49,6 +52,7 @@ pub(super) fn apply_settings(
     config.recording.transcription_mode = input.transcription_mode;
     config.recording.streaming_pcm_format = input.streaming_pcm_format;
     config.recording.english_only = input.english_only;
+    config.recording.custom_vocabulary = input.custom_vocabulary;
     store_mode_recording(config, previous_mode);
     config.mode = input.mode;
     normalize_mode_scoped_recording(config);
@@ -106,6 +110,7 @@ pub(super) fn local_transcription_config(config: &DesktopConfig) -> Transcriptio
         preload_on_startup: config.preload_on_startup,
         sample_rate: config.recording.sample_rate,
         english_only: config.recording.english_only,
+        custom_vocabulary: config.recording.custom_vocabulary.clone(),
         whisper_accelerator: config.whisper_accelerator,
         whisper_gpu_device: config.whisper_gpu_device,
         inference_pool: config.inference_pool.clone(),
@@ -205,6 +210,11 @@ pub(super) fn reload_local_candidate(
 }
 
 pub(super) fn validate_runtime(runtime: &RuntimeConfigDto) -> CommandResult<()> {
+    if runtime.custom_vocabulary.contains('\0') {
+        return Err(config_error(anyhow!(
+            "custom vocabulary cannot contain null characters"
+        )));
+    }
     if runtime.whisper_gpu_device < -1 {
         return Err(config_error(anyhow!(
             "GPU device must be -1 (automatic) or a non-negative device id"
@@ -294,6 +304,7 @@ pub(super) fn local_overview(state: &DesktopState) -> CommandResult<OverviewDto>
                 whisper_accelerator: config.whisper_accelerator,
                 whisper_gpu_device: config.whisper_gpu_device,
                 english_only: config.recording.english_only,
+                custom_vocabulary: config.recording.custom_vocabulary.clone(),
                 preload_on_startup: config.preload_on_startup,
                 inference_pool: Some(effective_pool),
                 inference_pool_explicit: Some(config.inference_pool.is_some()),

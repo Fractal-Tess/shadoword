@@ -22,6 +22,7 @@ export type SettingsDraft = {
 	readonly transcriptionMode: TranscriptionMode;
 	readonly streamingPcmFormat: StreamingPcmFormat;
 	readonly englishOnly: boolean;
+	readonly customVocabulary: string;
 	readonly copyFinal: boolean;
 	readonly pasteMethod: PasteMethod;
 	readonly pasteDelay: string;
@@ -47,6 +48,7 @@ export function settingsInputFromDraft(settings: DesktopSettings, draft: Setting
 		transcription_mode: draft.transcriptionMode,
 		streaming_pcm_format: draft.streamingPcmFormat,
 		english_only: draft.englishOnly,
+		custom_vocabulary: draft.customVocabulary,
 		copy_to_clipboard: draft.copyFinal,
 		paste_method: draft.pasteMethod,
 		paste_delay_ms: Number(draft.pasteDelay),
