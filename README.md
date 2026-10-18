@@ -1,281 +1,68 @@
-# Shadoword
-
 <p align="center">
-  <img src="shadoword-logo.svg" alt="Shadoword waveform mark" width="220">
+  <img src="assets/logo.svg" alt="Shadoword" width="160" />
 </p>
 
-Private speech-to-text for Linux. Hold a shortcut, speak, and send the transcript to the active application.
+<p align="center">
+  <a href="https://github.com/Fractal-Tess/shadoword/releases"><img src="https://img.shields.io/github/v/release/Fractal-Tess/shadoword?color=e6202c" alt="Latest release" /></a>
+  <a href="https://github.com/Fractal-Tess/shadoword/actions/workflows/ci.yml"><img src="https://github.com/Fractal-Tess/shadoword/actions/workflows/ci.yml/badge.svg" alt="CI" /></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-2b2b2b.svg" alt="MIT license" /></a>
+</p>
 
-Shadoword supports three execution modes:
+<h1 align="center">Shadoword</h1>
 
-- **Local** — offline Whisper inference on your machine
-- **Shadoword API** — self-hosted transcription from another machine
-- **OpenRouter** — optional direct, batch-only transcription
+<p align="center">
+  <img src="assets/screenshots/hero.webp" alt="Shadoword recording with local Whisper and streaming a dictated note into the working text, with the transcript history in front" width="100%" />
+</p>
 
-The desktop is built with Tauri 2 and SvelteKit. Audio capture, inference, credentials, hotkeys, tray behavior, and text delivery remain in Rust.
+<p align="center">
+  Private speech-to-text for Linux. Hold a shortcut, speak, and the text lands in whatever app has focus.
+</p>
 
-## Install
+Most dictation tools send your voice to someone else's server. Shadoword runs Whisper on your own machine by default, on the CPU or a CUDA or Vulkan GPU. If your laptop is too slow for that, point it at a Shadoword daemon on a bigger box you own. It is a Tauri 2 desktop app; audio capture, inference, hotkeys, the tray, and typing the result all happen in Rust, so the webview never touches your microphone or credentials.
 
-Download the Linux desktop archive from [GitHub Releases](https://github.com/Fractal-Tess/shadoword/releases):
+- **Dictate** anywhere with a global push-to-talk or toggle shortcut. Text is typed directly, pasted, or copied to the clipboard.
+- **Choose** where inference runs: local Whisper, a self-hosted Shadoword API daemon, or OpenRouter when you want a hosted model.
+- **Stream** long dictation in pause-separated segments, and steer spelling with a custom vocabulary list.
 
-```text
-shadoword-desktop-x86_64-linux.tar.gz
-shadoword-desktop-cuda-x86_64-linux.tar.gz
-shadoword-desktop-vulkan-x86_64-linux.tar.gz
-```
+## Quick start
 
-All desktop archives install the `shadoword` command. Choose the CUDA or Vulkan archive for accelerated local inference. Each release also includes `SHA256SUMS` and matching CPU, CUDA, and Vulkan API daemon archives.
-
-Nix source packages are also available:
-
-```bash
-nix build github:Fractal-Tess/shadoword#shadoword-desktop-source
-nix build github:Fractal-Tess/shadoword#shadoword-desktop-cuda-source
-nix build github:Fractal-Tess/shadoword#shadoword-desktop-vulkan-source
-nix build github:Fractal-Tess/shadoword#shadoword-api-source
-```
-
-## NixOS
-
-The flake exposes `nixosModules.default`, which runs the daemon and puts the
-`shadoword-api` CLI on the system path pointed at the service's own config file:
-
-```nix
-{
-  inputs.shadoword.url = "github:Fractal-Tess/shadoword";
-
-  # in your nixosSystem modules:
-  imports = [ inputs.shadoword.nixosModules.default ];
-
-  services.shadoword-api = {
-    enable = true;
-    variant = "cuda";                              # "cpu" (default), "cuda", or "vulkan"
-    listenAddress = "0.0.0.0";
-    initTokenFile = config.sops.secrets.shadoword_admin_token.path;
-  };
-}
-```
-
-`variant` picks the matching prebuilt release archive, so enabling the CUDA build
-does not compile it locally and does not push `allowUnfree` onto the host's
-nixpkgs. `package` overrides the choice outright. Without `initTokenFile`, issue
-the first token by hand:
+Download the desktop archive for your hardware from [Releases](https://github.com/Fractal-Tess/shadoword/releases): `shadoword-desktop-x86_64-linux.tar.gz` for CPU, or the `-cuda` or `-vulkan` variant for GPU inference. On Nix:
 
 ```bash
-sudo -u shadoword shadoword-api token generate admin "desktop administrator"
-sudo systemctl restart shadoword-api
+nix run github:Fractal-Tess/shadoword#shadoword-desktop
 ```
 
-`services.shadoword-api.autoStart` defaults to `true`; set it to `false` to
-keep the hardened system unit available for manual starts without adding the
-`multi-user.target` startup edge. The service's `environment` and `extraArgs`
-options are passed to the daemon, while `package` defaults to the flake's
-tested `packages.<system>.shadoword-api` output selected by `variant`.
+Open **Models**, download Whisper Large v3 Turbo (the recommended model, 1.5 GiB), then hold **F2** and talk. Release the key and the transcript is typed into the focused window. Change the shortcut under **Capture**.
 
-For a per-user graphical client, import
-`inputs.shadoword.homeManagerModules.default`. It exposes
-`services.shadoword-desktop` with `enable`, `package`, `autoStart`,
-`environment`, and `extraArgs`. The package defaults to the tested CPU desktop
-output, and the module installs it with Home Manager and starts it after the
-graphical session has initialized:
-
-```nix
-{
-  imports = [ inputs.shadoword.homeManagerModules.default ];
-
-  services.shadoword-desktop = {
-    enable = true;
-    autoStart = true;
-    package = inputs.shadoword.packages.${pkgs.system}.shadoword-desktop;
-    environment = {
-      # User-session overrides belong here when needed.
-    };
-  };
-}
-```
-
-Use `services.shadoword-api` through NixOS for the system daemon, its
-`shadoword` service account, firewall and GPU-group integration. Use
-`services.shadoword-desktop` through Home Manager for a user's desktop
-session; neither module generates or overwrites the desktop's mutable
-settings. Override `package` explicitly to pin a different release or local
-derivation rather than selecting an unsupported version option.
-
-`overlays.default` is also available if you would rather reach the builds as
-`pkgs.shadoword-api`, `pkgs.shadoword-api-cuda`, or `pkgs.shadoword-desktop`.
-
-Runnable flake apps are available as `apps.<system>.default` (the CPU
-`shadoword-api`) and `apps.<system>.shadoword-desktop` (the CPU desktop).
-
-## Custom vocabulary
-
-Open **Transcription → Custom vocabulary**, type a correct spelling such as
-`reranker`, and press **Space** or **Enter** to add it. Each word becomes a chip;
-click its **×** to remove it. Changes save automatically. Remove every word to
-disable hints.
-
-Use **Filter vocabulary** to find saved words. Filtering only changes the view,
-not the hints sent to the model. You can also paste a comma- or newline-separated
-list to add several words at once.
-
-Whisper uses the text as an initial prompt, not a replacement dictionary. Keep
-the list short; prompt context is limited and hints do not guarantee a spelling.
-Local settings stay on the desktop. In Shadoword API mode, vocabulary is saved
-on the daemon and applies to its clients. API administrators can also set
-`custom_vocabulary` through `/v1/config` or `transcription.custom_vocabulary`
-in `api.json`. OpenRouter receives provider-specific hints for Groq, OpenAI,
-and DeepInfra; support depends on the model and provider.
-## Develop
-
-CPU Whisper is the default backend:
-
-```bash
-cargo build
-cargo run -p shadoword-api
-
-cd crates/shadoword-desktop
-bun install
-bun run tauri dev
-```
-
-Vulkan:
-
-```bash
-nix develop
-cd crates/shadoword-desktop
-bun run tauri dev -- --features whisper-vulkan
-```
-
-CUDA:
-
-```bash
-nix develop .#cuda
-cd crates/shadoword-desktop
-bun run tauri dev -- --features whisper-cuda
-```
-
-## Shadoword API
-
-Every request needs a token, on loopback as much as anywhere else. A daemon with
-no tokens refuses to start, so generate the first one before the first run:
+To run inference on another machine, start the daemon there and connect the desktop to it under **Execution**:
 
 ```bash
 shadoword-api token generate admin "desktop administrator"
-shadoword-api token generate user "transcription client"
-shadoword-api token list
-shadoword-api token revoke "transcription client"
-```
-
-Token secrets are printed once. Only SHA-256 hashes are stored in the API configuration.
-
-Where running the CLI first is awkward — containers, or a NixOS unit fed by a
-secret manager — set `SHADOWORD_INIT_TOKEN_FILE` to a file holding an admin token,
-or `SHADOWORD_INIT_TOKEN` to the value itself. Prefer the file: an environment
-variable is readable by anything that can see the process. Either one is adopted
-only while the daemon has no tokens, so a restart never resurrects a token you
-revoked on purpose.
-
-The CLI edits the config file, so a running daemon has to be restarted to pick up its
-changes. An admin token can instead manage tokens over HTTP, which takes effect
-immediately and needs no restart:
-
-```bash
-curl -H "Authorization: Bearer $ADMIN_TOKEN" http://127.0.0.1:47813/v1/tokens
-curl -H "Authorization: Bearer $ADMIN_TOKEN" -H 'content-type: application/json' \
-  -d '{"name":"transcription client","role":"user"}' http://127.0.0.1:47813/v1/tokens
-curl -X DELETE -H "Authorization: Bearer $ADMIN_TOKEN" \
-  "http://127.0.0.1:47813/v1/tokens/transcription%20client"
-```
-
-Shadoword Desktop exposes the same three operations under Settings → Runtime when it is
-connected to a daemon with an admin token.
-
-- **Admin tokens** can manage tokens, models, downloads, configuration, and transcription.
-- **User tokens** can only submit batch or streaming transcription requests.
-- The last remaining admin token cannot be revoked, so a daemon cannot lock itself out.
-- `GET /health` and `GET /v1/version` are public.
-
-Start the daemon and download the default Turbo model when needed:
-
-```bash
 shadoword-api --download-model turbo
 ```
 
-Main endpoints:
+[INSTALL.md](INSTALL.md) covers the NixOS and Home Manager modules, Docker images, and the daemon's tokens and endpoints.
 
-```text
-GET    /health
-GET    /v1/version
-POST   /v1/transcribe-wav
-GET    /v1/stream
-GET    /v1/overview
-GET    /v1/models
-GET    /v1/tokens
-POST   /v1/tokens
-DELETE /v1/tokens/{name}
-```
+## A closer look
 
-Use `shadoword-api --help` for configuration, model, and request-recording options.
+<table>
+  <tr>
+    <td><img src="assets/screenshots/models.webp" alt="Models page listing the Whisper catalog, with Large v3 Turbo selected and Base and Large v3 installed" /></td>
+    <td><img src="assets/screenshots/vocabulary.webp" alt="Transcription settings with English-only recognition, streaming segments, and a custom vocabulary of eight words" /></td>
+  </tr>
+  <tr>
+    <td colspan="2"><img src="assets/screenshots/execution.webp" alt="Local runtime settings showing CPU and Vulkan backends built, two detected AMD GPUs, and a one-unit execution pool" /></td>
+  </tr>
+</table>
 
-## Docker
+## Custom vocabulary
 
-CPU, CUDA, and Vulkan daemon images are published to both `ghcr.io/fractal-tess/shadoword-backend` and `vgfractal/shadoword-backend` on Docker Hub.
+Under **Transcription → Custom vocabulary**, type a word such as `reranker` and press Space or Enter to add it. Whisper gets the list as its initial prompt, so it nudges spelling rather than replacing words. Keep it short. In Shadoword API mode the list is stored on the daemon and applies to all its clients.
 
-| Backend | Rolling tag | Versioned tag |
-| --- | --- | --- |
-| CPU | `latest` or `cpu` | `<version>` or `<version>-cpu` |
-| CUDA | `cuda` | `<version>-cuda` |
-| Vulkan | `vulkan` | `<version>-vulkan` |
+## More
 
-Mount persistent configuration and model directories at `/config` and `/data`; both are declared volumes, and an unmounted `/config` loses every token the daemon was given when the container is replaced. Start from [`docker/config/shadoword/api.json.example`](docker/config/shadoword/api.json.example), using `"cpu"` for the CPU image and `"gpu"` for CUDA or Vulkan.
+- [INSTALL.md](INSTALL.md): release archives, Nix, NixOS and Home Manager modules, Docker, and the Shadoword API.
+- [CONTRIBUTING.md](CONTRIBUTING.md): development setup, checks, workspace layout, and how the README images are made.
+- [CHANGELOG.md](CHANGELOG.md): release history.
 
-Seed the first admin token with a Docker secret:
-
-```yaml
-services:
-  shadoword-api:
-    image: ghcr.io/fractal-tess/shadoword-backend:cuda
-    environment:
-      SHADOWORD_INIT_TOKEN_FILE: /run/secrets/shadoword_admin_token
-    secrets: [shadoword_admin_token]
-    volumes:
-      - ./config:/config
-      - ./data:/data
-    ports: ["47813:47813"]
-```
-
-CUDA requires the NVIDIA Container Toolkit and `--gpus all`. Vulkan on AMD or Intel requires the render device, for example `--device /dev/dri`, plus access to the device's host group.
-
-The container images are reproducible Flake outputs built directly from the Nix package closures without a mutable distribution base image or `apt-get`. To build and load a variant locally:
-
-```bash
-image=$(nix build .#shadoword-container-cpu --no-link --print-out-paths) # or -cuda / -vulkan
-docker load < "$image"
-```
-
-Release automation reuses the exact CPU, CUDA, and Vulkan API derivations for the binary archives and their corresponding layered container images.
-
-## Checks
-
-```bash
-cargo check --workspace --all-targets
-cargo fmt --all -- --check
-cargo clippy --workspace --all-targets -- -D warnings
-
-cd crates/shadoword-desktop
-bun run generate:bindings
-bun run check
-bun run lint
-bun run build
-```
-
-## Workspace
-
-- `crates/shadoword-core` — audio, configuration, models, and transcription orchestration
-- `crates/shadoword-model-whisper` — Whisper backend
-- `crates/shadoword-shared` — shared model contracts
-- `crates/shadoword-desktop` — Tauri and SvelteKit desktop
-- `crates/shadoword-api` — HTTP and WebSocket daemon
-- `website` — public website
-
-See [`CHANGELOG.md`](CHANGELOG.md) for release history and [`crates/shadoword-desktop/README.md`](crates/shadoword-desktop/README.md) for desktop-specific development notes.
+Shadoword is released under the [MIT license](LICENSE).
